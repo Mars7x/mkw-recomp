@@ -79,6 +79,7 @@ pub fn run(root: &Path) -> Result<()> {
                     row["requires_floating_backend"] = json!(ir.iter().any(|i| matches!(
                         i.op,
                         mkw_arm64::Op::Floating(_)
+                            | mkw_arm64::Op::VectorCompare(_)
                             | mkw_arm64::Op::VectorFp(_)
                             | mkw_arm64::Op::Convert(_)
                             | mkw_arm64::Op::ConditionalFloat { .. }
@@ -113,6 +114,7 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::FloatSelect { .. } => features.push("fp_conditional_select"),
                             Op::Convert(_) => features.push("fp_integer_conversion"),
                             Op::ConditionalFloat { .. } => features.push("conditional_fp_compare"),
+                            Op::VectorCompare(_) => features.push("simd_fp_comparison"),
                             Op::VectorFp(v) => {
                                 features.push("vector_fp");
                                 if matches!(

@@ -8,6 +8,7 @@ mod integer;
 mod memory;
 mod simd;
 mod structures;
+mod vector_compare;
 mod vector_fp;
 use mkw_arm64::{Instruction, MemoryOrder, Op, Reg, Width};
 fn r(reg: Reg) -> String {
@@ -42,6 +43,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("atomics.rs"),
     include_str!("floating.rs"),
     include_str!("vector_fp.rs"),
+    include_str!("vector_compare.rs"),
     include_str!("../../../native/cpu.h"),
     include_str!("../../../native/fp.c"),
     include_str!("../../../native/convert.c"),
@@ -89,6 +91,10 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
         let next = format!("goto L_{:x};\n", i.pc + 4);
         match i.op {
             Op::Nop => out += &next,
+            Op::VectorCompare(op) => {
+                out += &vector_compare::emit(op);
+                out += &next;
+            }
             Op::VectorFp(op) => {
                 out += &vector_fp::emit(op);
                 out += &next;

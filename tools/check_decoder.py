@@ -154,6 +154,13 @@ for q in range(2):
       for size in range(4):
        for rm in [0,2,31]:
         for rt,rn in [(0,1),(31,31),(0,2)]:words.add(0x0d000000|(q<<30)|(post<<23)|(load<<22)|(r<<21)|(rm<<16)|(opcode<<13)|(lane_s<<12)|(size<<10)|(rn<<5)|rt)
+for scalar in range(2):
+ for q in range(2):
+  for size in range(2):
+   for base in [0x0e20e400,0x2e20e400,0x2ea0e400,0x2e20ec00,0x2ea0ec00]:
+    for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+   for base in [0x0ea0d800,0x2ea0c800,0x0ea0c800,0x2ea0d800,0x0ea0e800]:
+    for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -166,7 +173,13 @@ for row in rows:
  word=row['word'];decoded=list(decoder.disasm(word.to_bytes(4,'little'),0x1000));op=row['instruction']['op'];kind=next(iter(op))if isinstance(op,dict)else op;counts[kind]+=1
  if len(decoded)!=1:errors.append({'word':hex(word),'error':'accepted encoding not decoded by Capstone'});continue
  ins=decoded[0]
- if kind=='Structure':
+ if kind=='VectorCompare':
+  v=op['VectorCompare'];expected={'Equal':'fcmeq','GreaterEqual':'facge' if v['absolute'] else 'fcmge','Greater':'facgt' if v['absolute'] else 'fcmgt','LessEqual':'fcmle','Less':'fcmlt'}[v['relation']]
+  if ins.mnemonic!=expected:errors.append({'word':hex(word),'error':'SIMD FP comparison relation differs','reference':ins.mnemonic+' '+ins.op_str})
+  scalar=bool(word&(1<<28));size=8 if word&(1<<22) else 4;total=size if scalar else 16 if word&(1<<30) else 8
+  if (v['bytes'],v['total'])!=(size,total):errors.append({'word':hex(word),'error':'SIMD FP comparison width differs','reference':ins.op_str})
+  if (v['rhs'] is None)!=('#0.0' in ins.op_str):errors.append({'word':hex(word),'error':'SIMD FP compare-zero differs','reference':ins.op_str})
+ elif kind=='Structure':
   v=op['Structure'];expected='ld1r' if v['replicate'] else 'ld1' if v['load'] else 'st1'
   if ins.mnemonic!=expected:errors.append({'word':hex(word),'error':'single structure family differs','reference':ins.mnemonic+' '+ins.op_str})
   if v['replicate']:
