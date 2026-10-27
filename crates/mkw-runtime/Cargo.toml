@@ -1,0 +1,13 @@
+[package]
+name = "mkw-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+[dependencies]
+mkw-formats = { path = "../mkw-formats" }
+serde.workspace = true
+libloading.workspace = true
+[dev-dependencies]
+mkw-arm64 = { path = "../mkw-arm64" }
+mkw-codegen = { path = "../mkw-codegen" }
+serde_json.workspace = true

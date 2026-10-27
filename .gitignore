@@ -1,0 +1,6 @@
+/base/
+/private/
+/target/
+/.venv/
+__pycache__/
+*.pyc

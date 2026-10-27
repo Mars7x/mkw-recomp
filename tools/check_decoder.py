@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Cross-check independently authored encoding cases with optional private Capstone.
+This checks decoding/classification, not instruction execution or hardware behavior.
+"""
+from pathlib import Path
+import sys,json,subprocess,collections
+root=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(root/'private/tools/python'))
+from capstone import Cs,CS_ARCH_ARM64,CS_MODE_LITTLE_ENDIAN,__version__
+words=set()
+for vector in range(2):
+ for size in range(4):
+  for opc in range(4):
+   for registers in [(0,1),(31,31),(1,1)]:
+    rt,rn=registers
+    body=(size<<30)|(vector<<26)|(opc<<22)|(rn<<5)|rt
+    words.add(0x39000000|body|(5<<10))
+    for mode in range(4):words.add(0x38000000|body|(0x1f0<<12)|(mode<<10))
+    for option in range(8):
+     for scaled in range(2):words.add(0x38200800|body|(2<<16)|(option<<13)|(scaled<<12))
+ for opc in range(4):
+  for mode in range(4):
+   for load in range(2):words.add(0x28000000|(opc<<30)|(vector<<26)|(mode<<23)|(load<<22)|(0x7e<<15)|(1<<10)|(31<<5))
+for sf in range(2):
+ for n in range(2):
+  for r in range(64):
+   for s in range(64):
+    words.add(0x12000000|(sf<<31)|(n<<22)|(r<<16)|(s<<10)|(1<<5))
+    words.add(0x13000000|(sf<<31)|(n<<22)|(r<<16)|(s<<10)|(1<<5))
+for vector in range(2):
+ for opc in range(4):words.add(0x18000000|(vector<<26)|(opc<<30)|(4<<5))
+for sf in range(2):
+ for sub in range(2):
+  for immediate in range(2):
+   for condition in range(16):
+    for nzcv in range(16):
+     for rn in [1,31]:
+      for rhs in [2,31]:words.add(0x3a400000|(sf<<31)|(sub<<30)|(immediate<<11)|(condition<<12)|(rhs<<16)|(rn<<5)|nzcv)
+ for group in range(8):
+  for sub in range(2):
+   for acc in [0,31]:
+    for rn in [1,31]:words.add(0x1b000000|(sf<<31)|(group<<21)|(sub<<15)|(2<<16)|(acc<<10)|(rn<<5))
+ for signed in range(2):
+  for rn in [1,31]:words.add(0x1ac00800|(sf<<31)|(signed<<10)|(2<<16)|(rn<<5))
+for rn in range(32):words.add(0xd61f0000|(rn<<5))
+for q in range(2):
+ for op in range(2):
+  for o2 in range(2):
+   for mode in range(16):
+    for imm in range(256):words.add(0x0f000400|(q<<30)|(op<<29)|(o2<<11)|(mode<<12)|((imm>>5)<<16)|((imm&31)<<5))
+ for op in range(2):
+  for imm5 in range(32):
+   for imm4 in range(16):words.add(0x0e000400|(q<<30)|(op<<29)|(imm5<<16)|(imm4<<11)|(1<<5))
+ for op in range(8):
+  for rn,rm in [(1,2),(0,0),(31,31)]:words.add(0x0e201c00|(q<<30)|((op>>2)<<29)|((op&3)<<22)|(rm<<16)|(rn<<5))
+ for offset in range(16):words.add(0x2e000000|(q<<30)|(2<<16)|(offset<<11)|(1<<5))
+for imm5 in range(32):
+ for imm4 in range(16):words.add(0x5e000400|(imm5<<16)|(imm4<<11)|(1<<5))
+for ftype in range(4):
+ words.add(0x1e204020|(ftype<<22))
+ for imm in range(256):words.add(0x1e201000|(ftype<<22)|(imm<<13))
+ for sf in range(2):
+  for rmode in range(4):
+   for direction in range(2):words.add(0x1e260020|(ftype<<22)|(sf<<31)|(rmode<<19)|(direction<<16))
+for size in range(4):
+ for order in range(4):
+  for operation in range(16):
+   for rs,rt in [(0,1),(31,31),(1,31),(31,1)]:
+    for rn in [0,31]:words.add(0x38200000|(size<<30)|((order&1)<<23)|((order>>1)<<22)|(operation<<12)|(rs<<16)|(rn<<5)|rt)
+  for rs,rt in [(0,1),(31,31),(1,31),(31,1)]:
+   for rn in [0,31]:words.add(0x08a07c00|(size<<30)|((order&1)<<22)|((order>>1)<<15)|(rs<<16)|(rn<<5)|rt)
+ordered=sorted(words)
+result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
+rows=[json.loads(line)for line in result.stdout.splitlines()]
+assert len(rows)==len(ordered)
+decoder=Cs(CS_ARCH_ARM64,CS_MODE_LITTLE_ENDIAN);decoder.detail=True
+counts=collections.Counter();errors=[]
+memory_names={'ldr','str','ldur','stur','ldp','stp','ldnp','stnp','ldpsw','ldrsw','ldursw','ldrsb','ldrsh','ldursb','ldursh','ldrb','ldrh','ldurb','ldurh','strb','strh','sturb','sturh'}
+for row in rows:
+ if 'error'in row:continue
+ word=row['word'];decoded=list(decoder.disasm(word.to_bytes(4,'little'),0x1000));op=row['instruction']['op'];kind=next(iter(op))if isinstance(op,dict)else op;counts[kind]+=1
+ if len(decoded)!=1:errors.append({'word':hex(word),'error':'accepted encoding not decoded by Capstone'});continue
+ ins=decoded[0]
+ if kind=='OrderedMemory':
+  if ins.mnemonic not in {'ldapr','ldaprb','ldaprh'}:errors.append({'word':hex(word),'error':'ordered-memory family differs','reference':ins.mnemonic})
+ elif kind=='Atomic':
+  if not ins.mnemonic.startswith(('ldadd','ldclr','ldeor','ldset','ldsmax','ldsmin','ldumax','ldumin','swp','cas','stadd','stclr','steor','stset','stsmax','stsmin','stumax','stumin')):errors.append({'word':hex(word),'error':'atomic family differs','reference':ins.mnemonic+' '+ins.op_str})
+  register=decoder.reg_name(ins.operands[0].reg)
+  size=1 if ins.mnemonic.endswith('b')else 2 if ins.mnemonic.endswith('h')else 4 if register.startswith('w')else 8
+  if size!=op['Atomic']['bytes']:errors.append({'word':hex(word),'error':'atomic width differs','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='Simd':
+  expected={'fmov','mov','movi','mvni','orr','bic','dup','umov','smov','and','orn','eor','bsl','bit','bif','ext'}
+  if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'SIMD family differs','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='Logical':
+  if ins.mnemonic != 'and':errors.append({'word':hex(word),'error':'logical family differs','reference':ins.mnemonic})
+  bits=64 if word>>31 else 32
+  immediate=ins.operands[-1].imm & ((1<<bits)-1)
+  if immediate!=op['Logical']['rhs']['Immediate']:errors.append({'word':hex(word),'error':'logical immediate differs'})
+ elif kind=='Bitfield':
+  if ins.mnemonic not in {'sbfm','sbfiz','sbfx','asr','sxtb','sxth','sxtw'}:errors.append({'word':hex(word),'error':'bitfield family differs','reference':ins.mnemonic})
+ elif kind in {'ConditionalCompare','IndirectBranch','Multiply','Divide'}:
+  expected={'ConditionalCompare':{'ccmp','ccmn'},'IndirectBranch':{'br'},'Multiply':{'mul','mneg','madd','msub','smull','smnegl','smaddl','smsubl','umull','umnegl','umaddl','umsubl','smulh','umulh'},'Divide':{'udiv','sdiv'}}[kind]
+  if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'integer/control family differs','reference':ins.mnemonic})
+ elif kind=='Memory':
+  transfer=op['Memory'];name=decoder.reg_name(ins.operands[0].reg);vector='Vector'in transfer['first']
+  expected_vector=name[0]in'bh sdq'.replace(' ','')
+  if ins.mnemonic not in memory_names or vector!=expected_vector:errors.append({'word':hex(word),'error':'transfer family/bank differs','reference':ins.mnemonic+' '+ins.op_str});continue
+  size=({'b':1,'h':2,'s':4,'d':8,'q':16}[name[0]]if vector else 1 if ins.mnemonic.endswith('b')else 2 if ins.mnemonic.endswith('h')else 4 if ins.mnemonic.endswith('sw')or name.startswith('w')else 8)
+  if size!=transfer['bytes']:errors.append({'word':hex(word),'error':'transfer width differs','reference':ins.mnemonic+' '+ins.op_str,'bytes':transfer['bytes']})
+report={'reference':f'Capstone {__version__}','encoding_cases':len(ordered),'accepted':sum(counts.values()),'accepted_families':dict(counts),'errors':errors,'hardware_reference':False}
+folder=root/'private/testing/decoder-reference';folder.mkdir(parents=True,exist_ok=True);(folder/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps({k:v for k,v in report.items()if k!='errors'}));assert not errors,errors[:8]

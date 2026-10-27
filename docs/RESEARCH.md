@@ -1,0 +1,102 @@
+# Source research and architecture decision
+
+Checked October 26, 2026. Public repository metadata, current default-branch trees, branch heads, three recent commits and selected implementation files were fetched directly. Exact revisions, file hashes and branches are in [upstream-audit.json](upstream-audit.json). This is a focused source audit, not a full provenance/security review or reproduction of upstream gameplay results. No upstream build or gameplay test was run here.
+
+## Technical baseline
+
+Switchbrew describes T239's Cortex-A78C CPU, Ampere GPU and pointer-authentication features. These establish hardware requirements, not the exact instructions used by an individual executable. [T239 documentation](https://switchbrew.org/wiki/Switch_2:_Tegra_T239).
+
+NSO documentation specifies segment hashes and LZ4, plus newer XOM and Zbic flags. The supplied modules use LZ4; Zbic is detected and rejected, because ordinary zstd decoding has not been established for that variant. [NSO format](https://switchbrew.org/wiki/NSO).
+
+The NPDM ACID key/signature fields increase from 2048 to 3072 bits on Ounce; the supplied metadata has that larger layout. PAC, executable permissions and software CFI need separate semantics. [NPDM](https://switchbrew.org/wiki/NPDM), [mitigations](https://switchbrew.org/wiki/Security_Mitigations).
+
+Nintendo lists update 1.8.0 dated September 9, 2026 in North America. This does not identify the supplied dump: no trusted retail version mapping, CNMT or control NACP was supplied. Version strings remain unverified. [Nintendo update record](https://en-americas-support.nintendo.com/app/answers/detail/a_id/68580).
+
+## Compared implementations
+
+### mk8-recomp
+
+Audited `7690b2d1cbe8096d6ec826723fa5601c8e7d0d9e`, default `main`, and recorded the native-runtime branch. Recent changes concern guard-refusal reporting and decode coverage. The tree contains an older suyu integration and a newer prepared Belmante-runtime path. `generate.py` verifies segment hashes and generates separate private modules at fixed guest bases. The offline shader path is a Switch 1 reference, not verified Ampere support. CPU dispatch, memory and threading depend on the prepared external runtime; their complete implementation is outside this snapshot. Historical performance numbers are upstream claims, not local results. The repository lacks a root LICENSE; GPL notices, MIT upstream attribution and dependency obligations require a file-level audit before adoption. Useful architectural reference, not a drop-in Switch 2 foundation. [Source](https://github.com/dougchansan/mk8-recomp/tree/7690b2d1cbe8096d6ec826723fa5601c8e7d0d9e), [generator](https://github.com/dougchansan/mk8-recomp/blob/7690b2d1cbe8096d6ec826723fa5601c8e7d0d9e/integrations/belmante-runtime/generate.py).
+
+### WindowSmash
+
+Audited `8025b483b0443adb5668395eca31f9250e8c8efb`, `main`; Linux/macOS and performance branches also exist. Recent history includes credential-log fixes and runtime-package removal. `funcs.py` uses unwind records, symbols, relocations, constructors and BL targets; `lift.py` emits C, indirect dispatch and traps for unsupported instructions. Crucially, its hint mask discards PAC hints, while other PAC operations are unsupported: unsafe to transfer unchanged to this dump. The native kernel uses translated guest addresses and host synchronization/thread APIs. Graphics are D3D-oriented; Linux integration is not our intended Vulkan backend. It targets Switch 1/A57 assumptions, not proven A78C/Ampere behavior. Actual current LICENSE is GPLv3; any adoption needs matching notices and dependency review. Function-discovery strategy is useful; complete title compatibility is not independently reproduced. [Source](https://github.com/OpenSmash-Ultimate/WindowSmash/tree/8025b483b0443adb5668395eca31f9250e8c8efb).
+
+### LASRecomp
+
+Audited `a4b53a3fc5e91bf101367063bafe45017dc23335`, `main`; beta6 and other active branches were recorded. Recent history is release/build work. `gen.py` partitions generated C, retains indirect dispatch and uses emulation-assisted jump-table discovery. `lifter.py` supports portable C or host AArch64 SIMD assembly; the latter cannot serve x86-64. Generic hint lowering silently discards PAC hints. The CPU helpers and kernel include host-pointer memory assumptions and pthread-backed threads/condition variables. Vulkan/Metal graphics and `nvn/maxwell/translate.c` explicitly target Switch 1. Its own code is MIT under the actual LICENSE, with third-party exclusions. This is the leading candidate for a future portable lifting adapter, contingent on semantic tests, checked-memory integration and explicit PAC handling. It is not currently incorporated or validated against this game. [Source](https://github.com/peiikai/LASRecomp/tree/a4b53a3fc5e91bf101367063bafe45017dc23335).
+
+### smm2recomp
+
+Audited `8c0b2d417cd8fc86294bf1d0fc08795ebd3569e3`, `main`; development branches recorded. Recent changes concern a paused release, online integration and a format-string fix. The inspected lifter is byte-identical to LASRecomp's; generated C, indirect-dispatch structure and host kernel therefore share important constraints. There are concrete Vulkan device/execution/shader sources and a Maxwell translator. None establish Ampere shader support. Runtime CPU/kernel code retains native threading and address-model dependencies. The root license is GPLv3, while LAS attribution is separately retained; it must not be treated as wholly MIT. Existing implementation breadth is useful evidence for Switch 1 engineering patterns, but title claims and hardware correctness were not reproduced locally. Its online/mod features are outside this project's initial scope. [Source](https://github.com/smm2recomp/smm2recomp/tree/8c0b2d417cd8fc86294bf1d0fc08795ebd3569e3).
+
+### SwitchRecomp
+
+Audited `3c635ee893dc2f633fead4a60dd1fb19178619ce`, sole branch `main`; history contains an initial research framework and CI fix. The source implements a table decoder, typed IR, C code generation, memory/thread/runtime components and Vulkan tests. The decoder has a limited instruction table; no inspected implementation establishes the supplied PAC/SIMD instruction requirements. The GPU command processor skips unregistered methods, so accepting a buffer cannot certify its effects. Synthetic compute/shader paths are not commercial-game rendering evidence. Full indirect-flow and concurrent-memory equivalence are unverified. Actual LICENSE is GPLv3. This is an informative research skeleton, not a more mature replacement for the inspected Switch 1 lifters or a verified Switch 2 runtime. No code adopted. [Source](https://github.com/kaiyao7/SwitchRecomp/tree/3c635ee893dc2f633fead4a60dd1fb19178619ce).
+
+### OunceCake
+
+Audited `e3bcbd229be2229d44f036455adddda921ade3b2`, sole branch `main`. Recent commits fix binary FTP transfers and crashes. `program.cjs` and `content.cjs` concern installed-content selection, mounting and transfer; this is a dumper, not a CPU/GPU recompiler. There is no lifter, native-game runtime, shader translator or thread model to adopt for recompilation. Its source cannot certify that a particular supplied dump is complete. GPLv2 license and Atmosphere provenance are stated in the actual files. No dumping/exploit components or bundled native payload were executed or adopted. FTP listings in the supplied dump are useful for a limited size/presence comparison. [Source](https://github.com/misshexa66/OunceCake/tree/e3bcbd229be2229d44f036455adddda921ade3b2).
+
+### SuperMarioWonderRecomp and other claims
+
+Direct API/source access to `BelmanteGu/SuperMarioWonderRecomp` returned 404 during this audit, while web search retained a cached README. Consequently its current branch, code, license and claimed platform results could not be verified. mk8-recomp pins an older external revision, which is evidence of a dependency declaration, not access to that implementation. Do not import it based on cached MIT or gameplay claims. [Referenced repository](https://github.com/BelmanteGu/SuperMarioWonderRecomp).
+
+A search also surfaced Mario Kart World native-execution claims without an inspected source/validation path. They supply no reusable verified foundation. No inspected source establishes a tested native Switch 2 Ampere graphics path for this title.
+
+## Decision
+
+Use Rust for the dump identity/format boundary, typed analysis, diagnostics and safe guest-memory model. Use generated C compiled by a host compiler for the initial semantic harness. Existing LZ4/zstd libraries and Rust serialization/hash libraries are reused; mature compression is not reimplemented.
+
+Do not fork a full Switch emulator or copy a Switch 1 graphics runtime. Evaluate a narrowly isolated LASRecomp portable-lifter adapter after an instruction census and conformance suite; its current PAC and memory assumptions prevent direct adoption. The small original emitter implemented here is a testable ABI/semantic baseline, not a claim to have replaced a mature full lifter. Wholesale adoption is deferred for concrete technical reasons, not because a new general-purpose recompiler is assumed easier.
+
+The graphics work remains a separate investigation of actual NVN bootstrap calls, command generation, shader containers and Ampere instructions. Shader container signatures do not establish shader instruction encoding.
+
+## Independent format cross-check
+
+SARC header/node/name layout was checked against oead `5fb74e1128468380b47da23a5690891c8af4ab72`, including its version and header-size checks. Its GPLv2-or-later implementation was inspected, not copied. Our inspector only validates containment; it is not a full asset parser. ELF relocation terminology follows the public Arm ABI reference. [oead parser](https://github.com/zeldamods/oead/blob/5fb74e1128468380b47da23a5690891c8af4ab72/src/sarc.cpp), [Arm ELF ABI](https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst).
+
+## Feasibility and risk register
+
+Static CPU translation is technically plausible; the current synthetic native result demonstrates only the small implemented subset. There is no evidence yet that the complete title can boot on this foundation. A usable native port remains a substantial research and implementation effort.
+
+| Risk | Evidence and next validation |
+|---|---|
+| Authenticated control flow | PAC/RETAB observed; need guest PAC conformance and failure-behavior tests |
+| Symbol scope/relocation semantics | Real diagnostic linker rejects a duplicate export; establish dependency lookup rules |
+| Incomplete control-flow discovery | Metadata has many entries; extents, jump tables, callbacks and loaded modules remain unresolved |
+| Ampere graphics/shaders | Containers observed, no verified ISA/API backend; investigate real SDK submission path |
+| Floating point, atomics, concurrency | No game-semantic tests or ARM reference execution; require independent differential fixtures |
+| Input completeness/version | Listings match sizes, but no trusted complete-content or retail-version mapping |
+| Build scale/performance | Many executable words; no complete native build, memory bound or runtime benchmark |
+| Upstream reuse/licenses | File-level dependency/provenance audits remain necessary before copying components |
+
+## Follow-up: supplied rtld scopes and PAC implementation
+
+Static disassembly of the hash-verified supplied rtld revealed requester-local lookup for non-default visibility and ordered process-list lookup for default symbols. DT_NEEDED closure is therefore one explicit policy; the supplied-title diagnostic uses a separate rtld-first/address-ordered process scope. Exact offsets and evidence stay in private/analysis/rtld-link-semantics.json. This is static inference, not a reproduced retail startup trace. Generic rtld documentation describes memory-region enumeration but does not prove symbol order. [Switchbrew rtld](https://switchbrew.org/wiki/Rtld).
+
+A QARMA/PAC primitive has now been adopted. gem5 revision fed0e07e930fecf1e73dce94dd44e69a5bf70c46 files src/arch/arm/qarma.cc and qarma.hh were adapted into standalone C; pauth_helpers.cc informed the restricted legacy wrapper. Full Arm/Metempsy BSD notices and provenance are retained. Only a C compiler is required. The explicit diagnostic profile is not confirmed Switch 2 PAC configuration. [gem5 source](https://github.com/gem5/gem5/tree/fed0e07e930fecf1e73dce94dd44e69a5bf70c46/src/arch/arm).
+
+The QARMA core matches 4,096 inputs against QEMU revision d73149283205645625bfa9fe029cfb68e4c4a9ae. That GPL source stays private and builds only the independent comparison harness; it is not part of normal/public implementation. This is software differential evidence without an ARM/Switch 2 hardware oracle. [QEMU reference](https://github.com/qemu/qemu/blob/d73149283205645625bfa9fe029cfb68e4c4a9ae/target/arm/tcg/pauth_helper.c). Arm documents key/SP relationships and authenticated returns; profile-specific behavior still needs verification. [Arm discussion](https://developer.arm.com/community/arm-community-blogs/b/tools-software-ides-blog/posts/code-reuse-attacks-the-compiler-story).
+
+## Follow-up: ordered-memory contract
+
+The supplied-binary census exposed LDAPRB among the first unsupported instructions. Arm's compiler discussion distinguishes RCpc acquire from the stronger ordering constraints of other acquire operations. The implementation keeps RCpc acquire, RCsc acquire and release distinct in typed IR and ABI tags. The current Rust bridge serializes all accesses, so its tests establish a stronger diagnostic execution model rather than preservation of every weak-memory outcome. No claim of Switch 2 concurrency equivalence is made. [Arm RCpc compiler discussion](https://developer.arm.com/community/arm-community-blogs/b/tools-software-ides-blog/posts/enabling-rcpc-in-gcc-and-llvm), [Arm ordering discussion](https://developer.arm.com/community/arm-community-blogs/b/architectures-and-processors-blog/posts/when-a-barrier-does-not-block-the-pitfalls-of-partial-order).
+
+## Raw SIMD transport and integer mask validation
+
+The current incremental implementation follows Arm's architectural instruction formats and mask definitions for ordinary scalar/SIMD transfers, logical/bitfield/extract operations and extended arithmetic. New code is original; no implementation copied from these references. Raw vector transport does not establish FP arithmetic, access-trap or FPCR/FPSR semantics. [Arm A64 reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab), [Arm SIMD register-offset LDR](https://developer.arm.com/documentation/111181/2025-09_ASL1/SIMD-FP-Instructions/LDR--register--SIMD-FP---Load-SIMD-FP-register--register-offset--).
+
+Private Capstone 5.0.6 independently classifies generated encoding cases; accepted memory cases are additionally checked for transfer size and register bank. Native x86-64 tests use independently written bit-copy and circular-run oracles, plus fatal UBSan at O0/O2. These checks complement each other; neither is original AArch64 hardware validation. Receipts remain private and the optional validation script skips the Capstone check when its private installation is absent.
+
+## BR/tail, conditional compare and integer arithmetic validation
+
+Arm's instruction reference defines BR without a link-register update, conditional compares with either computed or immediate flags, and separate low/widening/high products and signed/unsigned division. The implementation uses original code for these semantics; no source implementation was copied. The diagnostic runtime routes unresolved tail requests only to registered native functions, retaining missing-target failures rather than inventing destinations. [Arm instruction reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab).
+
+Exact CIE/FDE extent surveys now permit explicit unconditional B tails to other entries; this changes the survey acceptance policy and must accompany any comparison with previous counts. Conditional escapes and strict slice truncation still reject. Native arithmetic checks use independent Rust wide-integer calculations and a condition truth table; Capstone separately classifies encoding families. Neither confirms the supplied game's PAC/BTI profile or indirect-target completeness. Original functions remain unexecuted.
+
+## Raw SIMD bits and serialized LSE evidence
+
+Arm documents FMOV as a bit transfer distinct from numeric conversion, and defines MOVI constant replication and vector lane transfers. The new decoder resolves compact FP and modified vector immediates to bits ahead of execution. New implementation and ELF fixture construction are original code; no Arm pseudocode or QEMU implementation was copied. [Arm instruction reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab), [Arm FMOV general reference](https://developer.arm.com/documentation/111182/2025-09_ASL1/SIMD-FP-Instructions/FMOV--general---Floating-point-move-to-or-from-general-purpose-register-without-conversion-).
+
+The supplied census then exposed scalar LSE operations. They now use a checked serialized normal-memory profile with explicit ordering tags. QEMU's translator was consulted as a separate implementation reference: it also uses stronger atomic primitives rather than establishing all allowed weak outcomes. Its LGPL source was inspected, not incorporated. Independent, locally constructed AArch64 ELFs compare functional SIMD/LSE results against installed QEMU 8.2.2; native contention tests separately exercise the Rust callback bridge. Neither check proves original-hardware weak-memory behavior, FPCR/FPSR semantics or the game's PAC/BTI configuration. [QEMU A64 translator](https://github.com/qemu/qemu/blob/master/target/arm/tcg/translate-a64.c).

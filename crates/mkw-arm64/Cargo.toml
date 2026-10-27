@@ -1,0 +1,7 @@
+[package]
+name = "mkw-arm64"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+[dependencies]
+serde.workspace = true

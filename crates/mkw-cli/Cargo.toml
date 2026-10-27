@@ -1,0 +1,15 @@
+[package]
+name = "mkw-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+[[bin]]
+name = "mkw-recomp"
+path = "src/main.rs"
+[dependencies]
+mkw-formats = { path = "../mkw-formats" }
+mkw-arm64 = { path = "../mkw-arm64" }
+mkw-codegen = { path = "../mkw-codegen" }
+serde.workspace = true
+serde_json.workspace = true
+mkw-runtime = { path = "../mkw-runtime" }

@@ -1,0 +1,742 @@
+{
+  "checked_utc": "2026-10-26",
+  "repositories": [
+    {
+      "repository": "peiikai/LASRecomp",
+      "default_branch": "main",
+      "head": "a4b53a3fc5e91bf101367063bafe45017dc23335",
+      "pushed_at": "2026-10-26T20:02:30Z",
+      "github_license_metadata": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      },
+      "recent_commits": [
+        {
+          "sha": "a4b53a3fc5e91bf101367063bafe45017dc23335",
+          "subject": "Merge pull request #435 from peiikai/beta_5.3"
+        },
+        {
+          "sha": "11af51bcb031d7aa54e877b98c470b09c39ab270",
+          "subject": "Merge pull request #431 from peiikai/fix-53-rooms-buildno"
+        },
+        {
+          "sha": "a67bb6b7c6a2feef4673b0a7d8cf90f21ab2bfd7",
+          "subject": "macOS bundle: a build number that always goes up"
+        }
+      ],
+      "branches": [
+        {
+          "name": "beta_5.3",
+          "sha": "11af51bcb031d7aa54e877b98c470b09c39ab270"
+        },
+        {
+          "name": "beta6-preview-1",
+          "sha": "c0154c58a4e11b25b103390e51d06abe472dc8e8"
+        },
+        {
+          "name": "beta_6",
+          "sha": "b2e8af24327bf0e335b99eddbeddd0053b3aa12f"
+        },
+        {
+          "name": "boss-rando",
+          "sha": "fa532f0d431c833f192287bb13c292e534f8c76d"
+        },
+        {
+          "name": "fix-414-windows-hook",
+          "sha": "7c4a6aefef5b1b1d196d0fbbb7cca0e93f099649"
+        },
+        {
+          "name": "frame-interp-rt",
+          "sha": "ffac96847b300e8f5a863b4b0a3673611774fedc"
+        },
+        {
+          "name": "hdr-mac",
+          "sha": "dfc33dbe197e543288f45da4f900879dbb4104a2"
+        },
+        {
+          "name": "main",
+          "sha": "a4b53a3fc5e91bf101367063bafe45017dc23335"
+        },
+        {
+          "name": "rando-chests-keyrings",
+          "sha": "c8388608198e49a93b259dd72ed6ed2825c76454"
+        },
+        {
+          "name": "rando-eagle-tower",
+          "sha": "8ce7bce452b881c867e4c068efca487af6981ab6"
+        },
+        {
+          "name": "rando-hints",
+          "sha": "04a2b1477c0fd3b5cb39c6b2bdec4e7dddf1988c"
+        },
+        {
+          "name": "rando-labyrinth",
+          "sha": "21b284571be1cebf64a03316491e2171f54ad85a"
+        },
+        {
+          "name": "rando-passage-fog",
+          "sha": "3d8f72c57a3642890bd0e60f88b977b0c939d077"
+        },
+        {
+          "name": "rando-rocksanity",
+          "sha": "600965593a0fa2d714e2dc8d0914f0b9530349d0"
+        },
+        {
+          "name": "smoke-53",
+          "sha": "aaeb35377f77dee13144d848b0904d6f27840091"
+        },
+        {
+          "name": "test-337-cfg-1",
+          "sha": "836f231c8a30a77bee966f5b01db005774f7c095"
+        },
+        {
+          "name": "test-chomp-4",
+          "sha": "2bd9ad8c02f246afc2a16ab950a91468b8afd26b"
+        },
+        {
+          "name": "test-deck-overlap-2",
+          "sha": "b6922ac3cc1b58397b480771daf272170386664d"
+        },
+        {
+          "name": "ui-parchment",
+          "sha": "1c3b2ccea3db9282e549d517a21a329f4aefac38"
+        }
+      ],
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "31e2e8c10f4461ff75bd2f95e26125f6126ee88828bf29233f4d9f14e90630d6"
+        },
+        {
+          "path": "runtime/cpu.h",
+          "sha256": "3a52fb12f11dd2ffbc39d42785aaee87600dc45085b1cdd8e72c952623f1c2b4"
+        },
+        {
+          "path": "runtime/kernel.c",
+          "sha256": "b2f86527530d9a6ed00e59a0de91043f777a5ce5337b104a601a7b34662dd06c"
+        },
+        {
+          "path": "runtime/nvn/maxwell/translate.c",
+          "sha256": "2cbdfd0057fbc62026ce95d4b06fd52c86b3078c664bdd5e0bb35658c36e975e"
+        },
+        {
+          "path": "runtime/nvn/vulkan/shaders.c",
+          "sha256": "de101b09fadc8f28eb5e17a253a1ff6882a6690bc41f2cea73ff58bdee820e50"
+        },
+        {
+          "path": "tools/gen.py",
+          "sha256": "b660dadfcb703e156b6ff5d5b495cf052eb1de52334e5425cb1cd1d03365acd2"
+        },
+        {
+          "path": "tools/lifter.py",
+          "sha256": "698cc14400b3c9f83530fa2a3c1c9fdc5c9a6819cca7c76d7708f970039dba79"
+        },
+        {
+          "path": "tools/nso.py",
+          "sha256": "edff083720f9ccdd6074a81197a718e4ee3c63f5aad5e5005423ec6b43ff14ab"
+        }
+      ],
+      "upstream_tests_executed": false
+    },
+    {
+      "repository": "misshexa66/OunceCake",
+      "default_branch": "main",
+      "head": "e3bcbd229be2229d44f036455adddda921ade3b2",
+      "pushed_at": "2026-10-25T23:03:01Z",
+      "github_license_metadata": {
+        "key": "gpl-2.0",
+        "name": "GNU General Public License v2.0",
+        "spdx_id": "GPL-2.0",
+        "url": "https://api.github.com/licenses/gpl-2.0",
+        "node_id": "MDc6TGljZW5zZTg="
+      },
+      "recent_commits": [
+        {
+          "sha": "e3bcbd229be2229d44f036455adddda921ade3b2",
+          "subject": "fix allowing transfers of binary data in ascii mode"
+        },
+        {
+          "sha": "6fcf9e80d302ff43c96dd5d912c9b08a11913daf",
+          "subject": "damn hexa, back at it again with the crash fix"
+        },
+        {
+          "sha": "ba1c52985d35f6ae54d8a3e949ded274bde68c55",
+          "subject": "fix crashes some people were hitting"
+        }
+      ],
+      "branches": [
+        {
+          "name": "main",
+          "sha": "e3bcbd229be2229d44f036455adddda921ade3b2"
+        }
+      ],
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "f9c375a1be4a41f7b70301dd83c91cb89e41567478859b77eef375a52d782505"
+        },
+        {
+          "path": "README.md",
+          "sha256": "f27565e5a02c097920b874b944e0cd3d40bfb687f9bb6f054425768606317f67"
+        },
+        {
+          "path": "engine/content.cjs",
+          "sha256": "359273e46d3e9a35179db586fbc7414a57d8a75a9592ba9583099370e92701de"
+        },
+        {
+          "path": "engine/program.cjs",
+          "sha256": "e7dbcb4397b3d4090c2cfe79d2f204579c210133f288e7468f562c354c12a2a2"
+        }
+      ],
+      "upstream_tests_executed": false
+    },
+    {
+      "repository": "kaiyao7/SwitchRecomp",
+      "default_branch": "main",
+      "head": "3c635ee893dc2f633fead4a60dd1fb19178619ce",
+      "pushed_at": "2026-10-08T23:20:11Z",
+      "github_license_metadata": {
+        "key": "gpl-3.0",
+        "name": "GNU General Public License v3.0",
+        "spdx_id": "GPL-3.0",
+        "url": "https://api.github.com/licenses/gpl-3.0",
+        "node_id": "MDc6TGljZW5zZTk="
+      },
+      "recent_commits": [
+        {
+          "sha": "3c635ee893dc2f633fead4a60dd1fb19178619ce",
+          "subject": "Fix CI: declare active_memory_ unconditionally and pin windows-2022 runner"
+        },
+        {
+          "sha": "adf36c99801fd0f3c8c95b005d57efff135b1fbc",
+          "subject": "Initial commit: SwitchRecomp research framework"
+        }
+      ],
+      "branches": [
+        {
+          "name": "main",
+          "sha": "3c635ee893dc2f633fead4a60dd1fb19178619ce"
+        }
+      ],
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+        },
+        {
+          "path": "include/switchrecomp/platform/memory.h",
+          "sha256": "71585e6d5ba4a4f946b67d743eb5a462ebc17d83306aeea6cf4ccf399a575f09"
+        },
+        {
+          "path": "include/switchrecomp/runtime/runtime.h",
+          "sha256": "9174ca3f3b3dc91fd302203e582009e8072ecc624d4b866200126a8e710e5fb4"
+        },
+        {
+          "path": "src/codegen/codegen.cpp",
+          "sha256": "4a62353823a55989bcd9430bb9100a08515ed3ad6226989e4b46756df8e312f3"
+        },
+        {
+          "path": "src/gpu/command_processor.cpp",
+          "sha256": "aab0f8756aa02d2017bd358589069d6cf766009099425418647d850d56af98a6"
+        },
+        {
+          "path": "src/gpu/vulkan_backend.cpp",
+          "sha256": "9cc56351531d7068ed0c7f7c1170a22c6278e881499b32b2f40bec2074c7bc8c"
+        },
+        {
+          "path": "src/translator/translator.cpp",
+          "sha256": "1e329df4313474dad1aa3dbf4f07d74e35c71208cae9323b3768d9c819504116"
+        }
+      ],
+      "upstream_tests_executed": false
+    },
+    {
+      "repository": "OpenSmash-Ultimate/WindowSmash",
+      "default_branch": "main",
+      "head": "8025b483b0443adb5668395eca31f9250e8c8efb",
+      "pushed_at": "2026-10-22T11:09:01Z",
+      "github_license_metadata": {
+        "key": "gpl-3.0",
+        "name": "GNU General Public License v3.0",
+        "spdx_id": "GPL-3.0",
+        "url": "https://api.github.com/licenses/gpl-3.0",
+        "node_id": "MDc6TGljZW5zZTk="
+      },
+      "recent_commits": [
+        {
+          "sha": "8025b483b0443adb5668395eca31f9250e8c8efb",
+          "subject": "Merge pull request #84 from OpenSmash-Ultimate/fix/nex-log-credentials"
+        },
+        {
+          "sha": "d91cb08b4d09c0c3ba31b974992efdf3a484fba7",
+          "subject": "Keep NSA ids and tokens out of the NEX server's log"
+        },
+        {
+          "sha": "d6603a621510a010144af6dd2cdda4bbe91fc2d1",
+          "subject": "Merge pull request #83 from OpenSmash-Ultimate/remove-runtime-package"
+        }
+      ],
+      "branches": [
+        {
+          "name": "amd-driver-threads",
+          "sha": "242c5cbe3787d0151bd143fbe20ba43e0d70ac4d"
+        },
+        {
+          "name": "amd-menus",
+          "sha": "2c519ef9c97b8fc6cd255e4eda0e1326023d5b50"
+        },
+        {
+          "name": "audio-gaps",
+          "sha": "33da2c16af9ccabbd0b0275345809e208b2116c2"
+        },
+        {
+          "name": "build-dlc-fix",
+          "sha": "9fc62b27aaa6c159c115a38607bb1758cdb4c32c"
+        },
+        {
+          "name": "build-launcher",
+          "sha": "f42590de01202855a75428dc88040571152e4abe"
+        },
+        {
+          "name": "build-progress",
+          "sha": "0854d8ca3c05425c85f888a55d24a7e619bec868"
+        },
+        {
+          "name": "cleanup",
+          "sha": "a1ad79e3d69b92658210f1a14b7c8afcb96d8cd8"
+        },
+        {
+          "name": "compile-crash-retry",
+          "sha": "b28d70268d60db60a492f35c067a8019bd644706"
+        },
+        {
+          "name": "composed-perf",
+          "sha": "2f917a4b3ccc636d0d00184517641d601a5ee163"
+        },
+        {
+          "name": "crash-fix",
+          "sha": "5cf17527d6cae09ccea407e47398e5266b2226ff"
+        },
+        {
+          "name": "deps-toolchain-fix",
+          "sha": "d239ea307dc7d86b05da4d5d617f841cbc65efe1"
+        },
+        {
+          "name": "device-lost",
+          "sha": "f1eea1ae480cc46ffa36958e9ff0d406456ca180"
+        },
+        {
+          "name": "discord",
+          "sha": "d58e99123c9d2b8285f38dfb285dc8cfe2dcb68b"
+        },
+        {
+          "name": "docs",
+          "sha": "f808f2d2e8717527a1a50eea1f5c4f822bffe4d3"
+        },
+        {
+          "name": "dxgi-factory6-iid",
+          "sha": "1247f81a83f89033b7bd930e8c5009c0044de486"
+        },
+        {
+          "name": "fast-clock",
+          "sha": "5004359c1f060a5d3d3a384db3b2b7e72e05078a"
+        },
+        {
+          "name": "fiber-reclaim",
+          "sha": "d74c5a56e0ff79ccad57fc05fb122c25bd7a84c2"
+        },
+        {
+          "name": "fiber-reuse",
+          "sha": "e883820229627e73175b14ed1ff92e5175d1f6df"
+        },
+        {
+          "name": "first-use-stutter",
+          "sha": "1b0e19d5209a154eb8d2875438a7d4719927a4a7"
+        },
+        {
+          "name": "fix/nex-log-credentials",
+          "sha": "d91cb08b4d09c0c3ba31b974992efdf3a484fba7"
+        },
+        {
+          "name": "gamecube",
+          "sha": "7b7cc3e9577be442c2e672994f2c8813fc1afcea"
+        },
+        {
+          "name": "gamecube-usb",
+          "sha": "34087ae26e1daa099567fab4665490a94eeb491a"
+        },
+        {
+          "name": "gpl-license",
+          "sha": "d59ef8c7b73b8429f20beaa7a30fb5da2894b21f"
+        },
+        {
+          "name": "installer",
+          "sha": "e9b4b3d104ccd1bbdf1bae7fcaec171ddf7cd42d"
+        },
+        {
+          "name": "installer-cpu-check",
+          "sha": "3159824bfbf093db2bc97e43b77afea04cb90a76"
+        },
+        {
+          "name": "installer-fix-vs",
+          "sha": "e3207e825f55bc4679e8e6e04786bbe20f9ad57a"
+        },
+        {
+          "name": "installer-vs-elevate",
+          "sha": "02bb97beeab0c7ce3ccccb2a486f0cdb31d9e9e5"
+        },
+        {
+          "name": "installer-vs-modify",
+          "sha": "6745104e81d6f94828721f58cd0f013465ef7054"
+        },
+        {
+          "name": "installer-zstd-check",
+          "sha": "151b2f38ded11a928e89365bd79ab6e6eb88d8db"
+        },
+        {
+          "name": "intel-gpu",
+          "sha": "c370274d77ab4bbbb361e401a605a42c86044ca3"
+        },
+        {
+          "name": "linux-port",
+          "sha": "6bc8efadb0d418ef287115be230d50fa22bb92e5"
+        },
+        {
+          "name": "linux-rebuild",
+          "sha": "69e6d3450129f47769c84f91a4ae4e5b57b5690a"
+        },
+        {
+          "name": "macos-port",
+          "sha": "ad04e3400c9df1b831c6bdd1b4208e19febf6e22"
+        },
+        {
+          "name": "macos-render-scale",
+          "sha": "f7a1b9e50e6f055e333185d240604024f2b90953"
+        },
+        {
+          "name": "main",
+          "sha": "8025b483b0443adb5668395eca31f9250e8c8efb"
+        },
+        {
+          "name": "match-perf",
+          "sha": "47460bce0efc05e8da7b04cdee53e78cd93d3c4d"
+        },
+        {
+          "name": "memory-regions",
+          "sha": "2a7bb2320610edc2d0ab0f7a0b5c53c693c5061d"
+        },
+        {
+          "name": "menu-borders",
+          "sha": "d33a166ab16b307d0f681d6ade3bb6d735160f69"
+        },
+        {
+          "name": "menu-perf",
+          "sha": "a2d6c1ed8ceeab37638e99e3088bff6206c226a5"
+        },
+        {
+          "name": "movie-audio-race",
+          "sha": "ba72ab381f3a4a42bf19573e912fb2d5e03913ca"
+        },
+        {
+          "name": "multi-version",
+          "sha": "eeb145b27caf4371ff231913d6c225e1e2d8f5a9"
+        },
+        {
+          "name": "old-release-check",
+          "sha": "67d3d6f2421793c218808f3b667d99e5fdd3bbeb"
+        },
+        {
+          "name": "online-files-fix",
+          "sha": "1574a29135ded510adc79eb95b0bc0443fbe19d5"
+        },
+        {
+          "name": "online-mode",
+          "sha": "053ad3588c6601b54e1b88af9f76fea9348cd647"
+        },
+        {
+          "name": "performance",
+          "sha": "b224063b5fa2a83ccf6b91301a41d3b2f322993a"
+        },
+        {
+          "name": "portable-msvc",
+          "sha": "fb41c25e1432686dac0bebb6aa07fc50b167b77e"
+        },
+        {
+          "name": "readme-installer",
+          "sha": "324d94179c78ecfc1b6f82d7131933e4c0f74a15"
+        },
+        {
+          "name": "relay-timeout-test",
+          "sha": "cbe49c46bb38b94168cad927538d37dcc204e56c"
+        },
+        {
+          "name": "render-scale",
+          "sha": "228b6788dfaebc55158a2356a6d4ec063e0046ed"
+        },
+        {
+          "name": "require-13.0.5",
+          "sha": "e74016eeb1ac649dad38ec6fb2ee8f7295b5c094"
+        },
+        {
+          "name": "resident-unmap",
+          "sha": "f33d96c1d9e59153294e9709e78909a0f58f603e"
+        },
+        {
+          "name": "results-eyes",
+          "sha": "9326fd2e88558705228d17d09e29f73e0f1c034f"
+        },
+        {
+          "name": "results-perf",
+          "sha": "2eb1e5e2079568bd70e048a2f94a353b70faf4d2"
+        },
+        {
+          "name": "settings-launcher",
+          "sha": "d65b5c2545de0f8305e9abada91fce774fa2190c"
+        },
+        {
+          "name": "settings-menu-macos",
+          "sha": "f3f00175bc69bf6993061d0b32937d61cb4155e4"
+        },
+        {
+          "name": "settings-overlay",
+          "sha": "39f4f243346cb547291cff6c5c479dff3c4a1b2f"
+        },
+        {
+          "name": "shader-progress",
+          "sha": "e54f35a14a878acf1c05066a17adafecc354640a"
+        },
+        {
+          "name": "shader-read-errors",
+          "sha": "7845d668dac7ef0b9413965f3c1cb93bd111ded8"
+        },
+        {
+          "name": "shader-stacks",
+          "sha": "316db6a1c5e507f7a4c191f160d7db62385e86a4"
+        },
+        {
+          "name": "skin-stale",
+          "sha": "bc2c4dabc5c02bdc6e9296a62859ca26a644e973"
+        },
+        {
+          "name": "steady-clock-now",
+          "sha": "143fe859cbb1f6d0a9b1c26b42c2cbddf51d21ba"
+        },
+        {
+          "name": "titlekey-decrypted",
+          "sha": "fd9255ba80ac6521aec374ca8f0fe10c31e69ef0"
+        },
+        {
+          "name": "tools-safe-path",
+          "sha": "370beb9b55ad6fcc40a485cbef14641b1a384f79"
+        },
+        {
+          "name": "uncapped-fps",
+          "sha": "37a83778ae8f1355075d95cebadbd316bde69662"
+        },
+        {
+          "name": "unmap-notify",
+          "sha": "4748053b5f7ec82c142a97fe0b838815e2a81507"
+        },
+        {
+          "name": "update-combined-nsp",
+          "sha": "28072e5e813da303f517120eadcc2acc0135a1be"
+        },
+        {
+          "name": "update-hashes-from-base",
+          "sha": "9f0144d1d1789fdaf386246cde51458f4e56f440"
+        },
+        {
+          "name": "version-label",
+          "sha": "43a5804debbc58bcdf65ac7feabae19bc1017906"
+        },
+        {
+          "name": "whiteout-fix",
+          "sha": "a487903220d9245a96568265e936a88e1815d3eb"
+        }
+      ],
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+        },
+        {
+          "path": "runtime/kernel.c",
+          "sha256": "7bb26f0304a6e9de3d31e1402d1f689be5d4b6744996e781f47d0c72851f3f7e"
+        },
+        {
+          "path": "tools/a64.py",
+          "sha256": "d0d8530a1d1d429e7d8ba1f9259142629b71d7170445c034ccdd351cbe328623"
+        },
+        {
+          "path": "tools/funcs.py",
+          "sha256": "8fac23efaa2d2557ce0646793815bc893535dc9db6f43b91fd7bfad356684ffb"
+        },
+        {
+          "path": "tools/lift.py",
+          "sha256": "20e042ece7713681ce02d901418269dabc67f50d68cb0d892a4f6307473c305d"
+        },
+        {
+          "path": "tools/nso.py",
+          "sha256": "367e7ddc28e74d721917e9cc8f1872471c575a2e9d0627d79e0eabd26e63750e"
+        },
+        {
+          "path": "tools/recomp.py",
+          "sha256": "da89c88b19baa137e63957a753befb359fea3c878dd7d3415e165700333d6cf4"
+        }
+      ],
+      "upstream_tests_executed": false
+    },
+    {
+      "repository": "dougchansan/mk8-recomp",
+      "default_branch": "main",
+      "head": "7690b2d1cbe8096d6ec826723fa5601c8e7d0d9e",
+      "pushed_at": "2026-10-24T23:03:57Z",
+      "github_license_metadata": null,
+      "recent_commits": [
+        {
+          "sha": "7690b2d1cbe8096d6ec826723fa5601c8e7d0d9e",
+          "subject": "Report verified guard refusal as a passing runner"
+        },
+        {
+          "sha": "36880fd05ec5c0c9ace1b2a69fb2a0206422d12d",
+          "subject": "Keep decode coverage aligned with the pinned strict-static emitter"
+        },
+        {
+          "sha": "8d8633aec67ad64c1d3edb132eaea0beda09bf22",
+          "subject": "Reduce copied texture admission work while preserving frame semantics"
+        }
+      ],
+      "branches": [
+        {
+          "name": "codex/native-runtime-progress",
+          "sha": "7f8c4cc0e4c372c756aee94b9cd913535e3be65f"
+        },
+        {
+          "name": "main",
+          "sha": "7690b2d1cbe8096d6ec826723fa5601c8e7d0d9e"
+        }
+      ],
+      "inspected_files": [
+        {
+          "path": "LEGAL.md",
+          "sha256": "bbf6b0e2fff0827885cc19a54c82e9b2857a899c3f890efa84ee4c3021d0be55"
+        },
+        {
+          "path": "docs/architecture.md",
+          "sha256": "4c84688e1d00c1fbfbe23ef6ea1c57414cb94a1333cdd42cee8d57e9acc006bf"
+        },
+        {
+          "path": "integrations/belmante-runtime/LICENSE.upstream",
+          "sha256": "6466066caf0162b4af89a3108a778843fa21f98dc8a0bc254fe08ededd04faa3"
+        },
+        {
+          "path": "integrations/belmante-runtime/UPSTREAM.json",
+          "sha256": "058fb33bc8c3c1acb3fda81a5c0f60b6319645157fe75dc6dca11666ace324bd"
+        },
+        {
+          "path": "integrations/belmante-runtime/generate.py",
+          "sha256": "30f44bcdc7f965cbf46800c5be29876637afe76a5154576e6489a42d2381c335"
+        },
+        {
+          "path": "scripts/nso.py",
+          "sha256": "e21f63d432cb9f4d85d50cb902acb7afaf9fa1a827e99192b955a156ee58b81b"
+        }
+      ],
+      "upstream_tests_executed": false
+    },
+    {
+      "repository": "smm2recomp/smm2recomp",
+      "default_branch": "main",
+      "head": "8c0b2d417cd8fc86294bf1d0fc08795ebd3569e3",
+      "pushed_at": "2026-10-25T09:36:39Z",
+      "github_license_metadata": {
+        "key": "gpl-3.0",
+        "name": "GNU General Public License v3.0",
+        "spdx_id": "GPL-3.0",
+        "url": "https://api.github.com/licenses/gpl-3.0",
+        "node_id": "MDc6TGljZW5zZTk="
+      },
+      "recent_commits": [
+        {
+          "sha": "8c0b2d417cd8fc86294bf1d0fc08795ebd3569e3",
+          "subject": "PROGRESS: paused after v0.5.5 (the 100 Mario result fix, OpenCourse World from PR #22); what the owner tests (an OCW sign-in)"
+        },
+        {
+          "sha": "ddc29c42c968bb85da2ba987417a2ddbfd04ef68",
+          "subject": "Mods: a GameBanana unpack error is written through \"%s\" (libarchive's message as a format string: -Wformat-security)"
+        },
+        {
+          "sha": "5c9e71419b19b318639ccdf074c12e1cd498c086",
+          "subject": "Merge PR #22 (mm2srv): Course World against your own OpenCourse World account - mm2srv's own rebase onto 4ce608d (the OCW rows drawn on the Mods tab's Online page in mods_page.mm, the Mii entry with the ocw backend only)"
+        }
+      ],
+      "branches": [
+        {
+          "name": "b5-dev",
+          "sha": "4b875a87163bf5c197546fc302bca538c95d19eb"
+        },
+        {
+          "name": "main",
+          "sha": "8c0b2d417cd8fc86294bf1d0fc08795ebd3569e3"
+        },
+        {
+          "name": "nextendo",
+          "sha": "e7cda81eafd94b25545fdcdc4eb8b33a4dfe4f80"
+        }
+      ],
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "e57f1c320b8cf8798a7d2ff83a6f9e06a33a03585f6e065fea97f1d86db84052"
+        },
+        {
+          "path": "core/crates/formats/src/nso.rs",
+          "sha256": "8e709b44e499babe2d1b1eda3a53a9fcc54dce8b5e78e97d1922f94628c70207"
+        },
+        {
+          "path": "recomp/runtime/cpu.h",
+          "sha256": "0e601f6c37ac49ec3b7c7f2f76327f5089e6a58795dffb9f7b2f00cc3e10fe15"
+        },
+        {
+          "path": "recomp/runtime/kernel.c",
+          "sha256": "e635d1623005125730137ab5f2eb2e3d0cb8c20c6c83b6334509229d548bd5be"
+        },
+        {
+          "path": "recomp/runtime/nvn/maxwell/translate.c",
+          "sha256": "389246801df460966d0f5b18e781aff89c65cab7cbd1edc0d5827be7569ca97d"
+        },
+        {
+          "path": "recomp/tools/gen.py",
+          "sha256": "1dc6dfbae6a4496f6d33a77b3dd9857a078254c3b4dfda7d096c05933f54cec3"
+        },
+        {
+          "path": "recomp/tools/lifter.py",
+          "sha256": "698cc14400b3c9f83530fa2a3c1c9fdc5c9a6819cca7c76d7708f970039dba79"
+        },
+        {
+          "path": "recomp/tools/nso.py",
+          "sha256": "edff083720f9ccdd6074a81197a718e4ee3c63f5aad5e5005423ec6b43ff14ab"
+        }
+      ],
+      "upstream_tests_executed": false
+    },
+    {
+      "repository": "BelmanteGu/SuperMarioWonderRecomp",
+      "status": "GitHub API and direct page returned 404; search has cached README; current source/branches/license not verified",
+      "upstream_tests_executed": false
+    }
+  ],
+  "other_source_inspection": {
+    "repository": "zeldamods/oead",
+    "commit": "5fb74e1128468380b47da23a5690891c8af4ab72",
+    "files": [
+      "src/sarc.cpp",
+      "src/include/oead/sarc.h",
+      "py/py_sarc.cpp"
+    ],
+    "purpose": "cross-check format fields; no code copied"
+  }
+}

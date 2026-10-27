@@ -1,0 +1,10 @@
+[package]
+name = "mkw-codegen"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+[dependencies]
+mkw-arm64 = { path = "../mkw-arm64" }
+
+[dev-dependencies]
+serde_json.workspace = true
