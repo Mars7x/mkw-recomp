@@ -47,6 +47,7 @@ pub enum MemoryOrder {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Op {
     Nop,
+    YieldHint,
     VectorFp(vector_fp::VectorFp),
     VectorInteger(vector_integer::VectorInteger),
     VectorCompare(vector_compare::Compare),
@@ -431,6 +432,8 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
             dst: reg(rd, false),
             src: reg((word >> 16) & 31, false),
         }
+    } else if word == 0xd503203f {
+        Op::YieldHint
     } else if word == 0xd503201f {
         Op::Nop
     } else if word & 0x1f800000 == 0x12800000 {
@@ -836,6 +839,20 @@ mod tail_compare_tests {
             0xd61f0001,
         ] {
             assert!(decode(word, 0).is_err(), "{word:08x}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod yield_tests {
+    #[test]
+    fn yield_is_exact_and_other_wait_hints_still_refuse() {
+        assert!(matches!(
+            super::decode(0xd503203f, 0).unwrap().op,
+            super::Op::YieldHint
+        ));
+        for word in [0xd503205f, 0xd503207f, 0xd503209f, 0xd50320bf] {
+            assert!(super::decode(word, 0).is_err());
         }
     }
 }

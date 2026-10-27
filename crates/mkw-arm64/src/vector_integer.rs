@@ -43,6 +43,14 @@ pub enum NarrowKind {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum VectorInteger {
+    MultiplyLow {
+        bytes: u8,
+        total: u8,
+        dst: u8,
+        lhs: u8,
+        rhs: u8,
+        rhs_lane: Option<u8>,
+    },
     PairwiseAdd {
         bytes: u8,
         total: u8,
@@ -150,6 +158,36 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let bytes = 1 << size;
     let dst = (w & 31) as u8;
     let lhs = ((w >> 5) & 31) as u8;
+    let multiply_low_regular = w & 0xbf20fc00 == 0x0e209c00;
+    let multiply_low_indexed = w & 0xbf00f400 == 0x0f008000;
+    if multiply_low_regular || multiply_low_indexed {
+        if size == 3 || (multiply_low_indexed && size == 0) {
+            return Some(Err("reserved SIMD multiply width".into()));
+        }
+        let rhs = ((w >> 16)
+            & if multiply_low_indexed && size == 1 {
+                15
+            } else {
+                31
+            }) as u8;
+        let rhs_lane = if multiply_low_indexed {
+            Some(if size == 1 {
+                (((w >> 11) & 1) * 4 + ((w >> 21) & 1) * 2 + ((w >> 20) & 1)) as u8
+            } else {
+                (((w >> 11) & 1) * 2 + ((w >> 21) & 1)) as u8
+            })
+        } else {
+            None
+        };
+        return Some(Ok(Op::VectorInteger(VectorInteger::MultiplyLow {
+            bytes,
+            total: if q { 16 } else { 8 },
+            dst,
+            lhs,
+            rhs,
+            rhs_lane,
+        })));
+    }
     if w & 0xbf20fc00 == 0x0e20bc00 {
         if !q && size == 3 {
             return Some(Err("reserved vector ADDP width".into()));
@@ -1037,5 +1075,37 @@ mod pairwise_add_tests {
             };
             assert_eq!((bytes, total, rhs), (8, 8, None));
         }
+    }
+}
+
+#[cfg(test)]
+mod multiply_low_tests {
+    use super::*;
+    #[test]
+    fn ordinary_and_indexed_multiply_domains() {
+        for base in [0x0e209c00, 0x0f008000] {
+            for q in 0..2 {
+                for size in 0..4 {
+                    let result = decode(base | (q << 30) | (size << 22) | 0x20020).unwrap();
+                    if size == 3 || (base == 0x0f008000 && size == 0) {
+                        assert!(result.is_err());
+                        continue;
+                    }
+                    let Op::VectorInteger(VectorInteger::MultiplyLow {
+                        bytes,
+                        total,
+                        rhs_lane,
+                        ..
+                    }) = result.unwrap()
+                    else {
+                        panic!()
+                    };
+                    assert_eq!((bytes, total), (1 << size, 8 << q));
+                    assert_eq!(rhs_lane.is_some(), base == 0x0f008000);
+                }
+            }
+        }
+        assert!(decode(0x5e229c20).is_none());
+        assert!(decode(0x2e229c20).is_none());
     }
 }

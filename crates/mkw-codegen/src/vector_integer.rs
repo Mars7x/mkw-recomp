@@ -8,6 +8,25 @@ fn mask(bytes: u8) -> u64 {
 }
 pub fn emit(op: VectorInteger) -> String {
     match op {
+        VectorInteger::MultiplyLow {
+            bytes,
+            total,
+            dst,
+            lhs,
+            rhs,
+            rhs_lane,
+        } => {
+            let bits = bytes * 8;
+            let mask = mask(bytes);
+            let right = if let Some(lane) = rhs_lane {
+                let offset = u32::from(lane) * u32::from(bits);
+                format!("(right[{}]>>{})", offset / 64, offset % 64)
+            } else {
+                "(right[half]>>shift)".into()
+            };
+            format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t a=(left[half]>>shift)&UINT64_C({mask}),b={right}&UINT64_C({mask});output[half]|=((a*b)&UINT64_C({mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes)
+        }
+
         VectorInteger::PairwiseAdd {
             bytes,
             total,

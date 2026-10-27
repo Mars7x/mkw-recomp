@@ -95,6 +95,9 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
         let next = format!("goto L_{:x};\n", i.pc + 4);
         match i.op {
             Op::Nop => out += &next,
+            // Architectural scheduling hint: the diagnostic profile chooses no
+            // scheduling effect. It still consumes its normal instruction budget.
+            Op::YieldHint => out += &next,
             Op::VectorCompare(op) => {
                 out += &vector_compare::emit(op);
                 out += &next;

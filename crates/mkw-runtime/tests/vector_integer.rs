@@ -121,7 +121,8 @@ fn elements(v: [u64; 2], bytes: u8, total: u8) -> Vec<u128> {
 fn oracle(op: VectorInteger, input: &[[u64; 2]; 32]) -> (usize, [u64; 2]) {
     let mut raw = [0u8; 16];
     let (dst, values, bytes) = match op {
-        VectorInteger::PairwiseAdd { .. }
+        VectorInteger::MultiplyLow { .. }
+        | VectorInteger::PairwiseAdd { .. }
         | VectorInteger::RightShift { .. }
         | VectorInteger::WidenArithmetic { .. }
         | VectorInteger::SaturatingShiftNarrow { .. }

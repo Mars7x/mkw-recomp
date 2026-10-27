@@ -4,6 +4,7 @@ Game inputs, generated artifacts, credentials and READMEs are never copied.
 Runs only when explicitly invoked; it installs no background watcher.
 """
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -32,6 +33,16 @@ def source_files():
         yield path
 
 
+def fingerprint_files(files):
+    return {name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for name, path in files.items()}
+
+
+def require_snapshot(expected, files):
+    if fingerprint_files(files) != expected:
+        raise SystemExit('Source snapshot changed; rerun publication and validation before pushing')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repository', required=True, help='Authorized GitHub HTTPS repository URL')
@@ -44,8 +55,10 @@ def main():
     owner_name = args.repository.removeprefix('https://github.com/').removesuffix('.git')
     if len(owner_name.split('/')) != 2 or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_./' for c in owner_name):
         parser.error('Invalid GitHub owner/repository')
+    frozen = fingerprint_files({path.relative_to(ROOT): path for path in source_files()})
     # Gate every commit/push on the workspace's required tests and supplied inputs.
     run(sys.executable, str(ROOT / 'tools/validate.py'), '--game', str(ROOT / 'base'), cwd=ROOT)
+    require_snapshot(frozen, {path.relative_to(ROOT): path for path in source_files()})
     account = json.loads(subprocess.check_output(['gh', 'api', 'user'], text=True))
     remote = json.loads(subprocess.check_output(['gh', 'repo', 'view', owner_name,
                                                '--json', 'isPrivate'], text=True))
@@ -64,6 +77,7 @@ def main():
     run(*git, 'config', 'user.email', f"{account['id']}+{account['login']}@users.noreply.github.com")
     run(*git, 'config', 'credential.https://github.com.helper', '!gh auth git-credential')
     files = {path.relative_to(ROOT): path for path in source_files()}
+    require_snapshot(frozen, files)
     # Delete only files this publisher recorded in its previous source snapshot.
     manifest_path = ROOT / 'private/publish-files.json'
     previous = json.loads(manifest_path.read_text()) if manifest_path.exists() else []
@@ -77,6 +91,8 @@ def main():
         destination = checkout / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
+    require_snapshot(frozen, {path.relative_to(ROOT): path for path in source_files()})
+    require_snapshot(frozen, {name: checkout / name for name in files})
     manifest_path.write_text(json.dumps([str(p) for p in files], indent=2) + '\n')
     run(*git, 'add', '-A', '--', *sorted({str(p) for p in files} | set(previous)))
     staged = subprocess.run([*git, 'diff', '--cached', '--quiet'], check=False)

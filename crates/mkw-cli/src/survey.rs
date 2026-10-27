@@ -116,6 +116,7 @@ pub fn run(root: &Path) -> Result<()> {
                             Op,
                         };
                         match instruction.op {
+                            Op::YieldHint => features.push("yield_hint"),
                             Op::FloatSelect { .. } => features.push("fp_conditional_select"),
                             Op::Convert(v) => {
                                 features.push("fp_integer_conversion");
@@ -127,6 +128,16 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::VectorCompare(_) => features.push("simd_fp_comparison"),
                             Op::VectorInteger(v) => {
                                 features.push("simd_integer_lanes_reduction");
+                                if let mkw_arm64::vector_integer::VectorInteger::MultiplyLow {
+                                    rhs_lane,
+                                    ..
+                                } = v
+                                {
+                                    features.push("simd_integer_multiply");
+                                    if rhs_lane.is_some() {
+                                        features.push("simd_integer_multiply_indexed");
+                                    }
+                                }
                                 if matches!(
                                     v,
                                     mkw_arm64::vector_integer::VectorInteger::PairwiseAdd { .. }

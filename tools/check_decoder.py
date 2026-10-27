@@ -295,6 +295,15 @@ for q in range(2):
   for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(0x0e20bc00|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
 for size in range(4):
  for rd,rn in [(0,1),(0,0),(31,31)]:words.add(0x5e31b800|(size<<22)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for u in range(2):
+   for size in range(4):
+    for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(0x0e209c00|(scalar<<28)|(q<<30)|(u<<29)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+   for size in range(4):
+    for index in range(8):
+     for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,15)]:words.add(0x0f008000|(scalar<<28)|(q<<30)|(u<<29)|(size<<22)|((index>>2)<<11)|(((index>>1)&1)<<21)|((index&1)<<20)|(rm<<16)|(rn<<5)|rd)
+words.update([0xd503201f,0xd503203f,0xd503205f,0xd503207f,0xd503209f,0xd50320bf])
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -325,9 +334,14 @@ for row in rows:
   if widen and v['amount']==0:aliases.add(('sxtl' if k=='SignedWiden' else 'uxtl')+('2' if v['upper'] else ''))
   if ins.mnemonic not in aliases or not ins.op_str.startswith(dest+', '+source):errors.append({'word':hex(word),'error':'SIMD shift kind/arrangement/registers differ','reference':ins.mnemonic+' '+ins.op_str})
   elif ins.mnemonic==name and ins.operands[-1].imm!=v['amount']:errors.append({'word':hex(word),'error':'SIMD shift amount differs','reference':ins.op_str})
+ elif kind=='YieldHint':
+  if word!=0xd503203f or ins.mnemonic!='yield':errors.append({'word':hex(word),'error':'YIELD exact hint differs'})
  elif kind=='VectorInteger':
   variant,v=next(iter(op['VectorInteger'].items()));letters={1:'b',2:'h',4:'s',8:'d'}
-  if variant=='PairwiseAdd':
+  if variant=='MultiplyLow':
+   name='mul';b=v['bytes'];reg=lambda n:'v'+str(n)+'.'+str(v['total']//b)+letters[b]
+   operands=reg(v['dst'])+', '+reg(v['lhs'])+', '+(reg(v['rhs']) if v['rhs_lane'] is None else 'v'+str(v['rhs'])+'.'+letters[b]+'['+str(v['rhs_lane'])+']')
+  elif variant=='PairwiseAdd':
    name='addp';b=v['bytes'];reg=lambda n:'v'+str(n)+'.'+str(v['total']//b)+letters[b]
    operands=reg(v['dst'])+', '+reg(v['lhs'])+', '+reg(v['rhs']) if v['rhs'] is not None else 'd'+str(v['dst'])+', v'+str(v['lhs'])+'.2d'
   elif variant=='RightShift':
