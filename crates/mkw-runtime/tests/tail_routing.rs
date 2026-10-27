@@ -36,7 +36,7 @@ fn native_br_local_external_tail_chains_cycles_and_refusals() {
             .replace(mkw_codegen::HEADER, "")
             .replace("mkw_guest", name);
     }
-    code += "int bad_budget(MkwCpu*c,uint64_t*budget){(void)budget;c->pc=0xd000;return MKW_EXIT_TAIL;}\n";
+    code += "unsigned bad_budget_abi_version(void){return MKW_CPU_ABI_VERSION;}\nint bad_budget(MkwCpu*c,uint64_t*budget){(void)budget;c->pc=0xd000;return MKW_EXIT_TAIL;}\n";
     let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../private/testing/tail-routing");
     std::fs::create_dir_all(&folder).unwrap();
     let src = folder.join("test.c");
@@ -65,7 +65,7 @@ fn native_br_local_external_tail_chains_cycles_and_refusals() {
             "{}",
             String::from_utf8_lossy(&build.stderr)
         );
-        // SAFETY: locally compiled synthetic functions implement ABI v7. Library
+        // SAFETY: locally compiled synthetic functions implement ABI v8. Library
         // outlives every symbol/attachment and callbacks are installed by guards.
         unsafe {
             let library = libloading::Library::new(&output).unwrap();

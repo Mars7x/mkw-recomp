@@ -304,9 +304,9 @@ for row in rows:
   if (v['bytes'],v['total'])!=(size,total):errors.append({'word':hex(word),'error':'SIMD FP comparison width differs','reference':ins.op_str})
   if (v['rhs'] is None)!=('#0.0' in ins.op_str):errors.append({'word':hex(word),'error':'SIMD FP compare-zero differs','reference':ins.op_str})
  elif kind=='InterleavedStructure':
-  v=op['InterleavedStructure'];name='ld2' if v['load'] else 'st2';arr=str(v['vector_bytes']//v['bytes'])+{1:'b',2:'h',4:'s',8:'d'}[v['bytes']]
+  v=op['InterleavedStructure'];name=('ld' if v['load'] else 'st')+str(v['registers'] if v['interleaved'] else 1);arr=str(v['vector_bytes']//v['bytes'])+{1:'b',2:'h',4:'s',8:'d'}[v['bytes']]
   reg=lambda r: 'sp' if r=='Sp' else 'x'+str(r['Gpr'])
-  operands='{v'+str(v['vector'])+'.'+arr+', v'+str((v['vector']+1)%32)+'.'+arr+'}, ['+reg(v['base'])+']'
+  operands='{'+', '.join('v'+str((v['vector']+n)%32)+'.'+arr for n in range(v['registers']))+'}, ['+reg(v['base'])+']'
   wb=v['writeback']
   if isinstance(wb,dict):operands+=', #'+str(wb['Immediate']) if 'Immediate' in wb else ', '+reg(wb['Register'])
   if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'interleaved structure arrangement/register/writeback differs','reference':ins.mnemonic+' '+ins.op_str,'expected':name+' '+operands})

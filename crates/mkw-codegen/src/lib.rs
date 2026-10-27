@@ -88,7 +88,7 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
         }
     }
     let mut out = format!(
-        "{HEADER}\nint mkw_guest_budget(MkwCpu *c, uint64_t *budget) {{\n goto L_{entry:x};\n"
+        "{HEADER}\nunsigned mkw_guest_budget_abi_version(void){{return MKW_CPU_ABI_VERSION;}}\nint mkw_guest_budget(MkwCpu *c, uint64_t *budget) {{\n goto L_{entry:x};\n"
     );
     for i in ins {
         out+=&format!("L_{:x}: ; /* guest {:016x}, instruction {:08x} */\n c->pc=c->module_base+UINT64_C({}); if (!*budget) return 2; --*budget;\n",i.pc,i.pc,i.word,i.pc);

@@ -2,7 +2,7 @@
 #define MKW_CPU_H
 #include <stdint.h>
 #include <stddef.h>
-#define MKW_CPU_ABI_VERSION 7u
+#define MKW_CPU_ABI_VERSION 8u
 #define MKW_CONVERT_FIXED_SCALE UINT32_C(0x10000)
 #define MKW_CONVERT_SCALE_SHIFT 8u
 /* Internal transfer request: dispatcher routes c->pc without changing LR. */
@@ -19,7 +19,7 @@ typedef struct MkwCpu MkwCpu;
 typedef int (*MkwConvert)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,uint64_t,uint64_t*,uint32_t*);
 /* Data barriers: DMB=0, DSB=1, followed by architectural option bits. */
 typedef int (*MkwBarrier)(void*,uint32_t,uint32_t);
-/* FP operations add/sub/mul/div/compare/compare-signaling/fused-add/negate/abs/sqrt/negated-multiply = 0..10; fused-subtract/negated-fused-add/negated-fused-subtract = 11..13; S/D format conversion = 14 (bytes is input width); max/min/max-number/min-number = 15..18; integral round N/P/M/Z/A/X/I = 19..25.
+/* FP operations add/sub/mul/div/compare/compare-signaling/fused-add/negate/abs/sqrt/negated-multiply = 0..10; fused-subtract/negated-fused-add/negated-fused-subtract = 11..13; S/D format conversion = 14 (bytes is input width); max/min/max-number/min-number = 15..18; integral round N/P/M/Z/A/X/I = 19..25; absolute difference = 26.
  * Output buffers commit only on success. Unsupported FPCR profiles refuse. */
 typedef int (*MkwFloating)(uint32_t,uint32_t,uint32_t,uint32_t,uint64_t,uint64_t,uint64_t,uint64_t*,uint32_t*);
 typedef int (*MkwOrderedMemory)(void*,uint32_t,int,uint64_t,uint64_t*,unsigned);
@@ -29,7 +29,7 @@ typedef int (*MkwOrderedMemory)(void*,uint32_t,int,uint64_t,uint64_t*,unsigned);
 typedef int (*MkwAtomicMemory)(void*,uint32_t,uint32_t,uint64_t,uint64_t,uint64_t,uint64_t*,unsigned);
 typedef int (*MkwCall)(void*,MkwCpu*,uint64_t,uint64_t*);
 typedef int (*MkwPAuth)(void*,uint32_t,uint32_t,uint64_t,uint64_t,uint64_t*);
-/* Memory callbacks transfer 1/2/4/8/16/32 little-endian bytes; buffer has ceil(bytes/8) words after full validation.
+/* Memory callbacks transfer 1/2/4/8/16/24/32/48/64 little-endian bytes; buffer has ceil(bytes/8) words after full validation.
  * Call callbacks share the budget and restore caller module_base. */
 typedef int (*MkwMemory)(void*,int,uint64_t,uint64_t*,unsigned);
 /* Thread registers are raw guest software values. Access requires explicit

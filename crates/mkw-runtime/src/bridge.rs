@@ -55,7 +55,9 @@ impl MemoryBridge {
         bytes: usize,
     ) -> Result<(), String> {
         let result = (|| {
-            if !matches!(bytes, 1 | 2 | 4 | 8 | 16 | 32) || words.len() < bytes.div_ceil(8) {
+            if !matches!(bytes, 1 | 2 | 4 | 8 | 16 | 24 | 32 | 48 | 64)
+                || words.len() < bytes.div_ceil(8)
+            {
                 return Err("unsupported memory width".into());
             }
             if order != MemoryOrder::Plain {
@@ -70,7 +72,7 @@ impl MemoryBridge {
                 .memory
                 .lock()
                 .map_err(|_| "memory backend lock poisoned")?;
-            let mut data = [0u8; 32];
+            let mut data = [0u8; 64];
             if store {
                 for (i, byte) in data[..bytes].iter_mut().enumerate() {
                     *byte = (words[i / 8] >> ((i % 8) * 8)) as u8;
@@ -78,7 +80,7 @@ impl MemoryBridge {
                 memory.write_bytes(address, &data[..bytes])?;
             } else {
                 memory.read_into(address, &mut data[..bytes])?;
-                let mut result = [0u64; 4];
+                let mut result = [0u64; 8];
                 for (i, &byte) in data[..bytes].iter().enumerate() {
                     result[i / 8] |= u64::from(byte) << ((i % 8) * 8);
                 }
@@ -195,7 +197,7 @@ unsafe fn dispatch(
         3 => MemoryOrder::Release,
         _ => return 3,
     };
-    if !matches!(bytes, 1 | 2 | 4 | 8 | 16 | 32) {
+    if !matches!(bytes, 1 | 2 | 4 | 8 | 16 | 24 | 32 | 48 | 64) {
         return 3;
     }
     // SAFETY: Attachment keeps the pinned bridge alive. The generated ABI always

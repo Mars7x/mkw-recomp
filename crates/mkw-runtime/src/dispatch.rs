@@ -2,7 +2,7 @@
 //! Guest executable permissions/module identity must be validated by the future
 //! game bootstrap; this API currently serves trusted synthetic native libraries.
 use crate::{
-    abi::{Call, Cpu, EXIT_TAIL},
+    abi::{Call, Cpu, CPU_ABI_VERSION, EXIT_TAIL},
     GuestAddr,
 };
 use libloading::{Library, Symbol};
@@ -15,7 +15,7 @@ pub struct NativeTarget<'code> {
 }
 impl<'code> NativeTarget<'code> {
     /// # Safety
-    /// The trusted symbol must implement native/cpu.h ABI v7, accept a live Cpu
+    /// The trusted symbol must implement native/cpu.h ABI v8, accept a live Cpu
     /// and shared budget, and never unwind into C or retain CPU/budget/context pointers past the call. No game compatibility is implied.
     /// The borrowed Library keeps the native code alive for all dispatch calls.
     pub unsafe fn load(
@@ -26,6 +26,17 @@ impl<'code> NativeTarget<'code> {
     ) -> Result<Self, String> {
         if address.0 % 4 != 0 || module_base % 4096 != 0 || address.0 < module_base {
             return Err("invalid native target address/base".into());
+        }
+        let name = symbol.strip_suffix(&[0]).unwrap_or(symbol);
+        if name.is_empty() || name.contains(&0) {
+            return Err("invalid native entry symbol".into());
+        }
+        let mut version_name = name.to_vec();
+        version_name.extend_from_slice(b"_abi_version\0");
+        let version = unsafe { library.get::<unsafe extern "C" fn() -> u32>(&version_name) }
+            .map_err(|e| e.to_string())?;
+        if unsafe { version() } != CPU_ABI_VERSION {
+            return Err("native target ABI version mismatch".into());
         }
         // SAFETY: the caller guarantees symbol ABI; Symbol borrows library lifetime.
         let function = unsafe { library.get::<Function>(symbol) }.map_err(|e| e.to_string())?;

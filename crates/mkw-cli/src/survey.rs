@@ -268,9 +268,13 @@ pub fn run(root: &Path) -> Result<()> {
                                     features.push("simd_shift_narrow");
                                 }
                             }
-                            Op::InterleavedStructure(_) => {
-                                features.push("interleaved_two_structure")
-                            }
+                            Op::InterleavedStructure(v) => features.push(if !v.interleaved {
+                                "multiple_ld1_structure"
+                            } else if v.registers == 2 {
+                                "interleaved_two_structure"
+                            } else {
+                                "interleaved_three_four_structure"
+                            }),
                             Op::Structure(v) => features.push(if v.replicate == 0 {
                                 "simd_lane_memory"
                             } else {
