@@ -30,7 +30,23 @@ pub enum Reduction {
     UnsignedMin,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum Accumulate {
+    Product,
+    Add,
+    Subtract,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum VectorInteger {
+    WidenMultiply {
+        bytes: u8,
+        dst: u8,
+        lhs: u8,
+        rhs: u8,
+        upper: bool,
+        signed: bool,
+        accumulate: Accumulate,
+        rhs_lane: Option<u8>,
+    },
     MultiplyHigh {
         bytes: u8,
         total: u8,
@@ -66,6 +82,44 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let bytes = 1 << size;
     let dst = (w & 31) as u8;
     let lhs = ((w >> 5) & 31) as u8;
+    let regular = match w & 0x9f20fc00 {
+        0x0e20c000 => Some(Accumulate::Product),
+        0x0e208000 => Some(Accumulate::Add),
+        0x0e20a000 => Some(Accumulate::Subtract),
+        _ => None,
+    };
+    let indexed_widen = match w & 0x9f00f400 {
+        0x0f00a000 => Some(Accumulate::Product),
+        0x0f002000 => Some(Accumulate::Add),
+        0x0f006000 => Some(Accumulate::Subtract),
+        _ => None,
+    };
+    if let Some(accumulate) = regular.or(indexed_widen) {
+        if size == 3 || (indexed_widen.is_some() && size == 0) {
+            return Some(Err("reserved widening multiply width".into()));
+        }
+        let indexed = indexed_widen.is_some();
+        let rhs = ((w >> 16) & if indexed && size == 1 { 15 } else { 31 }) as u8;
+        let rhs_lane = if indexed {
+            Some(if size == 1 {
+                (((w >> 11) & 1) * 4 + ((w >> 21) & 1) * 2 + ((w >> 20) & 1)) as u8
+            } else {
+                (((w >> 11) & 1) * 2 + ((w >> 21) & 1)) as u8
+            })
+        } else {
+            None
+        };
+        return Some(Ok(Op::VectorInteger(VectorInteger::WidenMultiply {
+            bytes,
+            dst,
+            lhs,
+            rhs,
+            upper: q,
+            signed: w & (1 << 29) == 0,
+            accumulate,
+            rhs_lane,
+        })));
+    }
     let indexed = match w & 0xaf00f400 {
         0x0f00c000 => Some(false),
         0x0f00d000 => Some(true),
@@ -375,5 +429,43 @@ mod indexed_product_tests {
             assert!(crate::decode(w, 0).is_err());
         }
         assert!(decode(0x1f40d020).is_none());
+    }
+}
+
+#[cfg(test)]
+mod widening_tests {
+    use super::*;
+    #[test]
+    fn widening_families_and_reserved_widths() {
+        for base in [
+            0x0e20c000, 0x0e208000, 0x0e20a000, 0x0f00a000, 0x0f002000, 0x0f006000,
+        ] {
+            for unsigned in 0..2 {
+                for upper in 0..2 {
+                    for size in 0..4 {
+                        let word = base | (unsigned << 29) | (upper << 30) | (size << 22) | 0x20020;
+                        let result = decode(word).unwrap();
+                        if size == 3 || (base & 0x01000000 != 0 && size == 0) {
+                            assert!(result.is_err());
+                        } else {
+                            let Op::VectorInteger(VectorInteger::WidenMultiply {
+                                signed,
+                                upper: high,
+                                bytes,
+                                ..
+                            }) = result.unwrap()
+                            else {
+                                panic!()
+                            };
+                            assert_eq!(
+                                (signed, high, bytes),
+                                (unsigned == 0, upper != 0, 1 << size)
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        assert!(decode(0x5e22c020).is_none());
     }
 }

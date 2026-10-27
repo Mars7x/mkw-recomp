@@ -129,6 +129,12 @@ pub fn run(root: &Path) -> Result<()> {
                                 features.push("simd_integer_lanes_reduction");
                                 if matches!(
                                     v,
+                                    mkw_arm64::vector_integer::VectorInteger::WidenMultiply { .. }
+                                ) {
+                                    features.push("simd_widening_multiply");
+                                }
+                                if matches!(
+                                    v,
                                     mkw_arm64::vector_integer::VectorInteger::MultiplyHigh { .. }
                                 ) {
                                     features.push("simd_saturating_multiply_high");

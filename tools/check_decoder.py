@@ -250,6 +250,15 @@ for scalar in range(2):
      for m in range(2):
       for base in [0x0f00c000,0x0f00d000]:
        for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,15)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(h<<11)|(l<<21)|(m<<20)|(rm<<16)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for u in range(2):
+   for size in range(4):
+    for base in [0x0e20c000,0x0e208000,0x0e20a000]:
+     for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(base|(scalar<<28)|(q<<30)|(u<<29)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+    for base in [0x0f00a000,0x0f002000,0x0f006000]:
+     for index in range(8):
+      for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,15)]:words.add(base|(scalar<<28)|(q<<30)|(u<<29)|(size<<22)|((index>>2)<<11)|(((index>>1)&1)<<21)|((index&1)<<20)|(rm<<16)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -282,7 +291,12 @@ for row in rows:
   elif ins.mnemonic==name and ins.operands[-1].imm!=v['amount']:errors.append({'word':hex(word),'error':'SIMD shift amount differs','reference':ins.op_str})
  elif kind=='VectorInteger':
   variant,v=next(iter(op['VectorInteger'].items()));letters={1:'b',2:'h',4:'s',8:'d'}
-  if variant=='MultiplyHigh':
+  if variant=='WidenMultiply':
+   name=('s' if v['signed'] else 'u')+{'Product':'mull','Add':'mlal','Subtract':'mlsl'}[v['accumulate']]+('2' if v['upper'] else '')
+   b=v['bytes'];reg=lambda n:'v'+str(n)+'.'+str((16 if v['upper'] else 8)//b)+letters[b]
+   operands='v'+str(v['dst'])+'.'+str(8//b)+letters[b*2]+', '+reg(v['lhs'])+', '
+   operands+=reg(v['rhs']) if v['rhs_lane'] is None else 'v'+str(v['rhs'])+'.'+letters[b]+'['+str(v['rhs_lane'])+']'
+  elif variant=='MultiplyHigh':
    name='sqrdmulh' if v['rounding'] else 'sqdmulh';scalar=bool(word&(1<<28))
    register=lambda n:letters[v['bytes']]+str(n) if scalar else 'v'+str(n)+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
    operands=', '.join(register(v[k]) for k in ['dst','lhs'])+', '

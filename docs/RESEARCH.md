@@ -199,3 +199,7 @@ A private 4,056-case synthetic SQDMULH/SQRDMULH experiment validated independent
 
 
 The multiple-structure encoding table was independently constructed and cross-checked with private Capstone, including distinct contiguous LD1 lists and LD2/LD3/LD4 interleaving, Q0 single-D constraints, list wrapping and post-index fields. Expanding beyond the old 32-byte contract deliberately increments CPU ABI to v8, updates both guards/buffers and adds per-native-entry version checks. Independent byte-array and QEMU fixtures compare up to four destination vectors and 64 memory bytes; stale ABI and buffer/fault negatives are required. No upstream or game code was copied. Software-only and unmodeled hardware/profile limitations remain explicit.
+
+## Widening multiply provenance
+
+The widening register/indexed masks and shared H/L/M lane fields were constructed independently and checked using private Capstone. Native code uses unsigned modulo arithmetic; the independent oracle uses i128 products and accumulator arithmetic followed by byte truncation. Tests include signed/unsigned boundaries, both source halves, destination aliases, V31, indexed lanes and preserved status fields. All implementation and synthetic ELF code is original; no new upstream sources or game code were copied. QEMU remains a software oracle and original execution stays gated.

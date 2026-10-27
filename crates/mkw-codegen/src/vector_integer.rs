@@ -1,4 +1,4 @@
-use mkw_arm64::vector_integer::{Kind, Reduction, VectorInteger};
+use mkw_arm64::vector_integer::{Accumulate, Kind, Reduction, VectorInteger};
 fn mask(bytes: u8) -> u64 {
     if bytes == 8 {
         u64::MAX
@@ -8,6 +8,46 @@ fn mask(bytes: u8) -> u64 {
 }
 pub fn emit(op: VectorInteger) -> String {
     match op {
+        VectorInteger::WidenMultiply {
+            bytes,
+            dst,
+            lhs,
+            rhs,
+            upper,
+            signed,
+            accumulate,
+            rhs_lane,
+        } => {
+            let bits = bytes * 8;
+            let outbits = bits * 2;
+            let input_mask = mask(bytes);
+            let output_mask = mask(bytes * 2);
+            let start = if upper { 64 } else { 0 };
+            let sign = 1u64 << (bits - 1);
+            let selected = if let Some(lane) = rhs_lane {
+                format!(
+                    "(right[{}]>>{})",
+                    u32::from(lane) * u32::from(bits) / 64,
+                    u32::from(lane) * u32::from(bits) % 64
+                )
+            } else {
+                "(right[offset/64]>>(offset%64))".into()
+            };
+            let extend = if signed {
+                format!("a=(a^UINT64_C({sign}))-UINT64_C({sign});b=(b^UINT64_C({sign}))-UINT64_C({sign});")
+            } else {
+                String::new()
+            };
+            let value = match accumulate {
+                Accumulate::Product => "a*b",
+                Accumulate::Add => "prior+a*b",
+                Accumulate::Subtract => "prior-a*b",
+            };
+            // Unsigned arithmetic defines modulo 2^64 even for signed products;
+            // input sign extension and the widened output mask select the ISA bits.
+            format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},old[2]={{c->vregs[{dst}][0],c->vregs[{dst}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset={start}+lane*{bits},out=lane*{outbits};uint64_t a=(left[offset/64]>>(offset%64))&UINT64_C({input_mask}),b={selected}&UINT64_C({input_mask}),prior=(old[out/64]>>(out%64))&UINT64_C({output_mask});(void)prior;{extend}uint64_t value=({value})&UINT64_C({output_mask});output[out/64]|=value<<(out%64);}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",8/bytes)
+        }
+
         VectorInteger::MultiplyHigh {
             bytes,
             total,
