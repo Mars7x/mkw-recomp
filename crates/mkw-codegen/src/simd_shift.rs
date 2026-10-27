@@ -7,6 +7,15 @@ fn mask(bytes: u8) -> u64 {
     }
 }
 pub fn emit(op: Shift) -> String {
+    if op.kind == Kind::Narrow {
+        let bits = op.bytes * 8;
+        let input_bits = bits * 2;
+        let n = op.amount;
+        let m = mask(op.bytes);
+        let dst = op.dst;
+        let src = op.src;
+        return format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},value=0;for(unsigned lane=0;lane<{};lane++){{unsigned from=lane*{input_bits};uint64_t element=((source[from/64]>>(from%64))>>{n})&UINT64_C({m});value|=element<<(lane*{bits});}}c->vregs[{dst}][{}]=value;{}}}\n",8/op.bytes,u8::from(op.upper),if op.upper{String::new()}else{format!("c->vregs[{dst}][1]=0;")});
+    }
     let bits = op.bytes * 8;
     let input_mask = mask(op.bytes);
     let sign = 1u64 << (bits - 1);
@@ -21,6 +30,7 @@ pub fn emit(op: Shift) -> String {
     };
     let start = if op.upper { 64 } else { 0 };
     let value = match op.kind {
+        Kind::Narrow => unreachable!(),
         Kind::Left => format!("a<<{n}"),
         Kind::UnsignedRight => {
             if n == bits {

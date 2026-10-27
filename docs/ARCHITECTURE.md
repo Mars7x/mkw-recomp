@@ -98,3 +98,6 @@ The supplied-binary survey retains its full bounded extent-lifting census but se
 
 
 Interleaved LD2/ST2 now use a distinct typed structure operation and one checked 16/32-byte transfer. Complete source/base snapshots preserve vector-list wrapping, aliases and offset wrap; complete-range validation and deferred destination/writeback preserve failure state. Legal Q0/Q1 B/H/S/D arrangements are checked separately; Q0 single-D forms reject. Metadata marks the required memory backend and selects representative objects. ABI v7/callback capacity remains unchanged. Other multiple LD1/LD3/LD4 and lane/replicate multi-register forms still require their own semantics and capacity checks. Actual SP/access traps, device/weak-memory behavior and target/bootstrap gates remain unverified.
+
+
+Non-saturating integer NEG and SHRN/SHRN2 now use defined unsigned native arithmetic with complete source snapshots. NEG wraps per element; SHRN drops bits without rounding and clears the unused upper half, while SHRN2 replaces only the upper destination half. All legal narrowing amounts and B/H/S output widths are bounded at decode time; scalar/reserved neighbors retain their previous ownership or reject. No callbacks, ABI v7 changes or saturation/QC semantics are introduced. Original execution and actual SIMD/FP access-trap behavior remain gated.

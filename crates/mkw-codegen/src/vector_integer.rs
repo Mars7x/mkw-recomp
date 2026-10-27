@@ -28,6 +28,7 @@ pub fn emit(op: VectorInteger) -> String {
             let expression = match kind {
                 Kind::Add => "a+b".into(),
                 Kind::Subtract => "a-b".into(),
+                Kind::Negate => "UINT64_C(0)-a".into(),
                 Kind::UnsignedMax => "a>b?a:b".into(),
                 Kind::UnsignedMin => "a<b?a:b".into(),
                 Kind::SignedMax => format!("(a^UINT64_C({sign}))>(b^UINT64_C({sign}))?a:b"),
@@ -47,7 +48,7 @@ pub fn emit(op: VectorInteger) -> String {
                     format!("({predicate})?UINT64_C({mask}):UINT64_C(0)")
                 }
             };
-            format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{right}][0],c->vregs[{right}][1]}},output[2]={{0,0}};(void)right;for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t a=(left[half]>>shift)&UINT64_C({mask}),b={rhs};uint64_t value={expression};output[half]|=(value&UINT64_C({mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes)
+            format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{right}][0],c->vregs[{right}][1]}},output[2]={{0,0}};(void)right;for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t a=(left[half]>>shift)&UINT64_C({mask}),b={rhs};(void)b;uint64_t value={expression};output[half]|=(value&UINT64_C({mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes)
         }
         VectorInteger::Reduce {
             bytes,

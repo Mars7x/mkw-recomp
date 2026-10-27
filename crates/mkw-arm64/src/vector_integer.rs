@@ -5,6 +5,7 @@ use serde::Serialize;
 pub enum Kind {
     Add,
     Subtract,
+    Negate,
     SignedMax,
     SignedMin,
     UnsignedMax,
@@ -98,6 +99,7 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
         (kind, Some(((w >> 16) & 31) as u8))
     } else {
         let kind = match w & 0xaf3ffc00 {
+            0x2e20b800 => Negate,
             0x0e209800 => Equal,
             0x2e208800 => SignedGe,
             0x0e208800 => SignedGt,
@@ -212,5 +214,32 @@ mod minmax_tests {
             crate::decode(0x1e226c20, 0).unwrap().op,
             Op::FloatSelect { .. }
         ));
+    }
+}
+
+#[cfg(test)]
+mod negate_tests {
+    use super::*;
+    #[test]
+    fn negate_arrangements_and_domains() {
+        for scalar in 0..2 {
+            for q in 0..2 {
+                for size in 0..4 {
+                    let w = 0x2e20bbff | (scalar << 28) | (q << 30) | (size << 22);
+                    if scalar != 0 && q == 0 {
+                        assert!(decode(w).is_none());
+                        continue;
+                    }
+                    if (scalar != 0 && size != 3) || (scalar == 0 && q == 0 && size == 3) {
+                        assert!(crate::decode(w, 0).is_err());
+                        continue;
+                    }
+                    assert!(
+                        matches!(crate::decode(w,0).unwrap().op,Op::VectorInteger(VectorInteger::Lanes{dst:31,lhs:31,rhs:None,bytes,kind:Kind::Negate,..})if bytes==1<<size)
+                    );
+                }
+            }
+        }
+        assert!(decode(0x6e207820).is_none());
     }
 }

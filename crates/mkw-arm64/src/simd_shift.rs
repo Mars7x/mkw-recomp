@@ -10,6 +10,7 @@ pub enum Kind {
     InsertRight,
     UnsignedWiden,
     SignedWiden,
+    Narrow,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Shift {
@@ -24,6 +25,26 @@ pub struct Shift {
 pub fn decode(w: u32) -> Option<Result<Op, String>> {
     if w & (1 << 28) != 0 && w & (1 << 30) == 0 {
         return None;
+    }
+    if w & 0xaf80fc00 == 0x0f008400 {
+        let imm = ((w >> 16) & 127) as u8;
+        if imm < 8 {
+            return None;
+        }
+        if imm >= 64 || w & (1 << 28) != 0 {
+            return Some(Err("reserved SHRN arrangement".into()));
+        }
+        let bits = 1u8 << (7 - imm.leading_zeros());
+        let upper = w & (1 << 30) != 0;
+        return Some(Ok(Op::SimdShift(Shift {
+            bytes: bits / 8,
+            total: if upper { 16 } else { 8 },
+            dst: (w & 31) as u8,
+            src: ((w >> 5) & 31) as u8,
+            amount: bits * 2 - imm,
+            upper,
+            kind: Kind::Narrow,
+        })));
     }
     if w & 0xaf3ffc00 == 0x2e213800 {
         let size = ((w >> 22) & 3) as u8;
@@ -153,5 +174,28 @@ mod shll_tests {
         }
         assert!(decode(0x2e203820).is_none());
         assert!(decode(0x2e213c20).is_none());
+    }
+}
+
+#[cfg(test)]
+mod narrow_tests {
+    use super::*;
+    #[test]
+    fn narrowing_shift_bounds_and_reserved_forms() {
+        for q in 0..2 {
+            for bits in [8u32, 16, 32] {
+                for n in 1..=bits {
+                    let w = 0x0f0087ff | (q << 30) | ((bits * 2 - n) << 16);
+                    assert!(
+                        matches!(crate::decode(w,0).unwrap().op,Op::SimdShift(Shift{bytes,dst:31,src:31,amount,upper,kind:Kind::Narrow,..})if (u32::from(bytes)*8,u32::from(amount),upper)==(bits,n,q!=0))
+                    );
+                }
+            }
+        }
+        for w in [0x0f408420, 0x5f088420] {
+            assert!(crate::decode(w, 0).is_err());
+        }
+        assert!(decode(0x0f008420).is_none());
+        assert!(decode(0x0f088c20).is_none());
     }
 }

@@ -40,7 +40,9 @@ fn words(include31: bool) -> Vec<u32> {
                 words.insert(base | fields | (rm << 16) | (rn << 5) | rd);
             }
         }
-        for base in [0x0e209800, 0x2e208800, 0x0e208800, 0x2e209800, 0x0e20a800] {
+        for base in [
+            0x0e209800, 0x2e208800, 0x0e208800, 0x2e209800, 0x0e20a800, 0x2e20b800,
+        ] {
             for (rd, rn) in [(0, 1), (0, 0), (31, 31), (31, 1)] {
                 if !include31 && rd == 31 {
                     continue;
@@ -138,6 +140,7 @@ fn oracle(op: VectorInteger, input: &[[u64; 2]; 32]) -> (usize, [u64; 2]) {
                 .map(|(&a, b)| match kind {
                     Kind::Add => ((a as i128 + b as i128) as u128) & mask(bits),
                     Kind::Subtract => ((a as i128 - b as i128) as u128) & mask(bits),
+                    Kind::Negate => (-signed(a, bits) as u128) & mask(bits),
                     Kind::UnsignedMax => a.max(b),
                     Kind::UnsignedMin => a.min(b),
                     Kind::SignedMax => (signed(a, bits).max(signed(b, bits)) as u128) & mask(bits),
@@ -277,6 +280,7 @@ fn integer_lanes_masks_and_reductions_match_wider_math() {
                     .unwrap()
             };
             for i in 0..values.len() {
+                let initial_fpsr = if i % 2 == 0 { 0x0800009f } else { 0x0000009f };
                 let mut cpu = Cpu {
                     sp: 99,
                     n: 1,
@@ -284,7 +288,7 @@ fn integer_lanes_masks_and_reductions_match_wider_math() {
                     c: 1,
                     v: 1,
                     fpcr: 0x02c00000,
-                    fpsr: 0x0800009f,
+                    fpsr: initial_fpsr,
                     ..Cpu::default()
                 };
                 cpu.x = std::array::from_fn(|r| 0xdeadbeef00000000 | r as u64);
@@ -305,7 +309,7 @@ fn integer_lanes_masks_and_reductions_match_wider_math() {
                 assert_eq!(cpu.x, general);
                 assert_eq!(
                     (cpu.sp, cpu.n, cpu.z, cpu.c, cpu.v, cpu.fpcr, cpu.fpsr),
-                    (99, 1, 0, 1, 1, 0x02c00000, 0x0800009f)
+                    (99, 1, 0, 1, 1, 0x02c00000, initial_fpsr)
                 );
             }
         }

@@ -127,6 +127,15 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::VectorCompare(_) => features.push("simd_fp_comparison"),
                             Op::VectorInteger(v) => {
                                 features.push("simd_integer_lanes_reduction");
+                                if matches!(
+                                    v,
+                                    mkw_arm64::vector_integer::VectorInteger::Lanes {
+                                        kind: mkw_arm64::vector_integer::Kind::Negate,
+                                        ..
+                                    }
+                                ) {
+                                    features.push("simd_integer_negate");
+                                }
                                 use mkw_arm64::vector_integer::{Kind, Reduction, VectorInteger};
                                 match v {
                                     VectorInteger::Lanes {
@@ -238,7 +247,12 @@ pub fn run(root: &Path) -> Result<()> {
                                 }
                             }
                             Op::Crc32 { .. } => features.push("crc32"),
-                            Op::SimdShift(_) => features.push("simd_immediate_shift"),
+                            Op::SimdShift(v) => {
+                                features.push("simd_immediate_shift");
+                                if v.kind == mkw_arm64::simd_shift::Kind::Narrow {
+                                    features.push("simd_shift_narrow");
+                                }
+                            }
                             Op::InterleavedStructure(_) => {
                                 features.push("interleaved_two_structure")
                             }

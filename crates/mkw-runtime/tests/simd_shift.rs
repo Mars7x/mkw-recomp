@@ -110,6 +110,7 @@ fn oracle(op: Shift, before: &[[u64; 2]; 32]) -> [u64; 2] {
             .sum();
         let n = u32::from(op.amount);
         let value = match op.kind {
+            Kind::Narrow => unreachable!("narrowing has a separate byte oracle"),
             Kind::Left | Kind::UnsignedWiden => a << n,
             Kind::UnsignedRight => a >> n,
             Kind::SignedRight => (signed(a, bits) >> n) as u128,
