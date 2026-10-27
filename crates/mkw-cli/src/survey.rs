@@ -174,6 +174,9 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::Atomic(_) => features.push("lse_atomic"),
                             Op::Simd(v) => {
                                 features.push("simd_register_bits");
+                                if matches!(v, mkw_arm64::simd::Simd::Transform { .. }) {
+                                    features.push("simd_raw_transform");
+                                }
                                 if matches!(
                                     v,
                                     mkw_arm64::simd::Simd::Table { .. }
@@ -186,6 +189,7 @@ pub fn run(root: &Path) -> Result<()> {
                                 }
                             }
                             Op::Crc32 { .. } => features.push("crc32"),
+                            Op::SimdShift(_) => features.push("simd_immediate_shift"),
                             Op::Structure(v) => features.push(if v.replicate == 0 {
                                 "simd_lane_memory"
                             } else {

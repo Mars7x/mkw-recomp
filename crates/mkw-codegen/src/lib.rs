@@ -7,6 +7,7 @@ mod floating;
 mod integer;
 mod memory;
 mod simd;
+mod simd_shift;
 mod structures;
 mod vector_compare;
 mod vector_fp;
@@ -40,6 +41,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("bitops.rs"),
     include_str!("integer.rs"),
     include_str!("simd.rs"),
+    include_str!("simd_shift.rs"),
     include_str!("structures.rs"),
     include_str!("atomics.rs"),
     include_str!("floating.rs"),
@@ -145,6 +147,10 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
             }
             Op::Atomic(op) => {
                 out += &atomics::emit(op);
+                out += &next;
+            }
+            Op::SimdShift(op) => {
+                out += &simd_shift::emit(op);
                 out += &next;
             }
             Op::Structure(op) => {

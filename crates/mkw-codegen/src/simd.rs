@@ -1,5 +1,5 @@
 use super::{r, write};
-use mkw_arm64::simd::{ImmediateKind, LaneSource, Simd};
+use mkw_arm64::simd::{ImmediateKind, LaneSource, Simd, TransformKind};
 fn mask(bytes: u8) -> u64 {
     if bytes == 8 {
         u64::MAX
@@ -19,6 +19,15 @@ fn lane(source: LaneSource, bytes: u8) -> String {
 }
 pub fn emit(op: Simd) -> String {
     match op {
+        Simd::Transform{dst,src,bytes,vector_bytes,kind}=>{
+            let mut out=format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{0,0}};\n");
+            match kind{
+                TransformKind::Not=>out+=&format!("for(unsigned half=0;half<{};half++)output[half]=~source[half];\n",vector_bytes/8),
+                TransformKind::ReverseBits=>out+=&format!("for(unsigned i=0;i<{vector_bytes};i++){{uint64_t value=(source[i/8]>>((i%8)*8))&UINT64_C(255),reverse=0;for(unsigned bit=0;bit<8;bit++)reverse|=((value>>bit)&UINT64_C(1))<<(7-bit);output[i/8]|=reverse<<((i%8)*8);}}\n"),
+                TransformKind::ReverseElements(block)=>out+=&format!("for(unsigned i=0;i<{vector_bytes};i+={bytes}){{unsigned at=(i/{block})*{block}+{block}-{bytes}-(i%{block});uint64_t value=(source[at/8]>>((at%8)*8))&UINT64_C({});output[i/8]|=value<<((i%8)*8);}}\n",mask(bytes)),
+            }
+            out+=&format!("c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n");out
+        }
         Simd::Table {dst,base,count,index,bytes,extension}=>{
             let mut out=format!("{{uint64_t table[{count}][2],index[2]={{c->vregs[{index}][0],c->vregs[{index}][1]}},old[2]={{c->vregs[{dst}][0],c->vregs[{dst}][1]}},output[2]={{0,0}};(void)old;\n");
             for slot in 0..count {let reg=(base+slot)%32;out+=&format!("table[{slot}][0]=c->vregs[{reg}][0];table[{slot}][1]=c->vregs[{reg}][1];\n");}

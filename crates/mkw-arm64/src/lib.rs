@@ -6,6 +6,7 @@ pub mod floating;
 pub mod integer;
 pub mod memory;
 pub mod simd;
+pub mod simd_shift;
 pub mod structures;
 pub mod vector_compare;
 pub mod vector_fp;
@@ -17,6 +18,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("bitops.rs"),
     include_str!("integer.rs"),
     include_str!("simd.rs"),
+    include_str!("simd_shift.rs"),
     include_str!("structures.rs"),
     include_str!("atomics.rs"),
     include_str!("floating.rs"),
@@ -49,6 +51,7 @@ pub enum Op {
     VectorInteger(vector_integer::VectorInteger),
     VectorCompare(vector_compare::Compare),
     Structure(structures::Structure),
+    SimdShift(simd_shift::Shift),
     Crc32 {
         dst: Reg,
         lhs: Reg,
@@ -284,6 +287,9 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
     let rd = word & 31;
     let rn = (word >> 5) & 31;
     let op = if let Some(result) = structures::decode(word) {
+        result
+            .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if let Some(result) = simd_shift::decode(word) {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
     } else if let Some(result) = vector_integer::decode(word) {

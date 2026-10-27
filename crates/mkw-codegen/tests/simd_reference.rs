@@ -214,6 +214,7 @@ fn raw_simd_native_matches_independent_qemu_execution() {
             Simd::Permute { .. } => "permutation",
             Simd::Table { .. } => "table",
             Simd::ByteCount { .. } => "byte_count",
+            Simd::Transform { .. } => "transform",
         };
         *families.entry(kind).or_insert(0usize) += 1;
     }

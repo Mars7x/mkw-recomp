@@ -195,6 +195,15 @@ for scalar in range(2):
  for q in range(2):
   for imm in range(128):
    for base in [0x0f00e400,0x2f00e400,0x0f00fc00,0x2f00fc00]:words.add(base|(scalar<<28)|(q<<30)|(imm<<16)|(1<<5))
+for q in range(2):
+ for size in range(4):
+  for base in [0x0e200800,0x2e200800,0x0e201800,0x2e205800,0x2e605800]:
+   for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(q<<30)|(size<<22)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for imm in range(128):
+   for base in [0x0f005400,0x2f005400,0x0f000400,0x2f000400,0x2f004400,0x0f00a400,0x2f00a400]:
+    for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(scalar<<28)|(q<<30)|(imm<<16)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -207,7 +216,21 @@ for row in rows:
  word=row['word'];decoded=list(decoder.disasm(word.to_bytes(4,'little'),0x1000));op=row['instruction']['op'];kind=next(iter(op))if isinstance(op,dict)else op;counts[kind]+=1
  if len(decoded)!=1:errors.append({'word':hex(word),'error':'accepted encoding not decoded by Capstone'});continue
  ins=decoded[0]
- if kind=='VectorInteger':
+ if kind=='SimdShift':
+  v=op['SimdShift'];k=v['kind'];widen=k in ['SignedWiden','UnsignedWiden'];scalar=bool(word&(1<<28));letters={1:'b',2:'h',4:'s',8:'d'}
+  if widen:
+   name=('sshll' if k=='SignedWiden' else 'ushll')+('2' if v['upper'] else '')
+   dest='v'+str(v['dst'])+'.'+str(16//(v['bytes']*2))+letters[v['bytes']*2]
+   source='v'+str(v['src'])+'.'+str((16 if v['upper'] else 8)//v['bytes'])+letters[v['bytes']]
+  else:
+   name={'Left':'shl','UnsignedRight':'ushr','SignedRight':'sshr','InsertLeft':'sli','InsertRight':'sri'}[k]
+   reg=lambda n: 'd'+str(n) if scalar else 'v'+str(n)+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
+   dest,source=reg(v['dst']),reg(v['src'])
+  aliases={name}
+  if widen and v['amount']==0:aliases.add(('sxtl' if k=='SignedWiden' else 'uxtl')+('2' if v['upper'] else ''))
+  if ins.mnemonic not in aliases or not ins.op_str.startswith(dest+', '+source):errors.append({'word':hex(word),'error':'SIMD shift kind/arrangement/registers differ','reference':ins.mnemonic+' '+ins.op_str})
+  elif ins.mnemonic==name and ins.operands[-1].imm!=v['amount']:errors.append({'word':hex(word),'error':'SIMD shift amount differs','reference':ins.op_str})
+ elif kind=='VectorInteger':
   variant,v=next(iter(op['VectorInteger'].items()));letters={1:'b',2:'h',4:'s',8:'d'}
   if variant=='Lanes':
    name={'Add':'add','Subtract':'sub','Equal':'cmeq','Test':'cmtst','SignedGe':'cmge','SignedGt':'cmgt','UnsignedGe':'cmhs','UnsignedGt':'cmhi','SignedLe':'cmle','SignedLt':'cmlt'}[v['kind']]
@@ -274,8 +297,12 @@ for row in rows:
   size=1 if ins.mnemonic.endswith('b')else 2 if ins.mnemonic.endswith('h')else 4 if register.startswith('w')else 8
   if size!=op['Atomic']['bytes']:errors.append({'word':hex(word),'error':'atomic width differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='Simd':
-  expected={'fmov','mov','movi','mvni','orr','bic','dup','umov','smov','and','orn','eor','bsl','bit','bif','ext','zip1','zip2','uzp1','uzp2','trn1','trn2','tbl','tbx','cnt'}
+  expected={'fmov','mov','movi','mvni','orr','bic','dup','umov','smov','and','orn','eor','bsl','bit','bif','ext','zip1','zip2','uzp1','uzp2','trn1','trn2','tbl','tbx','cnt','mvn','not','rbit','rev16','rev32','rev64'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'SIMD family differs','reference':ins.mnemonic+' '+ins.op_str})
+  if isinstance(op['Simd'],dict) and 'Transform' in op['Simd']:
+   v=op['Simd']['Transform'];k=v['kind'];name='mvn' if k=='Not' else 'rbit' if k=='ReverseBits' else 'rev'+str(k['ReverseElements']*8)
+   arr=str(v['vector_bytes']//v['bytes'])+{1:'b',2:'h',4:'s'}[v['bytes']];operands='v'+str(v['dst'])+'.'+arr+', v'+str(v['src'])+'.'+arr
+   if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'SIMD transform arrangement/registers differ','reference':ins.mnemonic+' '+ins.op_str})
   if isinstance(op['Simd'],dict) and 'Table' in op['Simd']:
    v=op['Simd']['Table'];name='tbx' if v['extension'] else 'tbl';arr=str(v['bytes'])+'b'
    table=', '.join('v'+str((v['base']+i)%32)+'.16b' for i in range(v['count']))

@@ -13,7 +13,20 @@ pub enum ImmediateKind {
     Bic,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum TransformKind {
+    Not,
+    ReverseBits,
+    ReverseElements(u8),
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Simd {
+    Transform {
+        dst: u8,
+        src: u8,
+        bytes: u8,
+        vector_bytes: u8,
+        kind: TransformKind,
+    },
     Table {
         dst: u8,
         base: u8,
@@ -134,6 +147,39 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
             dst,
             src,
             bytes: vector_bytes,
+        })));
+    }
+    let reversal = match w & 0xbf3ffc00 {
+        0x0e200800 => Some(8),
+        0x2e200800 => Some(4),
+        0x0e201800 => Some(2),
+        _ => None,
+    };
+    if let Some(block) = reversal {
+        let bytes = 1 << ((w >> 22) & 3);
+        if bytes >= block {
+            return Some(Err("reserved SIMD element reversal arrangement".into()));
+        }
+        return Some(Ok(Op::Simd(Simd::Transform {
+            dst,
+            src,
+            bytes,
+            vector_bytes,
+            kind: TransformKind::ReverseElements(block),
+        })));
+    }
+    let transform = match w & 0xbffffc00 {
+        0x2e205800 => Some(TransformKind::Not),
+        0x2e605800 => Some(TransformKind::ReverseBits),
+        _ => None,
+    };
+    if let Some(kind) = transform {
+        return Some(Ok(Op::Simd(Simd::Transform {
+            dst,
+            src,
+            bytes: 1,
+            vector_bytes,
+            kind,
         })));
     }
     let permutation = match w & 0xbf20fc00 {
@@ -493,6 +539,43 @@ mod table_count_tests {
             Op::Simd(Simd::ExtractVector { .. })
         ));
         for w in [0x4e220020, 0x4e028020, 0x4e605820, 0x5e205820] {
+            assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod transform_tests {
+    use super::*;
+    #[test]
+    fn reversal_arrangements_not_rbit_and_neighbor_count() {
+        for q in 0..2 {
+            for (base, block) in [(0x0e200800, 8), (0x2e200800, 4), (0x0e201800, 2)] {
+                for size in 0..4 {
+                    let w = base | (q << 30) | (size << 22) | 0x3ff;
+                    if 1 << size >= block {
+                        assert!(crate::decode(w, 0).is_err());
+                    } else {
+                        assert!(
+                            matches!(crate::decode(w,0).unwrap().op,Op::Simd(Simd::Transform{dst:31,src:31,bytes,vector_bytes,kind:TransformKind::ReverseElements(b)})if(bytes,vector_bytes,b)==(1<<size,8<<q,block))
+                        );
+                    }
+                }
+            }
+            for (base, kind) in [
+                (0x2e205800, TransformKind::Not),
+                (0x2e605800, TransformKind::ReverseBits),
+            ] {
+                assert!(
+                    matches!(crate::decode(base|(q<<30)|0x3ff,0).unwrap().op,Op::Simd(Simd::Transform{dst:31,src:31,kind:k,..})if k==kind)
+                );
+            }
+        }
+        assert!(matches!(
+            crate::decode(0x4e205820, 0).unwrap().op,
+            Op::Simd(Simd::ByteCount { .. })
+        ));
+        for w in [0x5e200820, 0x4e200c20, 0x6ea05820] {
             assert!(crate::decode(w, 0).is_err(), "{w:x}");
         }
     }
