@@ -48,6 +48,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("exclusive.rs"),
     include_str!("../../../native/exclusive_v10.h"),
     include_str!("../../../native/calls_v2.h"),
+    include_str!("../../../native/services_v3.h"),
     include_str!("floating.rs"),
     include_str!("vector_fp.rs"),
     include_str!("vector_integer.rs"),
@@ -61,21 +62,26 @@ pub const SOURCE_INPUTS: &[&str] = &[
 ];
 pub const HEADER: &str = include_str!("../../../native/cpu.h");
 pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
-    emit_profile(ins, entry, false, false)
+    emit_profile(ins, entry, false, false, false)
 }
 /// Explicit serialized-owned-memory v10 profile; old entry ABI is unchanged.
 pub fn emit_exclusive_v10(ins: &[Instruction], entry: u64) -> Result<String, String> {
-    emit_profile(ins, entry, true, false)
+    emit_profile(ins, entry, true, false, false)
 }
 /// Explicit v10 frame/exclusive-v2 call profile; never installs prefix ABI9 calls.
 pub fn emit_exclusive_calls_v10(ins: &[Instruction], entry: u64) -> Result<String, String> {
-    emit_profile(ins, entry, true, true)
+    emit_profile(ins, entry, true, true, false)
+}
+/// Explicit CPU-v10/table-v3 service profile; no default SVC acceptance.
+pub fn emit_services_v3(ins: &[Instruction], entry: u64) -> Result<String, String> {
+    emit_profile(ins, entry, true, true, true)
 }
 fn emit_profile(
     ins: &[Instruction],
     entry: u64,
     exclusive_v10: bool,
     calls_v2: bool,
+    services_v3: bool,
 ) -> Result<String, String> {
     if ins.is_empty() {
         return Err("empty translation".into());
@@ -108,17 +114,23 @@ fn emit_profile(
         }
     }
     let mut out = if exclusive_v10 {
-        let header = if calls_v2 {
+        let header = if services_v3 {
+            include_str!("../../../native/services_v3.h")
+        } else if calls_v2 {
             include_str!("../../../native/calls_v2.h")
         } else {
             include_str!("../../../native/exclusive_v10.h")
         };
-        let check = if calls_v2 {
+        let check = if services_v3 {
+            "mkw_services_v3_valid"
+        } else if calls_v2 {
             "mkw_calls_v2_valid"
         } else {
             "mkw_exclusive_v10_valid"
         };
-        let marker = if calls_v2 {
+        let marker = if services_v3 {
+            "unsigned mkw_guest_v10_budget_exclusive_version(void){return MKW_SERVICES_V3_VERSION;}\n"
+        } else if calls_v2 {
             "unsigned mkw_guest_v10_budget_exclusive_version(void){return MKW_EXCLUSIVE_V2_VERSION;}\n"
         } else {
             ""
@@ -129,10 +141,29 @@ fn emit_profile(
         "{HEADER}\nunsigned mkw_guest_budget_abi_version(void){{return MKW_CPU_ABI_VERSION;}}\nint mkw_guest_budget(MkwCpu *c, uint64_t *budget) {{\n goto L_{entry:x};\n"
     )
     };
+    let call_check = if services_v3 {
+        "mkw_services_v3_valid"
+    } else {
+        "mkw_calls_v2_valid"
+    };
+    let call_function = if services_v3 {
+        "mkw_call_services_v10"
+    } else {
+        "mkw_call_v10"
+    };
     for i in ins {
         out+=&format!("L_{:x}: ; /* guest {:016x}, instruction {:08x} */\n c->pc=c->module_base+UINT64_C({}); if (!*budget) return 2; --*budget;\n",i.pc,i.pc,i.word,i.pc);
         let next = format!("goto L_{:x};\n", i.pc + 4);
         match i.op {
+            Op::SupervisorCall { immediate } => {
+                if !services_v3 {
+                    return Err("SVC IR requires explicit service-table-v3 profile".into());
+                }
+                out += &format!(
+                    "{{int status=mkw_svc_v10(frame,{immediate});if(status)return status;}}\n"
+                );
+                out += &next;
+            }
             Op::Exclusive(op) => {
                 if !exclusive_v10 {
                     return Err("exclusive IR requires explicit v10 profile".into());
@@ -382,7 +413,7 @@ fn emit_profile(
             Op::IndirectCall { target } => {
                 if calls_v2 {
                     let target_expression = r(target);
-                    out += &format!("{{uint64_t target={target_expression};c->fault_address=target;if(!mkw_calls_v2_valid(frame)){{c->fault_status=3;return 3;}}c->x[30]=c->module_base+UINT64_C({});uint64_t caller_base=c->module_base;int status=mkw_call_v10(frame,target,budget);if(status)return status;if(c->module_base!=caller_base||c->pc!=caller_base+UINT64_C({})){{c->fault_status=6;return 6;}}}}\n",i.pc+4,i.pc+4);
+                    out += &format!("{{uint64_t target={target_expression};c->fault_address=target;if(!{call_check}(frame)){{c->fault_status=3;return 3;}}c->x[30]=c->module_base+UINT64_C({});uint64_t caller_base=c->module_base;int status={call_function}(frame,target,budget);if(status)return status;if(c->module_base!=caller_base||c->pc!=caller_base+UINT64_C({})){{c->fault_status=6;return 6;}}}}\n",i.pc+4,i.pc+4);
                 } else {
                     out+=&format!("{{uint64_t target={};c->fault_address=target;if(!c->call){{c->fault_status=3;return 3;}}c->x[30]=c->module_base+UINT64_C({});uint64_t caller_base=c->module_base;int status=c->call(c->call_context,c,target,budget);if(status)return status;if(c->module_base!=caller_base||c->pc!=caller_base+UINT64_C({})){{c->fault_status=6;return 6;}}}}\n",r(target),i.pc+4,i.pc+4);
                 }
@@ -445,7 +476,7 @@ fn emit_profile(
             Op::Call { target } => {
                 if calls_v2 {
                     let target_expression = format!("c->module_base+UINT64_C({target})");
-                    out += &format!("{{uint64_t target={target_expression};c->fault_address=target;if(!mkw_calls_v2_valid(frame)){{c->fault_status=3;return 3;}}c->x[30]=c->module_base+UINT64_C({});uint64_t caller_base=c->module_base;int status=mkw_call_v10(frame,target,budget);if(status)return status;if(c->module_base!=caller_base||c->pc!=caller_base+UINT64_C({})){{c->fault_status=6;return 6;}}}}\n",i.pc+4,i.pc+4);
+                    out += &format!("{{uint64_t target={target_expression};c->fault_address=target;if(!{call_check}(frame)){{c->fault_status=3;return 3;}}c->x[30]=c->module_base+UINT64_C({});uint64_t caller_base=c->module_base;int status={call_function}(frame,target,budget);if(status)return status;if(c->module_base!=caller_base||c->pc!=caller_base+UINT64_C({})){{c->fault_status=6;return 6;}}}}\n",i.pc+4,i.pc+4);
                 } else {
                     out+=&format!("if(!c->call){{c->fault_status=3;c->fault_address=c->module_base+UINT64_C({target});return 3;}} c->x[30]=c->module_base+UINT64_C({}); {{uint64_t caller_base=c->module_base;int status=c->call(c->call_context,c,c->module_base+UINT64_C({target}),budget);if(status)return status;if(c->module_base!=caller_base||c->pc!=caller_base+UINT64_C({})){{c->fault_status=6;return 6;}}}}\n",i.pc+4,i.pc+4);
                 }

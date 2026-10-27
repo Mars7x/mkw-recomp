@@ -15,6 +15,7 @@ mod linker;
 pub mod romfs_hle;
 #[cfg(target_os = "linux")]
 pub mod romfs_hooks;
+pub mod services;
 pub mod thread_runner;
 pub use linker::LinkScopes;
 use mkw_formats::{Nso, Result};

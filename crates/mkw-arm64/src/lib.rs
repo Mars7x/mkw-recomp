@@ -49,6 +49,9 @@ pub enum MemoryOrder {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Op {
     Exclusive(exclusive::Exclusive),
+    SupervisorCall {
+        immediate: u16,
+    },
     Nop,
     YieldHint,
     VectorFp(vector_fp::VectorFp),
@@ -653,6 +656,30 @@ pub fn lift_function_exclusive_v10(
     entry: u64,
 ) -> Result<Vec<Instruction>, String> {
     lift_bounded(bytes, base, entry, true, decode_exclusive_v10)
+}
+/// Explicit service-table-v3 profile; legacy/default decoders still refuse SVC.
+pub fn decode_services_v3(word: u32, pc: u64) -> Result<Instruction, String> {
+    if word & 0xffe0001f == 0xd4000001 {
+        Ok(Instruction {
+            word,
+            pc,
+            op: Op::SupervisorCall {
+                immediate: (word >> 5) as u16,
+            },
+        })
+    } else {
+        decode_exclusive_v10(word, pc)
+    }
+}
+pub fn lift_services_v3(bytes: &[u8], base: u64, entry: u64) -> Result<Vec<Instruction>, String> {
+    lift_bounded(bytes, base, entry, false, decode_services_v3)
+}
+pub fn lift_function_services_v3(
+    bytes: &[u8],
+    base: u64,
+    entry: u64,
+) -> Result<Vec<Instruction>, String> {
+    lift_bounded(bytes, base, entry, true, decode_services_v3)
 }
 fn lift_bounded(
     bytes: &[u8],

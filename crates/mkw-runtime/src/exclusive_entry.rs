@@ -63,7 +63,7 @@ impl<'code> Entry<'code> {
             let version = unsafe { library.get::<unsafe extern "C" fn() -> u32>(&query) }
                 .map_err(|e| e.to_string())?;
             if unsafe { version() } != expected {
-                return Err("native exclusive-v2 target version mismatch".into());
+                return Err("native exclusive table target version mismatch".into());
             }
         }
         // SAFETY: the caller guarantees the advertised version's function ABI.

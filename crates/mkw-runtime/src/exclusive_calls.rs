@@ -4,6 +4,7 @@ use crate::{
     exclusive_entry::Entry,
     exclusive_native::{Attachment, Context, CpuV10, Ops},
     host_call::{HostCall, HostReturn, HostService},
+    services::Services,
     GuestAddr,
 };
 use libloading::Library;
@@ -17,6 +18,26 @@ pub struct OpsV2 {
     pub call: Option<Call>,
     pub call_context: *mut c_void,
 }
+pub const SERVICES_V3_VERSION: u32 = 3;
+pub type Svc = unsafe extern "C" fn(*mut c_void, *mut CpuV10, u32) -> i32;
+#[repr(C)]
+pub struct OpsV3 {
+    pub base: OpsV2,
+    pub svc: Option<Svc>,
+    pub svc_context: *mut c_void,
+}
+enum Table {
+    V2(Box<OpsV2>),
+    V3(Box<OpsV3>),
+}
+impl Table {
+    fn base(&self) -> &Ops {
+        match self {
+            Self::V2(t) => &t.base,
+            Self::V3(t) => &t.base.base,
+        }
+    }
+}
 enum Body<'code> {
     Native(Entry<'code>),
     Host(Arc<dyn HostService>),
@@ -25,6 +46,7 @@ pub struct Target<'code> {
     address: GuestAddr,
     module_base: u64,
     body: Body<'code>,
+    profile: Option<u32>,
 }
 impl<'code> Target<'code> {
     /// Explicit named HLE registration only; no automatic SDK replacement.
@@ -40,6 +62,7 @@ impl<'code> Target<'code> {
             address,
             module_base,
             body: Body::Host(service),
+            profile: None,
         })
     }
 
@@ -61,6 +84,29 @@ impl<'code> Target<'code> {
             address,
             module_base,
             body: Body::Native(entry),
+            profile: Some(EXCLUSIVE_V2_VERSION),
+        })
+    }
+}
+impl<'code> Target<'code> {
+    /// # Safety
+    /// Same trusted code/lifetime/identity obligations as load, with CPU-v10 and
+    /// services_v3.h instead of the v2 table. Queries must be truthful; never
+    /// unwind/retain frame pointers. Original target execution remains gated.
+    pub unsafe fn load_services(
+        library: &'code Library,
+        symbol: &[u8],
+        address: GuestAddr,
+        module_base: u64,
+    ) -> Result<Self, String> {
+        let entry = unsafe {
+            Entry::load_table(library, symbol, address, module_base, SERVICES_V3_VERSION)
+        }?;
+        Ok(Self {
+            address,
+            module_base,
+            body: Body::Native(entry),
+            profile: Some(SERVICES_V3_VERSION),
         })
     }
 }
@@ -69,17 +115,29 @@ pub struct Router<'code> {
     max_depth: u16,
 }
 impl<'code> Router<'code> {
-    pub(crate) fn native_base(&self, address: GuestAddr) -> Option<u64> {
-        self.targets.get(&address).and_then(|target| {
-            matches!(&target.body, Body::Native(_)).then_some(target.module_base)
-        })
+    pub(crate) fn native_base_profile(&self, address: GuestAddr, profile: u32) -> Option<u64> {
+        self.targets
+            .get(&address)
+            .and_then(|t| (t.profile == Some(profile)).then_some(t.module_base))
+    }
+    fn supports(&self, profile: u32) -> bool {
+        self.targets
+            .values()
+            .all(|t| t.profile.is_none_or(|p| p == profile))
     }
     pub fn new(targets: Vec<Target<'code>>, max_depth: u16) -> Result<Self, String> {
         if !(1..=128).contains(&max_depth) {
             return Err("exclusive-v2 depth must be 1..=128".into());
         }
         let mut entries = BTreeMap::new();
+        let mut profile = None;
         for target in targets {
+            if let Some(p) = target.profile {
+                if profile.is_some_and(|old| old != p) {
+                    return Err("mixed native table profiles".into());
+                }
+                profile = Some(p);
+            }
             if entries.insert(target.address, target).is_some() {
                 return Err("duplicate exclusive-v2 target".into());
             }
@@ -97,10 +155,12 @@ struct CallContext<'a, 'code> {
     ops: *const Ops,
     prefix: Ops,
     depth: Cell<u16>,
+    profile: u32,
+    services: Option<&'a Services>,
 }
 pub struct Routed<'a, 'code> {
     cpu: &'a mut CpuV10,
-    table: Box<OpsV2>,
+    table: Table,
     context: Box<CallContext<'a, 'code>>,
     previous: *const Ops,
 }
@@ -109,6 +169,28 @@ impl<'a, 'code> Routed<'a, 'code> {
         attachment: &'a mut Attachment<'_>,
         router: &'a Router<'code>,
     ) -> Result<Self, String> {
+        Self::attach_inner(attachment, router, None)
+    }
+    pub fn attach_services(
+        attachment: &'a mut Attachment<'_>,
+        router: &'a Router<'code>,
+        services: &'a Services,
+    ) -> Result<Self, String> {
+        Self::attach_inner(attachment, router, Some(services))
+    }
+    fn attach_inner(
+        attachment: &'a mut Attachment<'_>,
+        router: &'a Router<'code>,
+        services: Option<&'a Services>,
+    ) -> Result<Self, String> {
+        let profile = if services.is_some() {
+            SERVICES_V3_VERSION
+        } else {
+            EXCLUSIVE_V2_VERSION
+        };
+        if !router.supports(profile) {
+            return Err("native target/attachment table profile mismatch".into());
+        }
         attachment.validate()?;
         let (cpu, memory) = attachment.parts();
         let previous = cpu.exclusive;
@@ -121,16 +203,32 @@ impl<'a, 'code> Routed<'a, 'code> {
             ops: std::ptr::null(),
             prefix,
             depth: Cell::new(0),
+            profile,
+            services,
         });
         let mut base = prefix;
-        base.version = EXCLUSIVE_V2_VERSION;
-        base.size = size_of::<OpsV2>() as u32;
-        let table = Box::new(OpsV2 {
+        base.version = profile;
+        base.size = if services.is_some() {
+            size_of::<OpsV3>()
+        } else {
+            size_of::<OpsV2>()
+        } as u32;
+        let pointer = std::ptr::addr_of_mut!(*context).cast();
+        let calls = OpsV2 {
             base,
             call: Some(call),
-            call_context: std::ptr::addr_of_mut!(*context).cast(),
-        });
-        context.ops = std::ptr::addr_of!(table.base);
+            call_context: pointer,
+        };
+        let table = if services.is_some() {
+            Table::V3(Box::new(OpsV3 {
+                base: calls,
+                svc: Some(svc),
+                svc_context: pointer,
+            }))
+        } else {
+            Table::V2(Box::new(calls))
+        };
+        context.ops = table.base();
         cpu.exclusive = context.ops;
         Ok(Self {
             cpu,
@@ -144,7 +242,7 @@ impl<'a, 'code> Routed<'a, 'code> {
     }
     pub fn run(&mut self, target: GuestAddr, budget: &mut u64) -> Result<i32, String> {
         validate(&self.context, self.cpu)?;
-        debug_assert!(std::ptr::eq(self.cpu.exclusive, &self.table.base));
+        debug_assert!(std::ptr::eq(self.cpu.exclusive, self.table.base()));
         Ok(route(&self.context, self.cpu, target, budget))
     }
 }
@@ -279,4 +377,37 @@ unsafe extern "C" fn call(
         return 3;
     }
     route(ctx, cpu, GuestAddr(target), unsafe { &mut *budget })
+}
+
+unsafe extern "C" fn svc(context: *mut c_void, cpu: *mut CpuV10, number: u32) -> i32 {
+    if context.is_null()
+        || !context.cast::<CallContext<'_, '_>>().is_aligned()
+        || cpu.is_null()
+        || !cpu.is_aligned()
+    {
+        return 7;
+    }
+    // SAFETY: v3 ABI requires the live installed context and a valid frame. Frame
+    // identity is checked before dereferencing a foreign CPU argument.
+    let ctx = unsafe { &*context.cast::<CallContext<'_, '_>>() };
+    if ctx.cpu != cpu || ctx.profile != SERVICES_V3_VERSION {
+        return 3;
+    }
+    let cpu = unsafe { &mut *cpu };
+    if validate(ctx, cpu).is_err() {
+        cpu.base.fault_status = 3;
+        return 3;
+    }
+    let Some(services) = ctx.services else {
+        cpu.base.fault_status = 3;
+        return 3;
+    };
+    match services.invoke(ctx.memory, number, &mut cpu.base.x) {
+        Ok(status) => status,
+        Err(fault) => {
+            cpu.base.fault_status = fault.status;
+            cpu.base.fault_address = fault.address.0;
+            fault.status
+        }
+    }
 }

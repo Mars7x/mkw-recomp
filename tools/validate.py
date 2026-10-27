@@ -34,7 +34,7 @@ def run(label, command, *, cwd=ROOT, required=True):
 run('format', ['cargo', 'fmt', '--all', '--', '--check'])
 run('lint', ['cargo', 'clippy', '--workspace', '--all-targets', '--offline', '--locked', '--', '-D', 'warnings'])
 run('unit and native semantic tests', ['cargo', 'test', '--workspace', '--offline', '--locked'])
-run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks', '--test', 'thread_runner'])
+run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks', '--test', 'thread_runner', '--test', 'services'])
 run('native synthetic demo', ['cargo', 'run', '--release', '--offline', '--locked', '--', 'aot-demo'])
 binary = ROOT / 'target/release/mkw-recomp'
 header = run('native ELF header', ['readelf', '-h', str(ROOT / 'private/builds/synthetic/aot-demo')])
@@ -73,6 +73,18 @@ if args.game:
             or explicit['exclusive_table_version'] != 1 or routed['game_code_executed']
             or routed['default_acceptance_changed'] or routed['target_profile_verified']):
         raise SystemExit('Exclusive-v2 routing changed compiler coverage, limits, identities or execution gates')
+    run('explicit service-table-v3 conditional compiler survey', [str(binary), 'cpu-survey-services-v3', str(game)])
+    service = json.loads((ROOT / 'private/analysis/cpu-services-v3/summary.json').read_text())
+    service_defaults = {m['module']: (m['indexed_extents'], m['default_accepted']) for m in service['modules']}
+    service_v1 = {m['module']: m['v1_conditional_additional'] for m in service['modules']}
+    prior_v1 = {m['module']: m['exclusive_v10_conditional_additional'] for m in explicit['modules']}
+    if (service_defaults != expected or service_v1 != prior_v1 or service['cpu_frame_version'] != 10
+            or service['exclusive_table_version'] != 3 or service['game_code_executed']
+            or service['default_acceptance_changed'] or service['target_profile_verified']
+            or any(m['services_v3_conditional_additional'] != m['v1_conditional_additional'] + m['new_beyond_v1']
+                   or m['additional_compiled_objects'] + m['additional_deferred'] != m['services_v3_conditional_additional']
+                   for m in service['modules'])):
+        raise SystemExit('Service-v3 survey changed strict baseline, prior profile, counts or execution/configuration gates')
     run('all rejected-extent blocker diagnostics', [str(binary), 'cpu-blockers', str(game)])
     if (ROOT/'private/tools/python/capstone').is_dir():
         run('all-blocker coverage prioritization', [sys.executable, str(ROOT/'tools/rank_blockers.py')])

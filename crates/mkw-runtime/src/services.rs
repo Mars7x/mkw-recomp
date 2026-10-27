@@ -1,0 +1,196 @@
+//! Explicit typed kernel-call transport. No Horizon handlers or default successes.
+use crate::{
+    exclusive_native::Context,
+    host_call::{HostCall, HostFault},
+    GuestAddr,
+};
+use std::{collections::BTreeMap, sync::Arc};
+pub const EXIT_THREAD: i32 = 9;
+const MAX_BYTES: usize = 1024 * 1024;
+#[derive(Default)]
+pub struct Outputs {
+    registers: [Option<u64>; 8],
+    writes: Vec<(GuestAddr, Vec<u8>)>,
+    bytes: usize,
+}
+impl Outputs {
+    pub fn write_x(mut self, index: usize, value: u64) -> Result<Self, HostFault> {
+        let slot = self
+            .registers
+            .get_mut(index)
+            .ok_or_else(HostFault::unsupported)?;
+        if slot.is_some() {
+            return Err(HostFault::unsupported());
+        }
+        *slot = Some(value);
+        Ok(self)
+    }
+    pub fn write_w(self, index: usize, value: u32) -> Result<Self, HostFault> {
+        self.write_x(index, u64::from(value))
+    }
+    pub fn write_memory(mut self, address: GuestAddr, bytes: Vec<u8>) -> Result<Self, HostFault> {
+        let total = self
+            .bytes
+            .checked_add(bytes.len())
+            .ok_or_else(HostFault::unsupported)?;
+        if self.writes.len() >= 32 || total > MAX_BYTES {
+            return Err(HostFault::unsupported());
+        }
+        self.bytes = total;
+        self.writes.push((address, bytes));
+        Ok(self)
+    }
+}
+pub enum Reply {
+    Return(Outputs),
+    ThreadExit,
+}
+pub struct Call<'a> {
+    context: &'a Context,
+    args: [u64; 8],
+}
+impl Call<'_> {
+    pub fn arguments(&self) -> [u64; 8] {
+        self.args
+    }
+    pub fn check_outputs(&self, ranges: &[(GuestAddr, usize)]) -> Result<(), HostFault> {
+        self.host().check_outputs(ranges)
+    }
+    pub fn c_string(&self, address: GuestAddr, limit: usize) -> Result<Vec<u8>, HostFault> {
+        self.host().c_string(address, limit)
+    }
+    pub fn read_bytes(&self, address: GuestAddr, size: usize) -> Result<Vec<u8>, HostFault> {
+        if size > MAX_BYTES {
+            return Err(HostFault::unsupported());
+        }
+        let memory = self
+            .context
+            .memory
+            .lock()
+            .map_err(|_| HostFault::unsupported())?;
+        memory
+            .validate_owner(&self.context.owner)
+            .map_err(|_| HostFault::unsupported())?;
+        let mut bytes = vec![0; size];
+        memory
+            .read_into(address, &mut bytes)
+            .map_err(|_| HostFault { status: 5, address })?;
+        Ok(bytes)
+    }
+    fn host(&self) -> HostCall<'_> {
+        let mut x = [0; 31];
+        x[..8].copy_from_slice(&self.args);
+        HostCall::new(self.context, &x)
+    }
+}
+pub trait Service: Send + Sync {
+    /// Bounded, non-unwinding host work. Check output ranges before external
+    /// effects. Return memory/register writes as one packet; no mutable CPU or
+    /// recursive dispatcher is exposed. External effects are not rolled back.
+    fn invoke(&self, call: &Call<'_>) -> Result<Reply, HostFault>;
+}
+pub struct Services {
+    handlers: BTreeMap<u16, Arc<dyn Service>>,
+}
+impl Services {
+    pub fn new(entries: Vec<(u16, Arc<dyn Service>)>) -> Result<Self, String> {
+        if entries.len() > 256 {
+            return Err("service handler quota exceeded".into());
+        }
+        let mut handlers = BTreeMap::new();
+        for (number, handler) in entries {
+            if handlers.insert(number, handler).is_some() {
+                return Err("duplicate SVC handler".into());
+            }
+        }
+        Ok(Self { handlers })
+    }
+    pub(crate) fn invoke(
+        &self,
+        context: &Context,
+        number: u32,
+        registers: &mut [u64; 31],
+    ) -> Result<i32, HostFault> {
+        let number = u16::try_from(number).map_err(|_| HostFault::unsupported())?;
+        let handler = self
+            .handlers
+            .get(&number)
+            .ok_or_else(HostFault::unsupported)?;
+        let call = Call {
+            context,
+            args: registers[..8].try_into().unwrap(),
+        };
+        let reply = handler.invoke(&call)?;
+        let empty = Outputs::default();
+        let outputs = match &reply {
+            Reply::Return(o) => o,
+            Reply::ThreadExit => &empty,
+        };
+        let writes: Vec<_> = outputs
+            .writes
+            .iter()
+            .map(|(a, b)| (*a, b.as_slice()))
+            .collect();
+        let mut memory = context
+            .memory
+            .lock()
+            .map_err(|_| HostFault::unsupported())?;
+        memory
+            .validate_owner(&context.owner)
+            .map_err(|_| HostFault::unsupported())?;
+        for (address, bytes) in &writes {
+            memory
+                .validate_access(*address, bytes.len(), true)
+                .map_err(|_| HostFault {
+                    status: 5,
+                    address: *address,
+                })?;
+        }
+        memory
+            .write_batch(&writes)
+            .map_err(|_| HostFault::unsupported())?;
+        // A completed exception return opens the local monitor. Refused/failed
+        // packets preserve it, along with every register and output range.
+        memory
+            .clear(&context.owner)
+            .map_err(|_| HostFault::unsupported())?;
+        for (index, value) in outputs.registers.iter().enumerate() {
+            if let Some(value) = value {
+                registers[index] = *value
+            }
+        }
+        Ok(if matches!(reply, Reply::ThreadExit) {
+            EXIT_THREAD
+        } else {
+            0
+        })
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn typed_packet_rejects_duplicate_registers_and_unbounded_outputs() {
+        assert!(Outputs::default().write_x(8, 1).is_err());
+        assert!(Outputs::default()
+            .write_x(0, 1)
+            .unwrap()
+            .write_w(0, 2)
+            .is_err());
+        assert!(Outputs::default()
+            .write_memory(GuestAddr(0), vec![0; MAX_BYTES + 1])
+            .is_err());
+        let mut o = Outputs::default();
+        for _ in 0..32 {
+            o = o.write_memory(GuestAddr(0), vec![]).unwrap()
+        }
+        assert!(o.write_memory(GuestAddr(0), vec![]).is_err());
+        let o = Outputs::default()
+            .write_w(0, u32::MAX)
+            .unwrap()
+            .write_x(1, u64::MAX)
+            .unwrap();
+        assert_eq!(o.registers[0], Some(0xffff_ffff));
+        assert_eq!(o.registers[1], Some(u64::MAX));
+    }
+}

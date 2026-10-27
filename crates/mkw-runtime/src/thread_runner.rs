@@ -5,8 +5,9 @@
 //! native ARM64 context machinery, Mach hooks or fixed Switch 1 TLS constants.
 use crate::{
     exclusive::ExclusiveMemory,
-    exclusive_calls::{Routed, Router},
+    exclusive_calls::{Routed, Router, EXCLUSIVE_V2_VERSION, SERVICES_V3_VERSION},
     exclusive_native::{Bridge, CpuV10},
+    services::Services,
     GuestAddr,
 };
 use std::sync::{Arc, Condvar, Mutex};
@@ -125,6 +126,7 @@ fn validate(
     router: &Router<'_>,
     workers: &[Worker],
     limits: Limits,
+    profile: u32,
 ) -> Result<(), String> {
     if limits.workers == 0
         || limits.workers > 64
@@ -136,7 +138,9 @@ fn validate(
     }
     let mut ranges: Vec<(u64, u64)> = Vec::new();
     for worker in workers {
-        if router.native_base(worker.entry).is_none() || worker.return_pc.0 % 4 != 0 {
+        if router.native_base_profile(worker.entry, profile).is_none()
+            || worker.return_pc.0 % 4 != 0
+        {
             return Err("worker requires a registered native entry and aligned return PC".into());
         }
         let s = worker.storage;
@@ -185,9 +189,35 @@ pub unsafe fn run(
     workers: Vec<Worker>,
     limits: Limits,
 ) -> Result<Vec<Outcome>, String> {
+    run_profile(memory, router, workers, limits, None)
+}
+/// Scoped workers with an explicit table-v3 SVC registry; no implicit handlers.
+/// # Safety
+/// Same concurrent native-code, trusted ABI and identity obligations as run.
+pub unsafe fn run_services(
+    memory: Arc<Mutex<ExclusiveMemory>>,
+    router: &Router<'_>,
+    workers: Vec<Worker>,
+    limits: Limits,
+    services: &Services,
+) -> Result<Vec<Outcome>, String> {
+    run_profile(memory, router, workers, limits, Some(services))
+}
+fn run_profile(
+    memory: Arc<Mutex<ExclusiveMemory>>,
+    router: &Router<'_>,
+    workers: Vec<Worker>,
+    limits: Limits,
+    services: Option<&Services>,
+) -> Result<Vec<Outcome>, String> {
+    let profile = if services.is_some() {
+        SERVICES_V3_VERSION
+    } else {
+        EXCLUSIVE_V2_VERSION
+    };
     {
         let memory = memory.lock().map_err(|_| "worker memory poisoned")?;
-        validate(&memory, router, &workers, limits)?;
+        validate(&memory, router, &workers, limits, profile)?;
     }
     let mut slots = Vec::new();
     for worker in workers {
@@ -205,7 +235,7 @@ pub unsafe fn run(
                 .stack_size(limits.host_stack_bytes)
                 .spawn_scoped(scope, move || {
                     latch.wait()?;
-                    execute(router, worker, bridge)
+                    execute(router, worker, bridge, services)
                 }) {
                 Ok(handle) => handles.push(handle),
                 Err(error) => {
@@ -236,20 +266,35 @@ pub unsafe fn run(
         }
     })
 }
-fn execute(router: &Router<'_>, worker: Worker, mut bridge: Bridge) -> Result<Outcome, String> {
+fn execute(
+    router: &Router<'_>,
+    worker: Worker,
+    mut bridge: Bridge,
+    services: Option<&Services>,
+) -> Result<Outcome, String> {
     let mut cpu = CpuV10::default();
     cpu.base.x[..8].copy_from_slice(&worker.arguments);
     cpu.base.x[30] = worker.return_pc.0;
     cpu.base.sp = worker.storage.stack.end()?;
     cpu.base.module_base = router
-        .native_base(worker.entry)
+        .native_base_profile(
+            worker.entry,
+            if services.is_some() {
+                SERVICES_V3_VERSION
+            } else {
+                EXCLUSIVE_V2_VERSION
+            },
+        )
         .ok_or("lost worker target")?;
     cpu.base
         .configure_thread_registers(worker.storage.tpidr_el0.0, worker.storage.tpidrro_el0.0);
     let mut budget = worker.budget;
     let status = {
         let mut attachment = bridge.attach(&mut cpu)?;
-        let mut routed = Routed::attach(&mut attachment, router)?;
+        let mut routed = match services {
+            Some(services) => Routed::attach_services(&mut attachment, router, services)?,
+            None => Routed::attach(&mut attachment, router)?,
+        };
         routed.run(worker.entry, &mut budget)?
     };
     if status == 0 && cpu.base.pc != worker.return_pc.0 {
