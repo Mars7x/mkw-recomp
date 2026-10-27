@@ -115,6 +115,7 @@ fn raw_simd_native_matches_independent_qemu_execution() {
     std::fs::set_permissions(&elf, std::fs::Permissions::from_mode(0o700)).unwrap();
     let oracle = Command::new("qemu-aarch64")
         .args(["-cpu", "max"])
+        .current_dir(&folder)
         .arg(&elf)
         .output()
         .unwrap();
@@ -210,6 +211,7 @@ fn raw_simd_native_matches_independent_qemu_execution() {
             Simd::Extract { .. } => "extract",
             Simd::Logical { .. } => "logical",
             Simd::ExtractVector { .. } => "ext",
+            Simd::Permute { .. } => "permutation",
         };
         *families.entry(kind).or_insert(0usize) += 1;
     }

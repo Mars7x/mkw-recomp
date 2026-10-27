@@ -5,12 +5,12 @@ static uint64_t exponent_mask(unsigned bytes){return bytes==4?UINT64_C(0x7f80000
 static uint64_t fraction_mask(unsigned bytes){return bytes==4?UINT64_C(0x007fffff):UINT64_C(0x000fffffffffffff);}
 static int nan_bits(uint64_t value,unsigned bytes){return (value&exponent_mask(bytes))==exponent_mask(bytes)&&(value&fraction_mask(bytes))!=0;}
 unsigned mkw_fp_abi_version(void){return MKW_CPU_ABI_VERSION;}
-/* Operations: add=0, sub=1, mul=2, div=3, quiet compare=4, signaling compare=5, fused multiply-add=6, negate=7, absolute=8, square-root=9, negated multiply=10, fused subtract=11, negated fused add=12, negated fused subtract=13, S/D format conversion=14.
+/* Operations: add=0, sub=1, mul=2, div=3, quiet compare=4, signaling compare=5, fused multiply-add=6, negate=7, absolute=8, square-root=9, negated multiply=10, fused subtract=11, negated fused add=12, negated fused subtract=13, S/D format conversion=14, max/min/max-number/min-number=15..18.
  * Result is raw IEEE bits or NZCV nibble. Nonzero status leaves outputs intact.
  * Supported FPCR: rounding and default-NaN; traps/flush/alternative/merge refuse. */
 int mkw_fp(uint32_t operation,uint32_t bytes,uint32_t fpcr,uint32_t fpsr,
            uint64_t left,uint64_t right,uint64_t accumulate,uint64_t *result,uint32_t *status){
-    if((bytes!=4&&bytes!=8)||operation>14||(fpcr&~UINT32_C(0x02c00000)))return 3;
+    if((bytes!=4&&bytes!=8)||operation>18||(fpcr&~UINT32_C(0x02c00000)))return 3;
     if(operation==14){
         MkwFpEnvironment saved=mkw_fp_begin(fpcr);uint64_t value;unsigned output_bytes;
         if(bytes==4){float32_t a={(uint32_t)left};value=f32_to_f64(a).v;output_bytes=8;}
@@ -18,7 +18,7 @@ int mkw_fp(uint32_t operation,uint32_t bytes,uint32_t fpcr,uint32_t fpsr,
         if((fpcr&UINT32_C(0x02000000))&&nan_bits(value,output_bytes))value=output_bytes==4?UINT64_C(0x7fc00000):UINT64_C(0x7ff8000000000000);
         uint32_t flags=mkw_fp_end(saved,fpsr);*result=value;*status=flags;return 0;
     }
-    if(operation>=11){
+    if(operation>=11&&operation<=13){
         uint64_t sign=bytes==4?UINT64_C(0x80000000):UINT64_C(0x8000000000000000);
         /* Fused subtract/negation flips inputs before the fused NaN/rounding rules. */
         if(operation==11||operation==12)left^=sign;
@@ -33,7 +33,17 @@ int mkw_fp(uint32_t operation,uint32_t bytes,uint32_t fpcr,uint32_t fpsr,
     if(bytes==4){left=(uint32_t)left;right=(uint32_t)right;accumulate=(uint32_t)accumulate;}
     MkwFpEnvironment saved=mkw_fp_begin(fpcr);
     uint64_t value=0;
-    if(operation==7||operation==8){uint64_t sign=bytes==4?UINT64_C(0x80000000):UINT64_C(0x8000000000000000);value=operation==7?left^sign:left&~sign;
+    if(operation>=15){
+        uint64_t sign=bytes==4?UINT64_C(0x80000000):UINT64_C(0x8000000000000000);
+        uint64_t quiet=bytes==4?UINT64_C(0x00400000):UINT64_C(0x0008000000000000);
+        int na=nan_bits(left,bytes),nb=nan_bits(right,bytes),sa=na&&!(left&quiet),sb=nb&&!(right&quiet);
+        int maximum=operation==15||operation==17,number=operation>=17;
+        if(na||nb){
+            if(number&&!sa&&!sb&&(na!=nb))value=na?right:left;
+            else{value=(sa?left:sb?right:na?left:right)|quiet;if(sa||sb)softfloat_exceptionFlags|=softfloat_flag_invalid;}
+        }else if(!(left&~sign)&&!(right&~sign))value=maximum?(left&right):(left|right);
+        else{int less;if((left^right)&sign)less=(left&sign)!=0;else less=(left&sign)?left>right:left<right;value=maximum?(less?right:left):(less?left:right);}
+    }else if(operation==7||operation==8){uint64_t sign=bytes==4?UINT64_C(0x80000000):UINT64_C(0x8000000000000000);value=operation==7?left^sign:left&~sign;
     }else if(operation==9){if(bytes==4){float32_t a={(uint32_t)left};value=f32_sqrt(a).v;}else{float64_t a={left};value=f64_sqrt(a).v;}
     }else if(operation==4||operation==5){
         uint64_t quiet=bytes==4?UINT64_C(0x00400000):UINT64_C(0x0008000000000000);

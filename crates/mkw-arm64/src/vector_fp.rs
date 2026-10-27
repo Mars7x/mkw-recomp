@@ -5,6 +5,7 @@ use serde::Serialize;
 pub enum VectorFpKind {
     Arithmetic(u8),
     Conversion(u8),
+    PairwiseAdd,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct VectorFp {
@@ -17,6 +18,33 @@ pub struct VectorFp {
     pub kind: VectorFpKind,
 }
 pub fn decode(w: u32) -> Option<Result<Op, String>> {
+    let scalar_pairwise = w & 0xffbffc00 == 0x7e30d800;
+    if scalar_pairwise || w & 0xbfa0fc00 == 0x2e20d400 {
+        let bytes = if w & (1 << 22) != 0 { 8 } else { 4 };
+        let total = if scalar_pairwise {
+            bytes
+        } else if w & (1 << 30) != 0 {
+            16
+        } else {
+            8
+        };
+        if !scalar_pairwise && bytes == 8 && total == 8 {
+            return Some(Err("reserved single-D pairwise FP arrangement".into()));
+        }
+        return Some(Ok(Op::VectorFp(VectorFp {
+            bytes,
+            total,
+            dst: (w & 31) as u8,
+            lhs: ((w >> 5) & 31) as u8,
+            rhs: if scalar_pairwise {
+                0
+            } else {
+                ((w >> 16) & 31) as u8
+            },
+            rhs_lane: None,
+            kind: VectorFpKind::PairwiseAdd,
+        })));
+    }
     let indexed = match w & 0xaf80f400 {
         0x0f809000 => Some(2),
         0x0f801000 => Some(6),
@@ -66,6 +94,10 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
             0x2e20dc00 => Some(2),
             0x2e20fc00 => Some(3),
             0x0e20cc00 => Some(6),
+            0x0e20f400 => Some(15),
+            0x0ea0f400 => Some(16),
+            0x0e20c400 => Some(17),
+            0x0ea0c400 => Some(18),
             0x0ea0cc00 => Some(11),
             _ => None,
         };
@@ -172,6 +204,32 @@ mod indexed_tests {
         }
         for w in [0x4f029020, 0x4f429020, 0x6f829020, 0x4f829420] {
             assert!(decode(w).is_none());
+        }
+    }
+}
+
+#[cfg(test)]
+mod pairwise_tests {
+    use super::*;
+    #[test]
+    fn pairwise_scalar_vector_and_reserved_widths() {
+        for (w, bytes, total) in [
+            (0x2e22d420, 4, 8),
+            (0x6e22d420, 4, 16),
+            (0x6e62d420, 8, 16),
+            (0x7e30d820, 4, 4),
+            (0x7e70d820, 8, 8),
+        ] {
+            let Op::VectorFp(v) = crate::decode(w, 0).unwrap().op else {
+                panic!()
+            };
+            assert_eq!(
+                (v.bytes, v.total, v.kind),
+                (bytes, total, VectorFpKind::PairwiseAdd)
+            );
+        }
+        for w in [0x2e62d420, 0x7e30dc20, 0x7ef0d820] {
+            assert!(crate::decode(w, 0).is_err());
         }
     }
 }

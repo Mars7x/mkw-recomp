@@ -52,6 +52,16 @@ pub enum Simd {
         bytes: u8,
         operation: u8,
     },
+    Permute {
+        dst: u8,
+        lhs: u8,
+        rhs: u8,
+        bytes: u8,
+        vector_bytes: u8,
+        /// 0: unzip, 1: transpose, 2: zip; part selects even/lower or odd/upper.
+        kind: u8,
+        part: u8,
+    },
     ExtractVector {
         dst: u8,
         lhs: u8,
@@ -96,6 +106,30 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let src = ((w >> 5) & 31) as u8;
     let q = w & (1 << 30) != 0;
     let vector_bytes = if q { 16 } else { 8 };
+    let permutation = match w & 0xbf20fc00 {
+        0x0e001800 => Some((0, 0)),
+        0x0e005800 => Some((0, 1)),
+        0x0e002800 => Some((1, 0)),
+        0x0e006800 => Some((1, 1)),
+        0x0e003800 => Some((2, 0)),
+        0x0e007800 => Some((2, 1)),
+        _ => None,
+    };
+    if let Some((kind, part)) = permutation {
+        let bytes = 1 << ((w >> 22) & 3);
+        if bytes == 8 && !q {
+            return Some(Err("reserved single-D permutation".into()));
+        }
+        return Some(Ok(Op::Simd(Simd::Permute {
+            dst,
+            lhs: src,
+            rhs: ((w >> 16) & 31) as u8,
+            bytes,
+            vector_bytes,
+            kind,
+            part,
+        })));
+    }
     let vector = |lane| LaneSource::Vector {
         register: src,
         lane,
@@ -338,5 +372,54 @@ mod tests {
                 ..
             })
         ));
+    }
+}
+
+#[cfg(test)]
+mod permutation_tests {
+    use super::*;
+    #[test]
+    fn permutation_arrangements_register31_and_reserved_forms() {
+        for q in 0..2 {
+            for size in 0..4 {
+                for (opcode, kind, part) in [
+                    (1, 0, 0),
+                    (5, 0, 1),
+                    (2, 1, 0),
+                    (6, 1, 1),
+                    (3, 2, 0),
+                    (7, 2, 1),
+                ] {
+                    let w = 0x0e1f0bff | (q << 30) | (size << 22) | (opcode << 12);
+                    if q == 0 && size == 3 {
+                        assert!(crate::decode(w, 0).is_err());
+                        continue;
+                    }
+                    let Op::Simd(Simd::Permute {
+                        dst,
+                        lhs,
+                        rhs,
+                        bytes,
+                        vector_bytes,
+                        kind: k,
+                        part: p,
+                    }) = crate::decode(w, 0).unwrap().op
+                    else {
+                        panic!()
+                    };
+                    assert_eq!(
+                        (dst, lhs, rhs, bytes, vector_bytes, k, p),
+                        (31, 31, 31, 1 << size, 8 << q, kind, part)
+                    );
+                }
+            }
+        }
+        assert!(matches!(
+            crate::decode(0x6e023820, 0).unwrap().op,
+            Op::Simd(Simd::ExtractVector { .. })
+        ));
+        for w in [0x4e023c20, 0x4e223820] {
+            assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
     }
 }

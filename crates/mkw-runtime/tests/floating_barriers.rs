@@ -32,6 +32,10 @@ fn fp_word(bytes: u8, operation: u32, zero: bool) -> u32 {
         11 => 0x1f008c00,
         12 => 0x1f200c00,
         13 => 0x1f208c00,
+        15 => 0x1e204800,
+        16 => 0x1e205800,
+        17 => 0x1e206800,
+        18 => 0x1e207800,
         _ => unreachable!(),
     };
     base | (if bytes == 8 { 1 << 22 } else { 0 }) | (if zero { 8 } else { 2 << 16 }) | (1 << 5)
@@ -218,6 +222,9 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
         }
         let sign = if bytes == 4 { 1u64 << 31 } else { 1u64 << 63 };
         pairs.extend([
+            (0, sign),
+            (sign, 0),
+            (sign, sign),
             (values[11], 0),
             (0, values[11]),
             (values[7], values[9]),
@@ -249,7 +256,7 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
         }
         for rounding in 0..4 {
             for dn in 0..2 {
-                for operation in 0..14 {
+                for operation in (0..14).chain(15..19) {
                     for (i, &(left, right)) in pairs.iter().enumerate() {
                         cases.push(reference::FloatingCase {
                             word: fp_word(bytes, operation, false),
@@ -382,6 +389,7 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
         std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o700)).unwrap();
         let qemu = Command::new("qemu-aarch64")
             .args(["-cpu", "max"])
+            .current_dir(&path)
             .arg(&image)
             .output()
             .unwrap();
@@ -457,7 +465,7 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
         .output()
         .unwrap();
     let version = String::from_utf8(version.stdout).unwrap();
-    let receipt = serde_json::json!({"reference":version.lines().next(),"synthetic_cases":cases.len(),"operations":["fadd","fsub","fmul","fdiv","fcmp","fcmpe","fmadd","fcsel","fneg","fabs","fsqrt","fnmul","fmsub","fnmadd","fnmsub","fccmp","fccmpe"],"widths":[32,64],"raw_select_widths":[16,32,64],"rounding_modes":4,"default_nan_modes":2,"flush_modes_supported":false,"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false});
+    let receipt = serde_json::json!({"reference":version.lines().next(),"synthetic_cases":cases.len(),"operations":["fadd","fsub","fmul","fdiv","fcmp","fcmpe","fmadd","fcsel","fneg","fabs","fsqrt","fnmul","fmsub","fnmadd","fnmsub","fmax","fmin","fmaxnm","fminnm","fccmp","fccmpe"],"widths":[32,64],"raw_select_widths":[16,32,64],"rounding_modes":4,"default_nan_modes":2,"flush_modes_supported":false,"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false});
     std::fs::write(
         path.join("receipt.json"),
         serde_json::to_vec_pretty(&receipt).unwrap(),
@@ -825,6 +833,131 @@ fn fused_sign_inputs_single_rounding_nan_priority_and_refusals() {
                             0
                         ]
                     );
+                    assert_eq!(cpu.fpsr, 0x08000080);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn minmax_signed_zero_nan_priority_number_selection_and_refusals() {
+    let path = folder("minmax-known");
+    let mut code = String::new();
+    for bytes in [4, 8] {
+        for operation in 15..19 {
+            code += &generate(
+                &[fp_word(bytes, operation, false), 0xd65f03c0],
+                &format!("minmax_{bytes}_{operation}"),
+            );
+        }
+    }
+    for opt in ["-O0", "-O2"] {
+        let library = build(&code, &path, opt);
+        let fp_lib = backend(&path, opt);
+        let backend = unsafe { FloatingBackend::load(&fp_lib) }.unwrap();
+        for bytes in [4, 8] {
+            for operation in 15..19 {
+                let native = unsafe {
+                    library
+                        .get::<Entry>(format!("minmax_{bytes}_{operation}\0").as_bytes())
+                        .unwrap()
+                };
+                let (one, two, qnan, snan, other_snan, sign, default) = if bytes == 4 {
+                    (
+                        0x3f800000,
+                        0x40000000,
+                        0x7fc12345,
+                        0x7f812345,
+                        0x7f823456,
+                        1u64 << 31,
+                        0x7fc00000,
+                    )
+                } else {
+                    (
+                        0x3ff0000000000000,
+                        0x4000000000000000,
+                        0x7ff8123456789abc,
+                        0x7ff0123456789abc,
+                        0x7ff023456789abcd,
+                        1u64 << 63,
+                        0x7ff8000000000000,
+                    )
+                };
+                let quiet = if bytes == 4 { 1u64 << 22 } else { 1u64 << 51 };
+                let maximum = operation == 15 || operation == 17;
+                let number = operation >= 17;
+                for dn in 0..2 {
+                    for (a, b, expected, flags) in [
+                        (one, two, if maximum { two } else { one }, 0),
+                        (
+                            one ^ sign,
+                            two ^ sign,
+                            if maximum { one ^ sign } else { two ^ sign },
+                            0,
+                        ),
+                        (0, sign, if maximum { 0 } else { sign }, 0),
+                        (sign, 0, if maximum { 0 } else { sign }, 0),
+                        (sign, sign, sign, 0),
+                        (qnan, one, if number { one } else { qnan }, 0),
+                        (one, qnan, if number { one } else { qnan }, 0),
+                        (snan, one, snan | quiet, 1),
+                        (one, snan, snan | quiet, 1),
+                        (qnan, other_snan, other_snan | quiet, 1),
+                        (snan, other_snan, snan | quiet, 1),
+                        (qnan, qnan ^ sign, qnan, 0),
+                    ] {
+                        let is_nan = (expected
+                            & if bytes == 4 {
+                                0x7f800000
+                            } else {
+                                0x7ff0000000000000
+                            })
+                            == if bytes == 4 {
+                                0x7f800000
+                            } else {
+                                0x7ff0000000000000
+                            };
+                        let expected = if dn == 1 && is_nan { default } else { expected };
+                        let mut cpu = Cpu {
+                            fpcr: dn << 25,
+                            fpsr: 0x08000080,
+                            n: 1,
+                            z: 0,
+                            c: 1,
+                            v: 1,
+                            ..Cpu::default()
+                        };
+                        cpu.vregs[0] = [123, 456];
+                        cpu.vregs[1][0] = a;
+                        cpu.vregs[2][0] = b;
+                        {
+                            let mut a = backend.attach(&mut cpu);
+                            assert_eq!(unsafe { native(a.cpu_mut(), 10) }, 0);
+                        }
+                        assert_eq!(
+                            cpu.vregs[0],
+                            [expected, 0],
+                            "{bytes}/{operation} {a:x} {b:x} DN{dn}"
+                        );
+                        assert_eq!(cpu.fpsr, 0x08000080 | flags);
+                        assert_eq!((cpu.n, cpu.z, cpu.c, cpu.v), (1, 0, 1, 1));
+                    }
+                }
+                for control in [0, 1 << 24, 1 << 8] {
+                    let mut cpu = Cpu {
+                        fpcr: control,
+                        fpsr: 0x08000080,
+                        ..Cpu::default()
+                    };
+                    cpu.vregs[0] = [123, 456];
+                    if control == 0 {
+                        assert_eq!(unsafe { native(&mut cpu, 10) }, 3);
+                    } else {
+                        let mut a = backend.attach(&mut cpu);
+                        assert_eq!(unsafe { native(a.cpu_mut(), 10) }, 3);
+                    }
+                    assert_eq!(cpu.vregs[0], [123, 456]);
                     assert_eq!(cpu.fpsr, 0x08000080);
                 }
             }

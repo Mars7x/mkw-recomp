@@ -10,8 +10,9 @@ fn words() -> Vec<u32> {
     let mut words = Vec::new();
     for arrangement in [0, 1 << 30, (1 << 30) | (1 << 22)] {
         for base in [
-            0x0e22d420, 0x0ea2d420, 0x2e22dc20, 0x2e22fc20, 0x0e22cc20, 0x0ea2cc20, 0x0ea0f820,
-            0x2ea0f820, 0x2ea1f820, 0x0e21d820, 0x2e21d820, 0x0ea1b820, 0x2ea1b820,
+            0x0e22d420, 0x0ea2d420, 0x2e22dc20, 0x2e22fc20, 0x0e22cc20, 0x0e22f420, 0x0ea2f420,
+            0x0e22c420, 0x0ea2c420, 0x2e22d420, 0x0ea2cc20, 0x0ea0f820, 0x2ea0f820, 0x2ea1f820,
+            0x0e21d820, 0x2e21d820, 0x0ea1b820, 0x2ea1b820,
         ] {
             words.push(base | arrangement);
         }
@@ -40,16 +41,20 @@ fn words() -> Vec<u32> {
             }
         }
     }
+    words.extend([0x7e30d820, 0x7e70d820]);
     let originals = words.clone();
     for w in originals {
         words.push(w & !(31 << 5)); // destination aliases first source
+        let mkw_arm64::Op::VectorFp(v) = mkw_arm64::decode(w, 0).unwrap().op else {
+            unreachable!()
+        };
         if matches!(
-            mkw_arm64::decode(w, 0).unwrap().op,
-            mkw_arm64::Op::VectorFp(mkw_arm64::vector_fp::VectorFp {
-                kind: mkw_arm64::vector_fp::VectorFpKind::Arithmetic(0 | 1 | 2 | 3 | 6 | 11),
-                ..
-            })
-        ) {
+            v.kind,
+            mkw_arm64::vector_fp::VectorFpKind::Arithmetic(
+                0 | 1 | 2 | 3 | 6 | 11 | 15 | 16 | 17 | 18
+            )
+        ) || (v.kind == mkw_arm64::vector_fp::VectorFpKind::PairwiseAdd && v.total > v.bytes)
+        {
             words.push(w & !(31 << 16)); // destination aliases second source
             words.push(w & !((31 << 16) | (31 << 5)));
         }
@@ -225,6 +230,109 @@ fn known_lanes_overlap_upper_clearing_and_transactional_refusal() {
         }
         assert_eq!(cpu.vregs[0], [0x4080000040800000; 2]);
         assert_eq!(cpu.fpsr, 0);
+        for (w, left, right, expected, flags) in [
+            (
+                0x4e22c420,
+                [0x000000007fc12345, 0x800000007f812345],
+                [0x800000003f800000, 0x000000003f800000],
+                [0x000000003f800000, 0x000000007fc12345],
+                1,
+            ),
+            (
+                0x4ea2c420,
+                [0x000000007fc12345, 0x800000007f812345],
+                [0x800000003f800000, 0x000000003f800000],
+                [0x800000003f800000, 0x800000007fc12345],
+                1,
+            ),
+            (
+                0x4e22f420,
+                [0x000000007fc12345, 0x800000007f812345],
+                [0x800000003f800000, 0x000000003f800000],
+                [0x000000007fc12345, 0x000000007fc12345],
+                1,
+            ),
+            (
+                0x4ea2f420,
+                [0x000000007fc12345, 0x800000007f812345],
+                [0x800000003f800000, 0x000000003f800000],
+                [0x800000007fc12345, 0x800000007fc12345],
+                1,
+            ),
+            (
+                0x6e22d420,
+                [0x400000003f800000, 0x4080000040400000],
+                [0x40c0000040a00000, 0x4100000040e00000],
+                [0x40e0000040400000, 0x4170000041300000],
+                0,
+            ),
+            (
+                0x2e22d420,
+                [0x400000003f800000, 0x4080000040400000],
+                [0x40c0000040a00000, 0x4100000040e00000],
+                [0x4130000040400000, 0],
+                0,
+            ),
+            (
+                0x6e62d420,
+                [0x3ff0000000000000, 0x4000000000000000],
+                [0x4008000000000000, 0x4010000000000000],
+                [0x4008000000000000, 0x401c000000000000],
+                0,
+            ),
+            (
+                0x7e30d820,
+                [0x400000003f800000, 123],
+                [0, 0],
+                [0x40400000, 0],
+                0,
+            ),
+            (
+                0x7e70d820,
+                [0x3ff0000000000000, 0x4000000000000000],
+                [0, 0],
+                [0x4008000000000000, 0],
+                0,
+            ),
+            (
+                0x6e22d420,
+                [0x3f8000007fc12345, 0x3f8000007f812345],
+                [0, 0],
+                [0x7fc123457fc12345, 0],
+                1,
+            ),
+        ] {
+            let native = unsafe {
+                library
+                    .get::<Entry>(format!("vector_{w:x}\0").as_bytes())
+                    .unwrap()
+            };
+            let mut cpu = Cpu {
+                fpsr: 0x08000080,
+                ..Cpu::default()
+            };
+            cpu.vregs[0] = [123, 456];
+            cpu.vregs[1] = left;
+            cpu.vregs[2] = right;
+            {
+                let mut a = backend.attach(&mut cpu);
+                assert_eq!(unsafe { native(a.cpu_mut(), 10) }, 0);
+            }
+            assert_eq!(cpu.vregs[0], expected, "numeric {w:x}");
+            assert_eq!(cpu.fpsr, 0x08000080 | flags);
+        }
+        let pairwise = unsafe { library.get::<Entry>(b"vector_2e22d420\0").unwrap() };
+        let mut cpu = Cpu {
+            fpsr: 0x08000080,
+            floating: Some(fail_second),
+            ..Cpu::default()
+        };
+        cpu.vregs[0] = [123, 456];
+        cpu.vregs[1] = [1, 0];
+        cpu.vregs[2] = [2, 0];
+        assert_eq!(unsafe { pairwise(&mut cpu, 10) }, 3);
+        assert_eq!(cpu.vregs[0], [123, 456]);
+        assert_eq!(cpu.fpsr, 0x08000080);
         let native = unsafe { library.get::<Entry>(b"vector_4e22d420\0").unwrap() };
         for mode in 0..3 {
             let mut cpu = Cpu {
@@ -330,6 +438,7 @@ fn vector_results_and_flags_match_qemu() {
         std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o700)).unwrap();
         let output = Command::new("qemu-aarch64")
             .args(["-cpu", "max"])
+            .current_dir(&path)
             .arg(&image)
             .output()
             .unwrap();

@@ -389,6 +389,7 @@ fn native_lse_matches_qemu_synthetic_reference() {
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
     let oracle = Command::new("qemu-aarch64")
         .args(["-cpu", "max"])
+        .current_dir(&folder)
         .arg(&path)
         .output()
         .unwrap();

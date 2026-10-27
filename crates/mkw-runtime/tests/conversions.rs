@@ -222,6 +222,7 @@ fn conversion_results_and_flags_match_qemu() {
         std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o700)).unwrap();
         let output = Command::new("qemu-aarch64")
             .args(["-cpu", "max"])
+            .current_dir(&path)
             .arg(&image)
             .output()
             .unwrap();

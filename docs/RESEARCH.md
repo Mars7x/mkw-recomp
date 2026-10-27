@@ -140,3 +140,13 @@ Arm distinguishes fused subtract/negated fused operations from multiplying then 
 The pinned SoftFloat subset now includes unchanged f32_to_f64/f64_to_f32 and four ARM-VFPv2 common-NaN helpers. Copies were compared with exact Git blobs at the recorded revision and hashed in provenance. Original glue retains guest rounding/exception state and canonicalizes default NaNs in the output format. The independent synthetic QEMU matrix covers 8,768 cases; no host casts/fenv are used. [SoftFloat source](https://github.com/ucb-bar/berkeley-softfloat-3/tree/497c81c1f5016dc6ef5b3219ece2f3c261d4d8f1/source).
 
 Original CRC lowering uses the architectural CRC-32/CRC-32C polynomials with explicit raw seed semantics and input bit widths. A separate polynomial-division oracle and known string checks validate the recurrence; QEMU additionally checks 40 synthetic encoding fixtures. No Arm pseudocode or reference implementation was copied. [Arm instruction reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab).
+
+## Permutation and pairwise evidence
+
+Original ZIP/UZP/TRN lowering computes lane bank/index selection over snapshots. Mandatory tests independently construct lane lists using interleave/select operations; 210 synthetic QEMU comparisons separately check arrangement and alias encodings. Scalar/vector FADDP now reuses numeric add with explicit adjacent-pair ordering. The expanded 37,856-case vector matrix checks software-reference results/FPSR/NZCV; it is not a hardware or retail-profile oracle. [Arm instruction reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab).
+
+## Min/max validation and artifact containment
+
+A small synthetic probe confirmed signaling-NaN payload priority in installed QEMU before native implementation. Original min/max glue now explicitly handles quiet/signaling NaNs, numeric selection and signed-zero ties. Mandatory known-pattern tests and expanded native/QEMU matrices cover 26,416 scalar FP/selection cases and 43,232 vector numeric cases at O0/O2. These remain software-reference evidence under the restricted FP profile, not original-hardware proof.
+
+The artifact guard rejected a stale QEMU crash dump from an earlier unallocated synthetic fixture during publication. The dump and failed validation receipt stay private; the fixture generator was corrected, and fixture process working directories now point into private testing. No dump or game input was published. Publication retains its full validation and artifact gates.

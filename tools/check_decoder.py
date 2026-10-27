@@ -114,7 +114,7 @@ for ftype in range(4):
 for q in range(2):
  for size in range(2):
   for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(1,2,1)]:
-   for base in [0x0e20d400,0x0ea0d400,0x2e20dc00,0x2e20fc00,0x0e20cc00,0x0ea0cc00]:
+   for base in [0x0e20d400,0x0ea0d400,0x2e20dc00,0x2e20fc00,0x0e20cc00,0x0ea0cc00,0x0e20f400,0x0ea0f400,0x0e20c400,0x0ea0c400]:
     words.add(base|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
    for base in [0x0ea0f800,0x2ea0f800,0x2ea1f800,0x0e21d800,0x2e21d800,0x0ea1b800,0x2ea1b800]:
     words.add(base|(q<<30)|(size<<22)|(rn<<5)|rd)
@@ -136,6 +136,15 @@ for sf in range(2):
 for source in range(4):
  for dest in range(4):
   for rd,rn in [(0,1),(0,0),(31,31)]:words.add(0x1e224000|(source<<22)|(dest<<15)|(rn<<5)|rd)
+for q in range(2):
+ for size in range(4):
+  for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(1,2,1)]:
+   for operation in [1,2,3,5,6,7]:words.add(0x0e000800|(q<<30)|(size<<22)|(operation<<12)|(rm<<16)|(rn<<5)|rd)
+for q in range(2):
+ for size in range(2):
+  for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(0x2e20d400|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+for size in range(2):
+ for rd,rn in [(0,1),(0,0),(31,31)]:words.add(0x7e30d800|(size<<22)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -154,7 +163,7 @@ for row in rows:
   if ins.mnemonic!=expected[v['bytes']][int(v['castagnoli'])]:errors.append({'word':hex(word),'error':'CRC variant differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='VectorFp':
   v=op['VectorFp']
-  expected={'fadd','fsub','fmul','fdiv','fmla','fmls','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
+  expected={'fadd','fsub','fmul','fdiv','fmla','fmls','faddp','fmax','fmin','fmaxnm','fminnm','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'vector numeric family differs','reference':ins.mnemonic+' '+ins.op_str})
   scalar=ins.op_str.startswith(('s','d'))
   size=8 if ((word>>22)&1) else 4
@@ -171,7 +180,7 @@ for row in rows:
  elif kind=='Convert':
   if ins.mnemonic not in {'scvtf','ucvtf','fcvtns','fcvtnu','fcvtps','fcvtpu','fcvtms','fcvtmu','fcvtzs','fcvtzu','fcvtas','fcvtau'}:errors.append({'word':hex(word),'error':'conversion family differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind in {'Floating','FloatSelect','SystemRegister','Barrier'}:
-  expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd','fneg','fabs','fsqrt','fnmul','fmsub','fnmadd','fnmsub','fcvt'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]
+  expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd','fneg','fabs','fsqrt','fnmul','fmsub','fnmadd','fnmsub','fcvt','fmax','fmin','fmaxnm','fminnm'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'FP/system/barrier family differs','reference':ins.mnemonic+' '+ins.op_str})
   if kind=='Floating' and op['Floating']['operation']==14:
    source='s' if op['Floating']['bytes']==4 else 'd'
@@ -185,8 +194,13 @@ for row in rows:
   size=1 if ins.mnemonic.endswith('b')else 2 if ins.mnemonic.endswith('h')else 4 if register.startswith('w')else 8
   if size!=op['Atomic']['bytes']:errors.append({'word':hex(word),'error':'atomic width differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='Simd':
-  expected={'fmov','mov','movi','mvni','orr','bic','dup','umov','smov','and','orn','eor','bsl','bit','bif','ext'}
+  expected={'fmov','mov','movi','mvni','orr','bic','dup','umov','smov','and','orn','eor','bsl','bit','bif','ext','zip1','zip2','uzp1','uzp2','trn1','trn2'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'SIMD family differs','reference':ins.mnemonic+' '+ins.op_str})
+  if isinstance(op['Simd'],dict) and 'Permute' in op['Simd']:
+   v=op['Simd']['Permute'];name=[['uzp1','uzp2'],['trn1','trn2'],['zip1','zip2']][v['kind']][v['part']]
+   arrangement=str(v['vector_bytes']//v['bytes'])+{1:'b',2:'h',4:'s',8:'d'}[v['bytes']]
+   operands=', '.join('v'+str(v[k])+'.'+arrangement for k in ['dst','lhs','rhs'])
+   if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'permutation arrangement/registers differ','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='Logical':
   if ins.mnemonic != 'and':errors.append({'word':hex(word),'error':'logical family differs','reference':ins.mnemonic})
   bits=64 if word>>31 else 32

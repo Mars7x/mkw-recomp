@@ -113,12 +113,24 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::ConditionalFloat { .. } => features.push("conditional_fp_compare"),
                             Op::VectorFp(v) => {
                                 features.push("vector_fp");
+                                if matches!(
+                                    v.kind,
+                                    mkw_arm64::vector_fp::VectorFpKind::Arithmetic(15..=18)
+                                ) {
+                                    features.push("fp_minmax");
+                                }
+                                if v.kind == mkw_arm64::vector_fp::VectorFpKind::PairwiseAdd {
+                                    features.push("pairwise_fp");
+                                }
                                 if v.rhs_lane.is_some() {
                                     features.push("indexed_vector_fp");
                                 }
                             }
                             Op::Floating(f) => {
                                 features.push("scalar_fp");
+                                if (15..=18).contains(&f.operation) {
+                                    features.push("fp_minmax");
+                                }
                                 if f.operation == 14 {
                                     features.push("fp_format_conversion");
                                 }
@@ -135,7 +147,12 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::SystemRegister { .. } => features.push("fp_nzcv_register"),
                             Op::Barrier { .. } => features.push("data_barrier"),
                             Op::Atomic(_) => features.push("lse_atomic"),
-                            Op::Simd(_) => features.push("simd_register_bits"),
+                            Op::Simd(v) => {
+                                features.push("simd_register_bits");
+                                if matches!(v, mkw_arm64::simd::Simd::Permute { .. }) {
+                                    features.push("simd_permutation");
+                                }
+                            }
                             Op::Crc32 { .. } => features.push("crc32"),
                             Op::IntegerUnary { .. } | Op::CarryArithmetic { .. } => {
                                 features.push("integer_bits_carry")

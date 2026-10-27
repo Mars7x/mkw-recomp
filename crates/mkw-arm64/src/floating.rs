@@ -195,6 +195,10 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
             2 => 0,
             3 => 1,
             8 => 10,
+            4 => 15,
+            5 => 16,
+            6 => 17,
+            7 => 18,
             _ => return None,
         };
         (operation, false)
@@ -385,6 +389,31 @@ mod format_tests {
         }
         for w in [0x1e224020, 0x1e62c020, 0x1ee24020, 0x1e23c020, 0x1ea24020] {
             assert!(crate::decode(w, 0).is_err(), "{w:08x}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod minmax_tests {
+    use super::*;
+    #[test]
+    fn minmax_register_width_and_half_refusal() {
+        for (encoded, operation) in [(4, 15), (5, 16), (6, 17), (7, 18)] {
+            for (ty, bytes) in [(0, 4), (1, 8)] {
+                let Op::Floating(f) = crate::decode(0x1e3f0bff | (encoded << 12) | (ty << 22), 0)
+                    .unwrap()
+                    .op
+                else {
+                    panic!()
+                };
+                assert_eq!(
+                    (f.operation, f.bytes, f.dst, f.lhs, f.rhs),
+                    (operation, bytes, 31, 31, 31)
+                );
+            }
+            for ty in [2, 3] {
+                assert!(crate::decode(0x1e220820 | (encoded << 12) | (ty << 22), 0).is_err());
+            }
         }
     }
 }

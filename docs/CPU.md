@@ -16,7 +16,7 @@ Native synthetic tests cover signed LR saved/restored through a guest stack, nes
 
 `cpu-survey` validates all 223,856 indexed CIE/FDE ranges for the observed encoding, including zRB/zPLRB key-B augmentations. It does not execute CFI programs, unwind exceptions or discover every function.
 
-211,850 indexed extents lower within the current subset; 125,128 contain PAC. The survey now explicitly permits unconditional out-of-extent B tail transfers, unlike strict slice lifting. These counts allow unbound tail/call/memory/PAC exits and do not establish runnable functions, full BR target discovery or translated callees. Fifty-four selected functions compile into private native objects, 40 containing PAC. No game-derived function has executed. Full-module translation and linking of generated code remain incomplete.
+212,303 indexed extents lower within the current subset; 125,474 contain PAC. The survey now explicitly permits unconditional out-of-extent B tail transfers, unlike strict slice lifting. These counts allow unbound tail/call/memory/PAC exits and do not establish runnable functions, full BR target discovery or translated callees. Fifty-eight selected functions compile into private native objects, 42 containing PAC. No game-derived function has executed. Full-module translation and linking of generated code remain incomplete.
 
 Private JSONL records preserve surveyed failures. `tools/classify_survey.py` optionally uses privately installed Capstone to classify the first unsupported word in each function. Counts are neither dynamic instruction frequencies nor full instruction coverage. Full indirect-target discovery/binding, Additional fixed-point/format conversions and arithmetic/control profiles, remaining SIMD computation and structure transfers, ISB, exclusive monitors, TLS and exceptions remain gaps.
 
@@ -58,7 +58,7 @@ The selected BSD Berkeley SoftFloat sources remain unmodified, with pinned hashe
 
 DMB/DSB domain/access options remain in IR and callback tags. For synchronous owned normal memory, the bridge holds the shared mutex and executes a sequentially consistent fence; there are no pending device/cache/TLB operations to complete. This deliberately stronger profile does not claim all weak-memory outcomes or device completion. ISB and unsupported barrier variants refuse.
 
-Mandatory native tests cover state/refusal behavior, fused single rounding, thread isolation, FCSEL truth tables and threaded barrier publication. An additional 20,560 fixtures compare native O0/O2 results, FPSR and NZCV with QEMU 8.2.2, including IEEE edge cases. The comparison shares broad SoftFloat ancestry and remains software evidence, not original-hardware proof.
+Mandatory native tests cover state/refusal behavior, fused single rounding, thread isolation, FCSEL truth tables and threaded barrier publication. An additional 26,416 fixtures compare native O0/O2 results, FPSR and NZCV with QEMU 8.2.2, including IEEE edge cases. The comparison shares broad SoftFloat ancestry and remains software evidence, not original-hardware proof.
 
 ## Integer conversions and unary operations
 
@@ -80,7 +80,7 @@ FNMUL applies its result-sign inversion after the ordinary multiply's rounding a
 
 ## SIMD numeric lanes
 
-S/D 2S/4S/2D arithmetic, FMLA/FMLS and unary operations, vector integer conversions and SIMD scalar S/D conversions lower to a fixed number of checked scalar helper calls. All sources and the accumulator are snapshotted before lane evaluation. Destination bits and sticky FPSR commit only after all lanes succeed; upper unused bits clear. This transactional refusal model handles unsupported profiles without partial vector state and does not implement enabled exception delivery. Half/scaled and remaining arithmetic/structure instructions still reject. Native known-pattern and overlap tests plus 36,064 QEMU comparisons at O0/O2 provide software evidence under the restricted FP profile.
+S/D 2S/4S/2D arithmetic, FMLA/FMLS and unary operations, vector integer conversions and SIMD scalar S/D conversions lower to a fixed number of checked scalar helper calls. All sources and the accumulator are snapshotted before lane evaluation. Destination bits and sticky FPSR commit only after all lanes succeed; upper unused bits clear. This transactional refusal model handles unsupported profiles without partial vector state and does not implement enabled exception delivery. Half/scaled and remaining arithmetic/structure instructions still reject. Native known-pattern and overlap tests plus 43,232 QEMU comparisons at O0/O2 provide software evidence under the restricted FP profile.
 
 S/D FMUL/FMLA/FMLS by element capture all 128 bits of the indexed source and broadcast the decoded lane to the destination lanes. Scalar forms clear the upper result bits. Lane fields and reserved arrangements are checked ahead of code generation. FMSUB/FNMADD/FNMSUB and FMLS negate the required input bit patterns before the existing fused helper runs, preserving single rounding, input-NaN priority and sign behavior under the restricted legacy profile. They do not use a post-rounded negate.
 
@@ -89,3 +89,15 @@ S/D FMUL/FMLA/FMLS by element capture all 128 bits of the indexed source and bro
 S↔D FCVT uses the existing floating callback with operation 14; its byte width describes the input, and the output uses the other supported format. The adapter scopes SoftFloat state, converts NaN payloads with the pinned Arm specialization, applies default-NaN in the output format and accumulates FPSR. Unsupported control profiles still refuse before changing destination/FPSR. Scalar outputs clear unused bits. Native known-pattern/rounding tests and 8,768 synthetic QEMU cases at O0/O2 cover this path; half precision remains unimplemented.
 
 CRC32/CRC32C instructions consume the specified low 8/16/32/64 data bits and a 32-bit seed, then write a zero-extended 32-bit result without changing NZCV. Original portable C uses a reflected polynomial recurrence. Tests independently use polynomial long division, verify known string check values and register overlap/discarded results, and compare 40 synthetic encoding fixtures with QEMU. No host CRC extension or runtime opcode decoder is required.
+
+## Permutations and pairwise addition
+
+ZIP/UZP/TRN select lanes from complete raw source snapshots, then commit the packed result with unused upper bits cleared. B/H/S/D arrangements follow their decoded element widths; a single-D vector is reserved. They preserve all FP/control/flag state and do not require numeric helpers. Independent lane-list construction and QEMU fixtures check arrangement and overlapping destinations, including V31.
+
+S/D scalar/vector FADDP selects adjacent source pairs before calling checked FP add. Vector results concatenate left-source sums then right-source sums; scalar results use the one source pair. Complete snapshots and deferred destination/FPSR commits preserve overlap and later-lane refusal behavior. Gradual-underflow/default-NaN/rounding restrictions remain the existing profile; no enabled trap behavior is implied.
+
+## Floating min/max
+
+S/D scalar/vector FMAX/FMIN propagate NaNs with signaling priority and quiet their selected payload, setting IOC for signaling inputs. FMAXNM/FMINNM select the numeric operand when exactly one input is a quiet NaN; signaling inputs still propagate/raise IOC. Default-NaN applies to NaN results. Numeric selection uses unsigned raw-encoding comparisons with explicit signed-zero ties: maximum selects positive zero unless both are negative; minimum selects negative zero if either is negative. FPCR profile checks and vector deferred commits remain in force. No host floating operation determines these results.
+
+Synthetic QEMU fixture executions now run with private working directories so even crash dumps from rejected author-created instructions stay out of distributable source directories. The public artifact guard continues to reject unexpected binary files rather than excluding them from review silently.
