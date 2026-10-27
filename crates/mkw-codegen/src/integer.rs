@@ -2,6 +2,51 @@ use super::{r, ty, write};
 use mkw_arm64::{integer::MultiplyKind, Op, Width};
 pub fn emit(op: Op) -> Result<String, String> {
     Ok(match op {
+        Op::IntegerUnary {
+            width,
+            dst,
+            src,
+            operation,
+        } => {
+            let bits = if width == Width::W32 { 32 } else { 64 };
+            let mut out = format!("{{uint64_t value=({})({}),result=0;\n", ty(width), r(src));
+            match operation {
+                0=>out+=&format!("for(unsigned i=0;i<{bits};i++)result|=((value>>i)&1)<<({bits}-1-i);\n"),
+                1..=3=>{let group=1u32<<operation;let bytes=bits/8;out+=&format!("for(unsigned b=0;b<{bytes};b++){{unsigned to=(b/{group})*{group}+({group}-1-b%{group});result|=((value>>(b*8))&255)<<(to*8);}}\n");},
+                4=>out+=&format!("for(unsigned bit={bits};bit>0;bit--){{if((value>>(bit-1))&1)break;result++;}}\n"),
+                5=>out+=&format!("uint64_t sign=value>>{};for(unsigned bit={};bit>0;bit--){{if(((value>>(bit-1))&1)!=sign)break;result++;}}\n",bits-1,bits-1),
+                _=>return Err("invalid integer unary operation".into()),
+            }
+            out += &write(dst, width, "result");
+            out += "}\n";
+            out
+        }
+        Op::CarryArithmetic {
+            width,
+            dst,
+            lhs,
+            rhs,
+            sub,
+            flags,
+        } => {
+            let t = ty(width);
+            let bits = if width == Width::W32 { 32 } else { 64 };
+            let mut out = format!(
+                "{{{t} a=({t})({}),b=({t})({}),carry=({t})(c->c&1u);\n",
+                r(lhs),
+                r(rhs)
+            );
+            if sub {
+                out += "b=~b;\n";
+            }
+            out += &format!("{t} sum=({t})(a+b),result=({t})(sum+carry);\n");
+            if flags {
+                out+=&format!("c->n=(uint32_t)(result>>{});c->z=(result==0);c->c=(sum<a)||(result<sum);c->v=(uint32_t)((~(a^b)&(a^result))>>{});\n",bits-1,bits-1);
+            }
+            out += &write(dst, width, "result");
+            out += "}\n";
+            out
+        }
         Op::Multiply {
             width,
             dst,
@@ -53,6 +98,6 @@ pub fn emit(op: Op) -> Result<String, String> {
             out += "}\n";
             out
         }
-        _ => return Err("not a multiply/divide operation".into()),
+        _ => return Err("not an integer arithmetic/bit operation".into()),
     })
 }

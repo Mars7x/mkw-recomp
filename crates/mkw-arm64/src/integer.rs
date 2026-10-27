@@ -13,6 +13,28 @@ pub fn decode(word: u32, width: Width) -> Option<Result<Op, String>> {
     let rd = reg(word & 31, false);
     let lhs = reg((word >> 5) & 31, false);
     let rhs = reg((word >> 16) & 31, false);
+    if word & 0x1fe0fc00 == 0x1a000000 {
+        return Some(Ok(Op::CarryArithmetic {
+            width,
+            dst: rd,
+            lhs,
+            rhs,
+            sub: word & (1 << 30) != 0,
+            flags: word & (1 << 29) != 0,
+        }));
+    }
+    if word & 0x7ffffc00 >= 0x5ac00000 && word & 0x7ffffc00 <= 0x5ac01400 {
+        let operation = ((word >> 10) & 7) as u8;
+        if operation == 3 && width == Width::W32 {
+            return Some(Err("reserved word REV size".into()));
+        }
+        return Some(Ok(Op::IntegerUnary {
+            width,
+            dst: rd,
+            src: lhs,
+            operation,
+        }));
+    }
     if matches!(word & 0x7fe0fc00, 0x1ac00800 | 0x1ac00c00) {
         return Some(Ok(Op::Divide {
             width,
@@ -54,5 +76,25 @@ mod tests {
         ] {
             assert!(crate::decode(word, 0).is_err(), "{word:08x}");
         }
+    }
+}
+
+#[cfg(test)]
+mod bit_carry_tests {
+    use super::*;
+    #[test]
+    fn reserved_bit_operations_and_carry_fields_reject() {
+        for w in [0x5ac00c00, 0x5ac01800, 0x1a000400, 0x1a200000] {
+            assert!(crate::decode(w, 0).is_err(), "{w:08x}");
+        }
+        assert!(matches!(
+            crate::decode(0xda0203e0, 0).unwrap().op,
+            Op::CarryArithmetic {
+                width: Width::X64,
+                lhs: super::super::Reg::Zero,
+                sub: true,
+                ..
+            }
+        ));
     }
 }

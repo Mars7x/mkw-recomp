@@ -98,6 +98,13 @@ for sf in range(2):
 for ftype in range(4):
  for base in [0x1e214000,0x1e20c000,0x1e21c000]:
   for rn in [0,1,31]:words.add(base|(ftype<<22)|(rn<<5))
+for sf in range(2):
+ for operation in range(8):
+  for rn in [0,1,31]:words.add(0x5ac00000|(sf<<31)|(operation<<10)|(rn<<5))
+ for sub in range(2):
+  for flags in range(2):
+   for rn in [0,1,31]:
+    for rm in [0,2,31]:words.add(0x1a000000|(sf<<31)|(sub<<30)|(flags<<29)|(rm<<16)|(rn<<5))
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -110,7 +117,10 @@ for row in rows:
  word=row['word'];decoded=list(decoder.disasm(word.to_bytes(4,'little'),0x1000));op=row['instruction']['op'];kind=next(iter(op))if isinstance(op,dict)else op;counts[kind]+=1
  if len(decoded)!=1:errors.append({'word':hex(word),'error':'accepted encoding not decoded by Capstone'});continue
  ins=decoded[0]
- if kind=='Convert':
+ if kind in {'IntegerUnary','CarryArithmetic'}:
+  expected={'IntegerUnary':{'rbit','rev16','rev32','rev','clz','cls'},'CarryArithmetic':{'adc','adcs','sbc','sbcs','ngc','ngcs'}}[kind]
+  if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'integer bit/carry family differs','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='Convert':
   if ins.mnemonic not in {'scvtf','ucvtf','fcvtns','fcvtnu','fcvtps','fcvtpu','fcvtms','fcvtmu','fcvtzs','fcvtzu','fcvtas','fcvtau'}:errors.append({'word':hex(word),'error':'conversion family differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind in {'Floating','FloatSelect','SystemRegister','Barrier'}:
   expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd','fneg','fabs','fsqrt'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]

@@ -1,28 +1,27 @@
-# Status — October 26, 2026
+# Status — October 27, 2026
 
-Integer/FP conversions and scalar unary FP operations are implemented and tested; automatic source-only milestone publication continues. **No game-derived function has executed. Mario Kart World has not booted, rendered or become playable.**
+Scalar bit permutations/counting and carry-chain arithmetic are implemented and tested; automatic source-only milestone publication continues. **No game-derived function has executed. Mario Kart World has not booted, rendered or become playable.**
 
 ## Latest implementation
 
-- Added W/X signed and unsigned integer-to-S/D conversions (SCVTF/UCVTF), plus FP-to-W/X FCVTNS/NU, FCVTPS/PU, FCVTMS/MU, FCVTZS/ZU and FCVTAS/AU. Integer-to-FP follows FPCR rounding; FP-to-integer follows its encoded rounding mode, including ties away. Results saturate on invalid range and return zero for NaN under the inspected Arm specialization, raising cumulative IOC rather than substituting host casts.
-- Added S/D FNEG, FABS and FSQRT. Sign operations preserve raw NaN payloads and FPSR even under default-NaN control; square root uses verified software arithmetic and cumulative exception flags. Unsupported half/control/trap/flush profiles still refuse before result mutation.
-- ABI v6 appends a dedicated typed conversion callback. The borrowed FP backend installs/restores arithmetic and conversion callbacks together; missing backends and unverified library ABIs refuse. Width truncation, zero registers, V31, preserved flags and callback absence are tested. Integer sign interpretation uses exact-width bit copies rather than out-of-range signed C casts.
-- Expanded the unchanged BSD SoftFloat subset from the same pinned revision with required conversion, square-root and primitive sources, retaining source hashes and notices. Original shared environment glue saves/restores thread-local rounding/tininess/exception state for both callback families. Helper identity includes the new source/header inputs.
-- Added mandatory native conversion/saturation/refusal fixtures and optional differential QEMU batches. Batched synthetic ELF generation keeps literal addressing within bounds and records general-register outputs as well as vector bits, FPSR, NZCV and FPCR. Existing floating, barrier, LSE, SIMD, PAC and tail regressions pass.
-- The validation-gated publisher continues to the explicitly approved public `Mars7x/mkw-recomp` repository. README, original inputs, generated game code, credentials and private artifacts remain excluded; required upstream licences remain included. Periodic continuation is configured in this chat, using the latest measured dependencies from this file.
+- Added W/X RBIT, REV16, REV/REV32/REV64 as appropriate for width, CLZ and CLS. Zero/all-ones and sign-boundary behavior is defined, including CLZ(0)=width and CLS excluding the sign bit. Reserved W REV64 and neighbouring instruction encodings reject. Results preserve NZCV and W writes zero-extend.
+- Added ADC/ADCS and SBC/SBCS, including NGC aliases and zero-register/discarded-result forms. Incoming carry is captured before state updates. Emitted unsigned arithmetic computes carry in two stages and avoids host signed overflow; optional flag updates and width truncation are explicit.
+- New native fixtures compare bit permutations/counts with independent Rust builtins/byte operations and carry results with wide signed/unsigned mathematical references across boundary operands and both carry inputs. O0/O2 use fatal UBSan. No new runtime fallback or ABI change was required.
+- The preceding published milestone (`6781ee3`) added SCVTF/UCVTF, encoded-rounding FP-to-integer conversions, FNEG/FABS/FSQRT and ABI v6 conversion callbacks. Its 7,232 conversion and 13,348 FP/selection QEMU fixtures remain passing, alongside source provenance and restricted-control refusal checks.
+- Periodic continuation is active in this chat and reads this file for the next measured dependency. The publisher retains the explicit public-visibility check and source-only exclusions. No README, original inputs, generated game code, credentials or private artifacts are published; upstream notices are retained.
 
 ## Supplied-binary evidence
 
-All **223,856 indexed CIE/FDE extents** validate. The survey lowers **205,977 indexed extents**, including **120,453 with PAC operations**, up from 203,734 under the same tail policy. Accepted extents include 1,448 with integer/FP conversions and 5,413 with scalar FP operations. **57,719 contain direct extent tails; 13,689 contain indirect BR** (categories overlap). Runtime helpers/profiles, callees and indirect targets remain incomplete or unbound; these are not runnable-function or full-module counts. **Thirty-eight representative game-derived samples compile into native objects, 29 with PAC; none execute.**
+All **223,856 indexed CIE/FDE extents** validate. The survey lowers **207,772 indexed extents**, including **121,685 with PAC operations**, up from 205,977 using the same tail policy. Accepted extents include **1,795 with the new integer bit/carry operations**. **57,840 contain direct extent tails; 13,768 contain indirect BR** (categories overlap). Helpers/profiles, callees and indirect targets can remain unbound or incomplete; these are not runnable-function or complete-module counts. **Forty-two representative game-derived samples compile into native objects, 33 with PAC; none execute.**
 
 The existing exact-version diagnostic still applies and reads back **309,844 relocations** across four modules / 79,721,040 mapped bytes, with 26,110 named symbol bindings. Symbol search uses validated SONAME dependencies and an explicit process policy inferred statically from the supplied rtld. Actual retail address layout/startup has not been reproduced.
 
 ## Validation
 
-- **85 Rust tests pass**, including known conversion results, integer saturation, all encoded FP-to-integer rounding variants, masks/sign/zero-register behavior, missing/unsupported callback refusal and shared-backend regression tests.
+- **88 Rust tests pass**, including independent native bit/carry reference checks, reserved encodings, zero/discarded registers, preserved flags and all prior conversion/FP/runtime regressions.
 - **7,232 conversion fixtures** match QEMU 8.2.2 at native O0/O2 with fatal UBSan, checking vector/general-register results, FPSR, NZCV and FPCR across W/X and S/D, controls, integer boundaries, fractions, signed zeros, infinities and quiet/signaling NaNs.
 - The expanded **13,348 FP/selection fixtures** also match QEMU at O0/O2. Earlier **2,741 SIMD**, **160 LSE** and **4,096 QARMA5** software comparisons remain passing. QEMU shares broad SoftFloat lineage and is not a hardware oracle; optional unavailability is explicitly recorded.
-- **85,028 constructed encodings**, including **46,132 accepted encodings**, pass private Capstone family/width/immediate checks. This checks decoding, not runtime semantics or hardware behavior.
+- **85,148 constructed encodings**, including **46,237 accepted encodings**, pass private Capstone family/width/immediate checks. This checks decoding, not runtime semantics or hardware behavior.
 - Native semantic cases run at O0/O2 with fatal undefined-behavior instrumentation. Synthetic programs only are executed; native game sample objects are compilation evidence.
 - **4,096 independent QARMA5 comparisons pass** against privately compiled QEMU reference code. The game's PAC profile is still unverified. The legacy/QARMA5/39-bit/no-TBI backend remains diagnostic and selected only by synthetic tests.
 - Formatting, Clippy with warnings denied, exact ExeFS/segment hashes, changed-identity refusal and truncated-CFG refusal pass. Public artifact checks exclude original inputs and all generated/private data.
@@ -38,14 +37,14 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 |---|---|---|
 | 0 investigation | Partially implemented | Retail version/completeness, graphics/resource analysis |
 | 1 foundation | Partially implemented | Synthetic native/Rust bridges pass; ISA and runtime semantics incomplete |
-| 2 game CPU translation | Partially implemented | 205,977 subset-liftable indexed extents with possible unbound tails/profiles; 38 objects; no complete module |
+| 2 game CPU translation | Partially implemented | 207,772 subset-liftable indexed extents with possible unbound tails/profiles; 42 objects; no complete module |
 | 3 runtime bootstrap | Not started | Load-time linking passes; no actual game execution/startup |
 | 4–8 graphics through packaging | Not started | No genuine game frame, native input/audio or gameplay |
 
 ## Files changed this session
 
-`native/cpu.h`, fp.c/new convert.c and fp_environment.h; floating IR/decoder/emitter and helper identity; runtime ABI/backend attachment; conversion, FP and synthetic-reference tests/shared support; CLI survey; tools/build_fp.py and check_decoder.py; pinned SoftFloat additions/provenance; STATUS/CPU/architecture/compatibility/research documentation. Original inputs were unchanged; generated outputs stay private. Source-only commits/pushes remain authorized.
+ARM64 IR/integer decoder; integer emitter; independent native bit/carry tests; CLI feature survey; optional Capstone reference cases; STATUS/CPU/compatibility/research documentation. No ABI change from v6. Original inputs remain unchanged and all game-derived generated outputs remain private. Validated source-only commits/pushes remain authorized.
 
 ## Next concrete dependencies
 
-The latest first-blocker census starts with REV (796 extents), MRS (782), CLZ (760), FNMUL (679), remaining SCVTF variants (588), FMUL (528), UDF (457), remaining FCVTZS variants (450), FCCMP (446), FCVT (351), UCVTF (232) and LD1 (204). Counts are first blockers, not dynamic frequencies. Next add validated scalar bit operations and remaining fused/conditional FP, then fixed-point/format and vector/structure operations. Extend control profiles only with functional/exception fixtures. System registers, ISB, exclusive monitors, device/weak-memory behavior, indirect discovery/binding, target PAC/FP/address configuration and bootstrap/services remain separate gates before original-function execution.
+The latest first blockers are MRS (783 extents), FNMUL (682), remaining SCVTF variants (590), FMUL (529), UDF (457), remaining FCVTZS variants (451), FCCMP (447), FCVT (355), UCVTF (237), LD1 (205), FMSUB (203) and FNMSUB (195). Counts are first blockers, not dynamic frequencies. Next investigate remaining system-register requirements without substituting host state, and validate remaining fused/conditional FP before scaled/format conversions and vector/structure operations. Unsupported instructions must not become success/no-op exits just to increase coverage. Target configuration, indirect binding, exception/exclusive/device/weak-memory behavior and bootstrap/services remain gates to original-function execution.

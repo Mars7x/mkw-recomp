@@ -103,6 +103,9 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::Barrier { .. } => features.push("data_barrier"),
                             Op::Atomic(_) => features.push("lse_atomic"),
                             Op::Simd(_) => features.push("simd_register_bits"),
+                            Op::IntegerUnary { .. } | Op::CarryArithmetic { .. } => {
+                                features.push("integer_bits_carry")
+                            }
                             Op::Multiply { .. } | Op::Divide { .. } => {
                                 features.push("multiply_divide")
                             }

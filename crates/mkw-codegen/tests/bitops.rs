@@ -534,3 +534,171 @@ fn native_raw_simd_known_patterns_and_aliases() {
     }
     cases.run("raw-simd-known");
 }
+
+#[test]
+fn native_integer_bit_operations_match_independent_builtins() {
+    let mut cases = Cases::new();
+    let mut values = vec![
+        0,
+        1,
+        2,
+        0xffffffff,
+        0x80000000,
+        0x7fffffff,
+        0x8000000000000000,
+        0x7fffffffffffffff,
+        u64::MAX,
+        0x0123456789abcdef,
+    ];
+    let mut random = 0xa57e241fac9b62d3u64;
+    for _ in 0..128 {
+        random ^= random << 13;
+        random ^= random >> 7;
+        random ^= random << 17;
+        values.push(random);
+    }
+    for sf in 0..2u32 {
+        for op in 0..6u32 {
+            if sf == 0 && op == 3 {
+                continue;
+            }
+            let name = cases.function(0x5ac00000 | (sf << 31) | (op << 10) | (1 << 5));
+            let mut rows = Vec::new();
+            for &value in &values {
+                let a = if sf == 0 {
+                    u64::from(value as u32)
+                } else {
+                    value
+                };
+                let expected = match op {
+                    0 => {
+                        if sf == 0 {
+                            u64::from((a as u32).reverse_bits())
+                        } else {
+                            a.reverse_bits()
+                        }
+                    }
+                    1 => {
+                        let bytes = a.to_le_bytes();
+                        let mut out = 0;
+                        for i in 0..(if sf == 0 { 4 } else { 8 }) {
+                            out |= u64::from(bytes[i ^ 1]) << (i * 8);
+                        }
+                        out
+                    }
+                    2 => {
+                        let lo = (a as u32).swap_bytes();
+                        let hi = ((a >> 32) as u32).swap_bytes();
+                        u64::from(lo) | (if sf == 1 { u64::from(hi) << 32 } else { 0 })
+                    }
+                    3 => a.swap_bytes(),
+                    4 => {
+                        if sf == 0 {
+                            u64::from((a as u32).leading_zeros())
+                        } else {
+                            u64::from(a.leading_zeros())
+                        }
+                    }
+                    5 => {
+                        if sf == 0 {
+                            let v = a as u32;
+                            u64::from(
+                                if v >> 31 != 0 {
+                                    v.leading_ones()
+                                } else {
+                                    v.leading_zeros()
+                                } - 1,
+                            )
+                        } else {
+                            u64::from(
+                                if a >> 63 != 0 {
+                                    a.leading_ones()
+                                } else {
+                                    a.leading_zeros()
+                                } - 1,
+                            )
+                        }
+                    }
+                    _ => unreachable!(),
+                };
+                rows.push(format!("{{UINT64_C({value}),UINT64_C({expected})}}"));
+            }
+            cases.main+=&format!("{{const uint64_t rows[][2]={{{}}};for(unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);i++){{c=(MkwCpu){{0}};c.x[1]=rows[i][0];c.n=1;c.z=0;c.c=1;c.v=1;if({name}(&c,10)||c.x[0]!=rows[i][1]||c.x[1]!=rows[i][0]||!c.n||c.z||!c.c||!c.v)return 1;}}}}\n",rows.join(","));
+        }
+    }
+    let zero = cases.function(0xdac013e0);
+    cases.check(&zero, "c.sp=99;", "c.x[0]!=64||c.sp!=99");
+    let discard = cases.function(0xdac0003f);
+    cases.check(&discard, "c.x[0]=123;c.x[1]=456;", "c.x[0]!=123");
+    cases.run("integer-unary");
+}
+#[test]
+fn native_carry_arithmetic_matches_wide_signed_and_unsigned_reference() {
+    let mut cases = Cases::new();
+    let values = [
+        0u64,
+        1,
+        2,
+        0xffffffff,
+        0x80000000,
+        0x7fffffff,
+        0x8000000000000000,
+        0x7fffffffffffffff,
+        u64::MAX,
+    ];
+    for sf in 0..2u32 {
+        let bits = 32u32 << sf;
+        let mask = (1u128 << bits) - 1;
+        let sign = 1i128 << (bits - 1);
+        for sub in 0..2 {
+            for flags in 0..2 {
+                let name = cases.function(
+                    0x1a000000 | (sf << 31) | (sub << 30) | (flags << 29) | (2 << 16) | (1 << 5),
+                );
+                let mut rows = Vec::new();
+                for &a in &values {
+                    for &b in &values {
+                        for carry in 0..2u32 {
+                            let aa = u128::from(a) & mask;
+                            let bb = u128::from(b) & mask;
+                            let sum =
+                                aa + (if sub != 0 { mask ^ bb } else { bb }) + u128::from(carry);
+                            let result = (sum & mask) as u64;
+                            let signed = |v: u128| {
+                                if v as i128 >= sign {
+                                    v as i128 - (1i128 << bits)
+                                } else {
+                                    v as i128
+                                }
+                            };
+                            let exact = if sub != 0 {
+                                signed(aa) - signed(bb) - i128::from(1 - carry)
+                            } else {
+                                signed(aa) + signed(bb) + i128::from(carry)
+                            };
+                            let nzcv = if flags != 0 {
+                                u32::from(result >> (bits - 1) != 0) * 8
+                                    + u32::from(result == 0) * 4
+                                    + u32::from(sum > mask) * 2
+                                    + u32::from(exact < -sign || exact >= sign)
+                            } else {
+                                9 + carry * 2
+                            };
+                            rows.push(format!(
+                                "{{UINT64_C({a}),UINT64_C({b}),{carry},UINT64_C({result}),{nzcv}}}"
+                            ));
+                        }
+                    }
+                }
+                cases.main+=&format!("{{const uint64_t rows[][5]={{{}}};for(unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);i++){{c=(MkwCpu){{0}};c.x[1]=rows[i][0];c.x[2]=rows[i][1];c.n=1;c.z=0;c.c=(uint32_t)rows[i][2];c.v=1;if({name}(&c,10)||c.x[0]!=rows[i][3]||((c.n<<3)|(c.z<<2)|(c.c<<1)|c.v)!=rows[i][4]||c.x[1]!=rows[i][0]||c.x[2]!=rows[i][1])return 1;}}}}\n",rows.join(","));
+            }
+        }
+    }
+    let discard = cases.function(0x3a02003f);
+    cases.check(
+        &discard,
+        "c.x[0]=123;c.x[1]=0xffffffff;c.x[2]=0;c.c=1;",
+        "c.x[0]!=123||!c.z||!c.c||c.n||c.v",
+    );
+    cases.run("carry-arithmetic");
+}

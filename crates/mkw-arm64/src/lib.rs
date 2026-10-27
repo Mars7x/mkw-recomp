@@ -37,6 +37,20 @@ pub enum MemoryOrder {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Op {
     Nop,
+    IntegerUnary {
+        width: Width,
+        dst: Reg,
+        src: Reg,
+        operation: u8,
+    },
+    CarryArithmetic {
+        width: Width,
+        dst: Reg,
+        lhs: Reg,
+        rhs: Reg,
+        sub: bool,
+        flags: bool,
+    },
     Floating(floating::Floating),
     Convert(floating::Conversion),
     FloatSelect {

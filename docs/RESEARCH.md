@@ -112,3 +112,7 @@ Arm distinguishes data ordering from completion and instruction synchronization.
 ## Conversion and unary extension
 
 The selected unchanged SoftFloat sources now include signed/unsigned integer conversions and square root from the same pinned revision. The inspected ARM-VFPv2 specialization defines saturation and zero-for-NaN results; native tests compare exact invalid and inexact flags with separate QEMU execution. Instruction rounding is kept distinct from FPCR rounding. No native floating casts or host fenv state stand in for guest semantics. The shared project environment helper scopes the vendored thread-local state. [SoftFloat operation/exception documentation](https://www.jhauser.us/arithmetic/SoftFloat-3/doc/SoftFloat.html), [pinned Arm specialization](https://github.com/ucb-bar/berkeley-softfloat-3/blob/497c81c1f5016dc6ef5b3219ece2f3c261d4d8f1/source/ARM-VFPv2/specialize.h).
+
+## Scalar bit and carry validation
+
+The next supplied-binary blockers included scalar REV and CLZ. Their fixed-width permutations/counts, plus RBIT/CLS and carry-chain operations, now lower through original unsigned C. Reserved width/opcode fields remain errors. Independent native tests compare bit operations with Rust builtins/byte swaps and carry/overflow flags with wide mathematical results, rather than copying the emitter's flag formula into the oracle. [Arm A64 bit-operation overview](https://developer.arm.com/-/media/Files/pdf/graphics-and-multimedia/ARMv8_InstructionSetOverview.pdf).

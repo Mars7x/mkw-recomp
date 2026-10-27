@@ -115,7 +115,10 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
                 out += &simd::emit(op);
                 out += &next;
             }
-            operation @ (Op::Multiply { .. } | Op::Divide { .. }) => {
+            operation @ (Op::Multiply { .. }
+            | Op::Divide { .. }
+            | Op::IntegerUnary { .. }
+            | Op::CarryArithmetic { .. }) => {
                 out += &integer::emit(operation)?;
                 out += &next;
             }
