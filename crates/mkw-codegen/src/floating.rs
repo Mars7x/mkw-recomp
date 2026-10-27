@@ -10,7 +10,7 @@ pub fn emit(op: Op) -> String {
             out+="}\n";out
         }
         Op::Floating(op)=>{
-            let accumulate=if op.operation==6{format!("c->vregs[{}][0]",op.accumulate)}else{"UINT64_C(0)".into()};
+            let accumulate=if matches!(op.operation,6|11|12|13){format!("c->vregs[{}][0]",op.accumulate)}else{"UINT64_C(0)".into()};
             let right=if op.zero{"UINT64_C(0)".into()}else{format!("c->vregs[{}][0]",op.rhs)};
             let mut out=format!("{{uint64_t result=0;uint32_t fpsr=c->fpsr;if(!c->floating){{c->fault_status=3;return 3;}}int status=c->floating({},{},c->fpcr,c->fpsr,c->vregs[{}][0],{right},{accumulate},&result,&fpsr);if(status){{c->fault_status=status;return status;}}c->fpsr=fpsr;\n",op.operation,op.bytes,op.lhs);
             if matches!(op.operation,4|5){out+="c->n=(uint32_t)((result>>3)&1);c->z=(uint32_t)((result>>2)&1);c->c=(uint32_t)((result>>1)&1);c->v=(uint32_t)(result&1);\n";}

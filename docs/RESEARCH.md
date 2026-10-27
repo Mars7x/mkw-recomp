@@ -130,3 +130,7 @@ A private synthetic probe compared FNMUL with multiply followed by raw result-si
 ## SIMD numeric helper reuse
 
 The new vector path uses the already attributed scalar SoftFloat adapters per lane, with original source snapshots, packing and commit logic. Independently authored AArch64 fixtures now initialize full Q0–Q3 values and compare vector results/FPSR/NZCV across arrangements, source/destination aliases and controls. The 13,216 comparisons exercise synthetic instructions only. Capstone separately checks constructed encoding families and arrangements; neither software reference establishes original-hardware behavior or retail FP configuration.
+
+## Fused sign and indexed-lane validation
+
+Arm distinguishes fused subtract/negated fused operations from multiplying then subtracting with two roundings. Original glue now transforms the required raw input signs before calling the established fused adapter. Mandatory cancellation and NaN-sign fixtures and expanded independent QEMU tests check this ordering. Indexed S/D FMUL/FMLA/FMLS reuse source snapshots with a statically decoded element index; all legal source indices and overlap cases are compared. No Arm/QEMU implementation source was copied. [Arm instruction reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab).

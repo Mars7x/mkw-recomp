@@ -84,7 +84,9 @@ for ftype in range(4):
 for ftype in range(4):
  for rn in [0,1,31]:
   for rm in [0,2,31]:
-   for ra in [0,3,31]:words.add(0x1f000000|(ftype<<22)|(rm<<16)|(ra<<10)|(rn<<5))
+   for ra in [0,3,31]:
+    for neg in range(2):
+     for sub in range(2):words.add(0x1f000000|(ftype<<22)|(rm<<16)|(ra<<10)|(rn<<5)|(neg<<21)|(sub<<15))
 for ftype in range(4):
  for condition in range(16):
   for rn in [0,1,31]:
@@ -112,13 +114,21 @@ for ftype in range(4):
 for q in range(2):
  for size in range(2):
   for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(1,2,1)]:
-   for base in [0x0e20d400,0x0ea0d400,0x2e20dc00,0x2e20fc00,0x0e20cc00]:
+   for base in [0x0e20d400,0x0ea0d400,0x2e20dc00,0x2e20fc00,0x0e20cc00,0x0ea0cc00]:
     words.add(base|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
    for base in [0x0ea0f800,0x2ea0f800,0x2ea1f800,0x0e21d800,0x2e21d800,0x0ea1b800,0x2ea1b800]:
     words.add(base|(q<<30)|(size<<22)|(rn<<5)|rd)
 for size in range(2):
  for rd,rn in [(0,1),(0,0),(31,31)]:
   for base in [0x5e21d800,0x7e21d800,0x5ea1b800,0x7ea1b800]:words.add(base|(size<<22)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for size in range(2):
+   for low in range(2):
+    for high in range(2):
+     for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:
+      for base in [0x0f801000,0x0f805000,0x0f809000,0x2f809000]:
+       words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(low<<21)|(high<<11)|(rm<<16)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -133,12 +143,15 @@ for row in rows:
  ins=decoded[0]
  if kind=='VectorFp':
   v=op['VectorFp']
-  expected={'fadd','fsub','fmul','fdiv','fmla','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
+  expected={'fadd','fsub','fmul','fdiv','fmla','fmls','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'vector numeric family differs','reference':ins.mnemonic+' '+ins.op_str})
   scalar=ins.op_str.startswith(('s','d'))
   size=8 if ((word>>22)&1) else 4
   total=size if scalar else (16 if ((word>>30)&1) else 8)
   if (v['bytes'],v['total'])!=(size,total):errors.append({'word':hex(word),'error':'vector numeric arrangement differs','reference':ins.op_str})
+  if v['rhs_lane'] is not None:
+   if ins.operands[-1].vector_index!=v['rhs_lane']:errors.append({'word':hex(word),'error':'indexed source lane differs','reference':ins.op_str})
+   if (word>>16)&31 != v['rhs']:errors.append({'word':hex(word),'error':'indexed source register differs'})
  elif kind=='ConditionalFloat':
   if ins.mnemonic not in {'fccmp','fccmpe'}:errors.append({'word':hex(word),'error':'conditional FP family differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind in {'IntegerUnary','CarryArithmetic'}:
@@ -147,7 +160,7 @@ for row in rows:
  elif kind=='Convert':
   if ins.mnemonic not in {'scvtf','ucvtf','fcvtns','fcvtnu','fcvtps','fcvtpu','fcvtms','fcvtmu','fcvtzs','fcvtzu','fcvtas','fcvtau'}:errors.append({'word':hex(word),'error':'conversion family differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind in {'Floating','FloatSelect','SystemRegister','Barrier'}:
-  expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd','fneg','fabs','fsqrt','fnmul'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]
+  expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd','fneg','fabs','fsqrt','fnmul','fmsub','fnmadd','fnmsub'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'FP/system/barrier family differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='OrderedMemory':
   if ins.mnemonic not in {'ldapr','ldaprb','ldaprh'}:errors.append({'word':hex(word),'error':'ordered-memory family differs','reference':ins.mnemonic})

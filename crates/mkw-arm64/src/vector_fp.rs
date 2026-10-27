@@ -13,9 +13,43 @@ pub struct VectorFp {
     pub dst: u8,
     pub lhs: u8,
     pub rhs: u8,
+    pub rhs_lane: Option<u8>,
     pub kind: VectorFpKind,
 }
 pub fn decode(w: u32) -> Option<Result<Op, String>> {
+    let indexed = match w & 0xaf80f400 {
+        0x0f809000 => Some(2),
+        0x0f801000 => Some(6),
+        0x0f805000 => Some(11),
+        _ => None,
+    };
+    if let Some(operation) = indexed {
+        let scalar = w & (1 << 28) != 0;
+        let q = w & (1 << 30) != 0;
+        let bytes = if w & (1 << 22) != 0 { 8 } else { 4 };
+        let low = (w >> 21) & 1;
+        if (scalar && !q) || (bytes == 8 && (low != 0 || (!scalar && !q))) {
+            return Some(Err("reserved indexed FP arrangement".into()));
+        }
+        let high = (w >> 11) & 1;
+        let lane = if bytes == 4 { high * 2 + low } else { high };
+        return Some(Ok(Op::VectorFp(VectorFp {
+            bytes,
+            total: if scalar {
+                bytes
+            } else if q {
+                16
+            } else {
+                8
+            },
+            dst: (w & 31) as u8,
+            lhs: ((w >> 5) & 31) as u8,
+            rhs: ((w >> 16) & 31) as u8,
+            rhs_lane: Some(lane as u8),
+            kind: VectorFpKind::Arithmetic(operation),
+        })));
+    }
+
     let scalar = w & 0xdfbffc00 == 0x5e21d800 || w & 0xdfbffc00 == 0x5ea1b800;
     let conversion = scalar || w & 0x9fbffc00 == 0x0e21d800 || w & 0x9fbffc00 == 0x0ea1b800;
     let kind = if conversion {
@@ -32,6 +66,7 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
             0x2e20dc00 => Some(2),
             0x2e20fc00 => Some(3),
             0x0e20cc00 => Some(6),
+            0x0ea0cc00 => Some(11),
             _ => None,
         };
         if let Some(op) = binary {
@@ -63,6 +98,7 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
         lhs: ((w >> 5) & 31) as u8,
         rhs: ((w >> 16) & 31) as u8,
         kind,
+        rhs_lane: None,
     })))
 }
 
@@ -72,8 +108,8 @@ mod tests {
     #[test]
     fn arrangements_and_scalar_conversion_are_bounded() {
         for base in [
-            0x0e22d420, 0x0ea2d420, 0x2e22dc20, 0x2e22fc20, 0x0e22cc20, 0x0ea0f820, 0x2ea0f820,
-            0x2ea1f820, 0x0e21d820, 0x2e21d820, 0x0ea1b820, 0x2ea1b820,
+            0x0e22d420, 0x0ea2d420, 0x2e22dc20, 0x2e22fc20, 0x0e22cc20, 0x0ea2cc20, 0x0ea0f820,
+            0x2ea0f820, 0x2ea1f820, 0x0e21d820, 0x2e21d820, 0x0ea1b820, 0x2ea1b820,
         ] {
             for q in 0..2 {
                 for size in 0..2 {
@@ -105,6 +141,37 @@ mod tests {
             0x4e21d820 ^ (1 << 10),
         ] {
             assert!(decode(unsupported).is_none());
+        }
+    }
+}
+
+#[cfg(test)]
+mod indexed_tests {
+    use super::*;
+    #[test]
+    fn indexed_lanes_register31_and_reserved_arrangements() {
+        for (size, bytes) in [(0, 4), (1, 8)] {
+            for lane in 0..(if size == 0 { 4 } else { 2 }) {
+                let index = if size == 0 {
+                    ((lane & 1) << 21) | ((lane >> 1) << 11)
+                } else {
+                    lane << 11
+                };
+                let Op::VectorFp(v) = decode(0x4f9f93ff | (size << 22) | index).unwrap().unwrap()
+                else {
+                    panic!()
+                };
+                assert_eq!(
+                    (v.dst, v.lhs, v.rhs, v.rhs_lane, v.bytes, v.total),
+                    (31, 31, 31, Some(lane as u8), bytes, 16)
+                );
+            }
+        }
+        for w in [0x0fc29020, 0x4fe29020, 0x5fe29020, 0x1f829020] {
+            assert!(decode(w).unwrap().is_err());
+        }
+        for w in [0x4f029020, 0x4f429020, 0x6f829020, 0x4f829420] {
+            assert!(decode(w).is_none());
         }
     }
 }

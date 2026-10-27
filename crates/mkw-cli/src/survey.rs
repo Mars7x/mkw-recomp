@@ -111,8 +111,18 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::FloatSelect { .. } => features.push("fp_conditional_select"),
                             Op::Convert(_) => features.push("fp_integer_conversion"),
                             Op::ConditionalFloat { .. } => features.push("conditional_fp_compare"),
-                            Op::VectorFp(_) => features.push("vector_fp"),
-                            Op::Floating(_) => features.push("scalar_fp"),
+                            Op::VectorFp(v) => {
+                                features.push("vector_fp");
+                                if v.rhs_lane.is_some() {
+                                    features.push("indexed_vector_fp");
+                                }
+                            }
+                            Op::Floating(f) => {
+                                features.push("scalar_fp");
+                                if (11..=13).contains(&f.operation) {
+                                    features.push("fused_sign_fp");
+                                }
+                            }
                             Op::SystemRegister {
                                 register:
                                     mkw_arm64::floating::SystemReg::TpidrEl0

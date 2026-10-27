@@ -10,8 +10,8 @@ fn words() -> Vec<u32> {
     let mut words = Vec::new();
     for arrangement in [0, 1 << 30, (1 << 30) | (1 << 22)] {
         for base in [
-            0x0e22d420, 0x0ea2d420, 0x2e22dc20, 0x2e22fc20, 0x0e22cc20, 0x0ea0f820, 0x2ea0f820,
-            0x2ea1f820, 0x0e21d820, 0x2e21d820, 0x0ea1b820, 0x2ea1b820,
+            0x0e22d420, 0x0ea2d420, 0x2e22dc20, 0x2e22fc20, 0x0e22cc20, 0x0ea2cc20, 0x0ea0f820,
+            0x2ea0f820, 0x2ea1f820, 0x0e21d820, 0x2e21d820, 0x0ea1b820, 0x2ea1b820,
         ] {
             words.push(base | arrangement);
         }
@@ -21,13 +21,32 @@ fn words() -> Vec<u32> {
             words.push(base | size);
         }
     }
+    for scalar in 0..2 {
+        for q in 0..2 {
+            for size in 0..2 {
+                if (scalar == 1 && q == 0) || (scalar == 0 && q == 0 && size == 1) {
+                    continue;
+                }
+                for lane in 0..(if size == 0 { 4 } else { 2 }) {
+                    let index = if size == 0 {
+                        ((lane & 1) << 21) | ((lane >> 1) << 11)
+                    } else {
+                        lane << 11
+                    };
+                    for base in [0x0f829020, 0x0f821020, 0x0f825020] {
+                        words.push(base | (scalar << 28) | (q << 30) | (size << 22) | index);
+                    }
+                }
+            }
+        }
+    }
     let originals = words.clone();
     for w in originals {
         words.push(w & !(31 << 5)); // destination aliases first source
         if matches!(
             mkw_arm64::decode(w, 0).unwrap().op,
             mkw_arm64::Op::VectorFp(mkw_arm64::vector_fp::VectorFp {
-                kind: mkw_arm64::vector_fp::VectorFpKind::Arithmetic(0 | 1 | 2 | 3 | 6),
+                kind: mkw_arm64::vector_fp::VectorFpKind::Arithmetic(0 | 1 | 2 | 3 | 6 | 11),
                 ..
             })
         ) {
@@ -150,6 +169,62 @@ fn known_lanes_overlap_upper_clearing_and_transactional_refusal() {
             assert_eq!(cpu.vregs[dst], expected, "{w:x}");
             assert_eq!(cpu.fpsr, 0x08000080 | flags, "{w:x}");
         }
+        for w in words() {
+            let mkw_arm64::Op::VectorFp(v) = mkw_arm64::decode(w, 0).unwrap().op else {
+                unreachable!()
+            };
+            if v.lhs != 1
+                || v.rhs != 2
+                || v.kind != mkw_arm64::vector_fp::VectorFpKind::Arithmetic(2)
+            {
+                continue;
+            }
+            let Some(lane) = v.rhs_lane else { continue };
+            let native = unsafe {
+                library
+                    .get::<Entry>(format!("vector_{w:x}\0").as_bytes())
+                    .unwrap()
+            };
+            let mut cpu = Cpu::default();
+            cpu.vregs[0] = [123, 456];
+            cpu.vregs[1] = if v.bytes == 4 {
+                [0x3f8000003f800000; 2]
+            } else {
+                [0x3ff0000000000000; 2]
+            };
+            cpu.vregs[2] = if v.bytes == 4 {
+                [0x4040000040000000, 0x40a0000040800000]
+            } else {
+                [0x4000000000000000, 0x4008000000000000]
+            };
+            let element = if v.bytes == 4 {
+                [0x40000000u64, 0x40400000, 0x40800000, 0x40a00000][usize::from(lane)]
+            } else {
+                cpu.vregs[2][usize::from(lane)]
+            };
+            let mut expected = [0u64; 2];
+            for n in 0..v.total / v.bytes {
+                let offset = u32::from(n) * u32::from(v.bytes) * 8;
+                expected[(offset / 64) as usize] |= element << (offset % 64);
+            }
+            {
+                let mut a = backend.attach(&mut cpu);
+                assert_eq!(unsafe { native(a.cpu_mut(), 10) }, 0);
+            }
+            assert_eq!(cpu.vregs[0], expected, "indexed {w:x}");
+            assert_eq!(cpu.fpsr, 0);
+        }
+        let fmls = unsafe { library.get::<Entry>(b"vector_4ea2cc20\0").unwrap() };
+        let mut cpu = Cpu::default();
+        cpu.vregs[0] = [0x4120000041200000; 2];
+        cpu.vregs[1] = [0x4000000040000000; 2];
+        cpu.vregs[2] = [0x4040000040400000; 2];
+        {
+            let mut a = backend.attach(&mut cpu);
+            assert_eq!(unsafe { fmls(a.cpu_mut(), 10) }, 0);
+        }
+        assert_eq!(cpu.vregs[0], [0x4080000040800000; 2]);
+        assert_eq!(cpu.fpsr, 0);
         let native = unsafe { library.get::<Entry>(b"vector_4e22d420\0").unwrap() };
         for mode in 0..3 {
             let mut cpu = Cpu {

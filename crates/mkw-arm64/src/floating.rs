@@ -119,7 +119,7 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
             condition: ((w >> 12) & 15) as u8,
         }));
     }
-    if w & 0xff208000 == 0x1f000000 {
+    if w & 0xff000000 == 0x1f000000 {
         let bytes = match (w >> 22) & 3 {
             0 => 4,
             1 => 8,
@@ -127,7 +127,13 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
         };
         return Some(Ok(Op::Floating(Floating {
             bytes,
-            operation: 6,
+            operation: match ((w >> 21) & 1, (w >> 15) & 1) {
+                (0, 0) => 6,
+                (0, 1) => 11,
+                (1, 0) => 12,
+                (1, 1) => 13,
+                _ => unreachable!(),
+            },
             dst: (w & 31) as u8,
             lhs: ((w >> 5) & 31) as u8,
             rhs: ((w >> 16) & 31) as u8,
@@ -222,7 +228,7 @@ mod tests {
         }
         for word in [
             0xd50330bf, 0xd503349f, 0xd5033fdf, 0xd5033f9e, 0x1ea02820, 0x1ee02820, 0x1e222028,
-            0x1e202001, 0x1f220c20, 0x1f028c20, 0x1fc20c20,
+            0x1e202001, 0x1fa20c20, 0x1fc20c20,
         ] {
             assert!(crate::decode(word, 0).is_err(), "{word:08x}");
         }
@@ -323,6 +329,34 @@ mod conditional_fp_tests {
         ));
         for word in [0x1ee20420, 0x1ea20420, 0x1ee28820] {
             assert!(crate::decode(word, 0).is_err(), "{word:08x}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod fused_tests {
+    use super::*;
+    #[test]
+    fn fused_sign_variants_preserve_accumulator_and_width_fields() {
+        for (signs, operation) in [
+            (0, 6),
+            (1 << 15, 11),
+            (1 << 21, 12),
+            ((1 << 21) | (1 << 15), 13),
+        ] {
+            for (ty, bytes) in [(0, 4), (1, 8)] {
+                let w = 0x1f1f7fff | signs | (ty << 22);
+                let Op::Floating(f) = crate::decode(w, 0).unwrap().op else {
+                    panic!()
+                };
+                assert_eq!(
+                    (f.bytes, f.operation, f.dst, f.lhs, f.rhs, f.accumulate),
+                    (bytes, operation, 31, 31, 31, 31)
+                );
+            }
+            for ty in [2, 3] {
+                assert!(crate::decode(0x1f020c20 | signs | (ty << 22), 0).is_err());
+            }
         }
     }
 }

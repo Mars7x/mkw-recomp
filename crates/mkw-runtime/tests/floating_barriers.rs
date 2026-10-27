@@ -29,6 +29,9 @@ fn fp_word(bytes: u8, operation: u32, zero: bool) -> u32 {
         5 => 0x1e202010,
         6 => 0x1f000c00,
         10 => 0x1e208800,
+        11 => 0x1f008c00,
+        12 => 0x1f200c00,
+        13 => 0x1f208c00,
         _ => unreachable!(),
     };
     base | (if bytes == 8 { 1 << 22 } else { 0 }) | (if zero { 8 } else { 2 << 16 }) | (1 << 5)
@@ -246,7 +249,7 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
         }
         for rounding in 0..4 {
             for dn in 0..2 {
-                for operation in 0..11 {
+                for operation in 0..14 {
                     for (i, &(left, right)) in pairs.iter().enumerate() {
                         cases.push(reference::FloatingCase {
                             word: fp_word(bytes, operation, false),
@@ -280,16 +283,18 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
             (one, one, qnan),
             (one, one, snan),
         ] {
-            for dn in 0..2 {
-                cases.push(reference::FloatingCase {
-                    word: fp_word(bytes, 6, false),
-                    left,
-                    right,
-                    accumulate,
-                    nzcv: 0xb0000000,
-                    fpcr: dn << 25,
-                    fpsr: 0,
-                });
+            for operation in [6, 11, 12, 13] {
+                for dn in 0..2 {
+                    cases.push(reference::FloatingCase {
+                        word: fp_word(bytes, operation, false),
+                        left,
+                        right,
+                        accumulate,
+                        nzcv: 0xb0000000,
+                        fpcr: dn << 25,
+                        fpsr: 0,
+                    });
+                }
             }
         }
         for operation in 4..6 {
@@ -452,7 +457,7 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
         .output()
         .unwrap();
     let version = String::from_utf8(version.stdout).unwrap();
-    let receipt = serde_json::json!({"reference":version.lines().next(),"synthetic_cases":cases.len(),"operations":["fadd","fsub","fmul","fdiv","fcmp","fcmpe","fmadd","fcsel","fneg","fabs","fsqrt","fnmul","fccmp","fccmpe"],"widths":[32,64],"raw_select_widths":[16,32,64],"rounding_modes":4,"default_nan_modes":2,"flush_modes_supported":false,"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false});
+    let receipt = serde_json::json!({"reference":version.lines().next(),"synthetic_cases":cases.len(),"operations":["fadd","fsub","fmul","fdiv","fcmp","fcmpe","fmadd","fcsel","fneg","fabs","fsqrt","fnmul","fmsub","fnmadd","fnmsub","fccmp","fccmpe"],"widths":[32,64],"raw_select_widths":[16,32,64],"rounding_modes":4,"default_nan_modes":2,"flush_modes_supported":false,"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false});
     std::fs::write(
         path.join("receipt.json"),
         serde_json::to_vec_pretty(&receipt).unwrap(),
@@ -697,6 +702,131 @@ fn conditional_compare_skips_false_path_and_fnmul_preserves_nan_sign_rules() {
                 assert_eq!(unsafe { native(attached.cpu_mut(), 10) }, 0);
                 assert_eq!(attached.cpu_mut().vregs[0], [expected, 0]);
                 assert_eq!(attached.cpu_mut().fpsr, 0);
+            }
+        }
+    }
+}
+#[test]
+fn fused_sign_inputs_single_rounding_nan_priority_and_refusals() {
+    let path = folder("fused-sign-known");
+    let mut code = String::new();
+    for bytes in [4, 8] {
+        for operation in 11..14 {
+            code += &generate(
+                &[fp_word(bytes, operation, false), 0xd65f03c0],
+                &format!("fused_{bytes}_{operation}"),
+            );
+        }
+    }
+    for opt in ["-O0", "-O2"] {
+        let library = build(&code, &path, opt);
+        let fp_lib = backend(&path, opt);
+        let backend = unsafe { FloatingBackend::load(&fp_lib) }.unwrap();
+        for bytes in [4, 8] {
+            for operation in 11..14 {
+                let native = unsafe {
+                    library
+                        .get::<Entry>(format!("fused_{bytes}_{operation}\0").as_bytes())
+                        .unwrap()
+                };
+                let (two, three, ten, one, qnan, sign) = if bytes == 4 {
+                    (
+                        0x40000000,
+                        0x40400000,
+                        0x41200000,
+                        0x3f800000,
+                        0x7fc12345,
+                        1u64 << 31,
+                    )
+                } else {
+                    (
+                        0x4000000000000000,
+                        0x4008000000000000,
+                        0x4024000000000000,
+                        0x3ff0000000000000,
+                        0x7ff8123456789abc,
+                        1u64 << 63,
+                    )
+                };
+                let ordinary = if bytes == 4 {
+                    match operation {
+                        11 => 0x40800000,
+                        12 => 0xc1800000,
+                        _ => 0xc0800000,
+                    }
+                } else {
+                    match operation {
+                        11 => 0x4010000000000000,
+                        12 => 0xc030000000000000,
+                        _ => 0xc010000000000000,
+                    }
+                };
+                for (left, right, acc, expected) in [
+                    (two, three, ten, ordinary),
+                    (
+                        qnan,
+                        one,
+                        two,
+                        if operation == 13 { qnan } else { qnan ^ sign },
+                    ),
+                    (
+                        one,
+                        one,
+                        qnan,
+                        if operation == 11 { qnan } else { qnan ^ sign },
+                    ),
+                ] {
+                    let mut cpu = Cpu {
+                        fpsr: 0x08000080,
+                        ..Cpu::default()
+                    };
+                    cpu.vregs[0] = [123, 456];
+                    cpu.vregs[1][0] = left;
+                    cpu.vregs[2][0] = right;
+                    cpu.vregs[3][0] = acc;
+                    {
+                        let mut a = backend.attach(&mut cpu);
+                        assert_eq!(unsafe { native(a.cpu_mut(), 10) }, 0);
+                    }
+                    assert_eq!(cpu.vregs[0], [expected, 0], "{bytes}/{operation}");
+                    assert_eq!(cpu.fpsr, 0x08000080);
+                }
+                let mut cpu = Cpu {
+                    fpsr: 0x08000080,
+                    ..Cpu::default()
+                };
+                cpu.vregs[0] = [123, 456];
+                assert_eq!(unsafe { native(&mut cpu, 10) }, 3);
+                assert_eq!(cpu.vregs[0], [123, 456]);
+                cpu.fpcr = 1 << 24;
+                {
+                    let mut a = backend.attach(&mut cpu);
+                    assert_eq!(unsafe { native(a.cpu_mut(), 10) }, 3);
+                }
+                assert_eq!(cpu.vregs[0], [123, 456]);
+                assert_eq!(cpu.fpsr, 0x08000080);
+                if bytes == 4 {
+                    cpu.fpcr = 0;
+                    cpu.vregs[1][0] = 0x3f800001;
+                    cpu.vregs[2][0] = 0x3f7ffffe;
+                    cpu.vregs[3][0] = if operation == 12 { one ^ sign } else { one };
+                    {
+                        let mut a = backend.attach(&mut cpu);
+                        assert_eq!(unsafe { native(a.cpu_mut(), 10) }, 0);
+                    }
+                    assert_eq!(
+                        cpu.vregs[0],
+                        [
+                            if operation == 13 {
+                                0xa8800000
+                            } else {
+                                0x28800000
+                            },
+                            0
+                        ]
+                    );
+                    assert_eq!(cpu.fpsr, 0x08000080);
+                }
             }
         }
     }
