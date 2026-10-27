@@ -556,7 +556,20 @@ mod table_count_tests {
             crate::decode(0x6e020020, 0).unwrap().op,
             Op::Simd(Simd::ExtractVector { .. })
         ));
-        for w in [0x4e220020, 0x4e028020, 0x4e605820, 0x5e205820] {
+        assert!(matches!(
+            crate::decode(0x4e220020, 0).unwrap().op,
+            Op::VectorInteger(crate::vector_integer::VectorInteger::WidenArithmetic {
+                bytes: 1,
+                dst: 0,
+                lhs: 1,
+                rhs: 2,
+                upper: true,
+                signed: true,
+                wide_lhs: false,
+                subtract: false
+            })
+        ));
+        for w in [0x4e028020, 0x4e605820, 0x5e205820] {
             assert!(crate::decode(w, 0).is_err(), "{w:x}");
         }
     }

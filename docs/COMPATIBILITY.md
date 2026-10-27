@@ -61,3 +61,13 @@ SQXTN/UQXTN/SQXTUN support H/S/D inputs narrowed to B/H/S, scalar results and ve
 SSHL/USHL support legal B/H/S/D vectors and D scalar forms. Each lane uses only the signed low byte of its count: positive counts shift left, negative counts shift right, and counts at/beyond element width produce zero or arithmetic sign fill. Complete snapshots preserve aliases/V31; unused destination bits clear. Explicit bounds prevent C shifts by the element width or larger; unsigned sign fill avoids host signed-right-shift dependencies. FPSR.QC and all other flags/controls are unchanged.
 
 An independent bit-copy oracle checks 688,128 native cases per optimization; 458,752 synthetic QEMU cases match O0/O2 with fatal UBSan. Matrices cover every count byte, irrelevant upper count bits, all arrangements, extrema, aliases and preserved state. No callbacks or ABI changes are required; software-reference and actual target/access/bootstrap limitations remain.
+
+## Saturating immediate narrowing shifts
+
+SQSHRN/SQRSHRN, UQSHRN/UQRSHRN and SQSHRUN/SQRSHRUN support every legal H/S/D-to-B/H/S amount, scalar results and vector low/upper destination halves. Source snapshots and shared narrowing saturation preserve aliases, retained halves and sticky QC. Bounded unsigned arithmetic computes the signed/logical shifted value and optional rounding bit before clamping; this avoids overflowing a 64-bit pre-shift rounding addition.
+
+Independent i128 division/clamp expectations check 1,225,728 native cases per optimization. A 612,864-case synthetic QEMU matrix matches O0/O2 with fatal UBSan. The matrix covers all amounts, rounding ties, saturation thresholds, extrema, scalar/vector forms and V31 aliases. Plain SQXTN/UQXTN/SQXTUN regressions also pass through the shared lowering. Software comparisons do not establish original hardware or remove target/access/bootstrap gates.
+
+## Widening integer add/subtract
+
+SADDL/UADDL/SSUBL/USUBL and SADDW/UADDW/SSUBW/USUBW support B/H/S inputs and upper-source variants. Wide-left forms retain the full-width left operand; upper selection applies only to narrow sources. Complete snapshots preserve aliases and unsigned arithmetic defines widened wrap while sign extension applies to signed narrow sources. Independent i128 expectations cover 74,880 native cases per optimization; 49,920 synthetic QEMU cases match O0/O2 with fatal UBSan. No callbacks, flags or ABI changes are introduced.

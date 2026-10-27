@@ -129,6 +129,13 @@ pub fn run(root: &Path) -> Result<()> {
                                 features.push("simd_integer_lanes_reduction");
                                 if matches!(
                                     v,
+                                    mkw_arm64::vector_integer::VectorInteger::WidenArithmetic { .. }
+                                ) {
+                                    features.push("simd_widening_arithmetic");
+                                }
+                                if matches!(v,mkw_arm64::vector_integer::VectorInteger::SaturatingShiftNarrow{..}){features.push("simd_saturating_shift_narrow");}
+                                if matches!(
+                                    v,
                                     mkw_arm64::vector_integer::VectorInteger::RegisterShift { .. }
                                 ) {
                                     features.push("simd_register_shift");

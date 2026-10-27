@@ -43,6 +43,26 @@ pub enum NarrowKind {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum VectorInteger {
+    WidenArithmetic {
+        bytes: u8,
+        dst: u8,
+        lhs: u8,
+        rhs: u8,
+        upper: bool,
+        signed: bool,
+        wide_lhs: bool,
+        subtract: bool,
+    },
+    SaturatingShiftNarrow {
+        bytes: u8,
+        dst: u8,
+        src: u8,
+        scalar: bool,
+        upper: bool,
+        kind: NarrowKind,
+        amount: u8,
+        rounding: bool,
+    },
     RegisterShift {
         bytes: u8,
         total: u8,
@@ -113,6 +133,60 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let bytes = 1 << size;
     let dst = (w & 31) as u8;
     let lhs = ((w >> 5) & 31) as u8;
+    let widen_arithmetic = match w & 0x9f20fc00 {
+        0x0e200000 => Some((false, false)),
+        0x0e202000 => Some((false, true)),
+        0x0e201000 => Some((true, false)),
+        0x0e203000 => Some((true, true)),
+        _ => None,
+    };
+    if let Some((wide_lhs, subtract)) = widen_arithmetic {
+        if size == 3 {
+            return Some(Err("reserved widening arithmetic width".into()));
+        }
+        return Some(Ok(Op::VectorInteger(VectorInteger::WidenArithmetic {
+            bytes,
+            dst,
+            lhs,
+            rhs: ((w >> 16) & 31) as u8,
+            upper: q,
+            signed: w & (1 << 29) == 0,
+            wide_lhs,
+            subtract,
+        })));
+    }
+    let shift_narrow = match w & 0xaf80fc00 {
+        0x0f009400 => Some((NarrowKind::Signed, false)),
+        0x0f009c00 => Some((NarrowKind::Signed, true)),
+        0x2f009400 => Some((NarrowKind::Unsigned, false)),
+        0x2f009c00 => Some((NarrowKind::Unsigned, true)),
+        0x2f008400 => Some((NarrowKind::SignedUnsigned, false)),
+        0x2f008c00 => Some((NarrowKind::SignedUnsigned, true)),
+        _ => None,
+    };
+    if let Some((kind, rounding)) = shift_narrow {
+        let imm = ((w >> 16) & 127) as u8;
+        if imm < 8 {
+            return None;
+        }
+        if imm >= 64 {
+            return Some(Err("reserved saturating narrowing shift width".into()));
+        }
+        let bits = 1u8 << (7 - imm.leading_zeros());
+        let scalar = w & (1 << 28) != 0;
+        return Some(Ok(Op::VectorInteger(
+            VectorInteger::SaturatingShiftNarrow {
+                bytes: bits / 8,
+                dst,
+                src: lhs,
+                scalar,
+                upper: q && !scalar,
+                kind,
+                amount: bits * 2 - imm,
+                rounding,
+            },
+        )));
+    }
     let register_shift = match w & 0xaf20fc00 {
         0x0e204400 => Some(true),
         0x2e204400 => Some(false),
@@ -700,6 +774,101 @@ mod register_shift_tests {
                                 }
                             )
                         );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod saturating_shift_narrow_tests {
+    use super::*;
+    #[test]
+    fn all_saturating_narrowing_amounts_and_domains() {
+        for base in [
+            0x0f009400, 0x0f009c00, 0x2f009400, 0x2f009c00, 0x2f008400, 0x2f008c00,
+        ] {
+            for scalar in 0..2 {
+                for q in 0..2 {
+                    for imm in 0..128 {
+                        let w = base | (scalar << 28) | (q << 30) | (imm << 16) | 0x20;
+                        let result = decode(w);
+                        if (scalar != 0 && q == 0) || imm < 8 {
+                            assert!(result.is_none());
+                            continue;
+                        }
+                        if imm >= 64 {
+                            assert!(result.unwrap().is_err());
+                            continue;
+                        }
+                        let Op::VectorInteger(VectorInteger::SaturatingShiftNarrow {
+                            bytes,
+                            amount,
+                            scalar: single,
+                            upper,
+                            ..
+                        }) = result.unwrap().unwrap()
+                        else {
+                            panic!()
+                        };
+                        assert!(amount >= 1 && amount <= bytes * 8);
+                        assert_eq!(u32::from(bytes) * 16 - u32::from(amount), imm);
+                        assert_eq!((single, upper), (scalar != 0, scalar == 0 && q != 0));
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod widen_arithmetic_tests {
+    use super::*;
+    #[test]
+    fn widening_arithmetic_domains_and_arrangements() {
+        for base in [0x0e200000, 0x0e202000, 0x0e201000, 0x0e203000] {
+            for scalar in 0..2 {
+                for q in 0..2 {
+                    for unsigned in 0..2 {
+                        for size in 0..4 {
+                            let result = decode(
+                                base | (scalar << 28)
+                                    | (q << 30)
+                                    | (unsigned << 29)
+                                    | (size << 22)
+                                    | 0x20020,
+                            );
+                            if scalar != 0 {
+                                assert!(result.is_none());
+                                continue;
+                            }
+                            if size == 3 {
+                                assert!(result.unwrap().is_err());
+                                continue;
+                            }
+                            let Op::VectorInteger(VectorInteger::WidenArithmetic {
+                                bytes,
+                                upper,
+                                signed,
+                                wide_lhs,
+                                subtract,
+                                ..
+                            }) = result.unwrap().unwrap()
+                            else {
+                                panic!()
+                            };
+                            assert_eq!(
+                                (bytes, upper, signed, wide_lhs, subtract),
+                                (
+                                    1 << size,
+                                    q != 0,
+                                    unsigned == 0,
+                                    base & 0x1000 != 0,
+                                    base & 0x2000 != 0
+                                )
+                            );
+                        }
                     }
                 }
             }

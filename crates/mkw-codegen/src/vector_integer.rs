@@ -8,6 +8,40 @@ fn mask(bytes: u8) -> u64 {
 }
 pub fn emit(op: VectorInteger) -> String {
     match op {
+        VectorInteger::WidenArithmetic {
+            bytes,
+            dst,
+            lhs,
+            rhs,
+            upper,
+            signed,
+            wide_lhs,
+            subtract,
+        } => {
+            let bits = bytes * 8;
+            let outbits = bits * 2;
+            let input_mask = mask(bytes);
+            let output_mask = mask(bytes * 2);
+            let sign = 1u64 << (bits - 1);
+            let start = if upper { 64 } else { 0 };
+            let left_offset = if wide_lhs { "out" } else { "offset" };
+            let left_mask = if wide_lhs { output_mask } else { input_mask };
+            let extend = if signed {
+                format!(
+                    "{}b=(b^UINT64_C({sign}))-UINT64_C({sign});",
+                    if wide_lhs {
+                        String::new()
+                    } else {
+                        format!("a=(a^UINT64_C({sign}))-UINT64_C({sign});")
+                    }
+                )
+            } else {
+                String::new()
+            };
+            let value = if subtract { "a-b" } else { "a+b" };
+            format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset={start}+lane*{bits},out=lane*{outbits},left_offset={left_offset};uint64_t a=(left[left_offset/64]>>(left_offset%64))&UINT64_C({left_mask}),b=(right[offset/64]>>(offset%64))&UINT64_C({input_mask});{extend}uint64_t value=({value})&UINT64_C({output_mask});output[out/64]|=value<<(out%64);}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",8/bytes)
+        }
+
         VectorInteger::RegisterShift {
             bytes,
             total,
@@ -27,6 +61,25 @@ pub fn emit(op: VectorInteger) -> String {
             format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t a=(left[half]>>shift)&UINT64_C({mask}),b=(right[half]>>shift)&UINT64_C(255),value;int amount=(int)b;if(amount>=128)amount-=256;if(amount>=0){{value=amount>={bits}?0:(a<<amount)&UINT64_C({mask});}}else{{unsigned count=(unsigned)(-amount);if(count>={bits})value={negative}?UINT64_C({mask}):0;else{{value=a>>count;if({negative})value|=UINT64_C({mask})^(UINT64_C({mask})>>count);}}}}output[half]|=value<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes)
         }
 
+        VectorInteger::SaturatingShiftNarrow {
+            bytes,
+            dst,
+            src,
+            scalar,
+            upper,
+            kind,
+            amount,
+            rounding,
+        } => narrow(Narrow {
+            bytes,
+            dst,
+            src,
+            scalar,
+            upper,
+            kind,
+            amount,
+            rounding,
+        }),
         VectorInteger::SaturatingNarrow {
             bytes,
             dst,
@@ -34,41 +87,16 @@ pub fn emit(op: VectorInteger) -> String {
             scalar,
             upper,
             kind,
-        } => {
-            let bits = bytes * 8;
-            let inbits = bits * 2;
-            let input_mask = mask(bytes * 2);
-            let output_mask = mask(bytes);
-            let sign = 1u64 << (inbits - 1);
-            let signed_input = kind != NarrowKind::Unsigned;
-            let signed_output = kind == NarrowKind::Signed;
-            let max = if signed_output {
-                (1u64 << (bits - 1)) - 1
-            } else {
-                output_mask
-            };
-            let min = 1u64 << (bits - 1);
-            let threshold = input_mask - min + 1;
-            let negative = if signed_input {
-                format!("(a&UINT64_C({sign}))!=0")
-            } else {
-                "0".into()
-            };
-            let handle_negative = if signed_output {
-                format!("if(a<UINT64_C({threshold})){{value=UINT64_C({min});fpsr|=UINT32_C(134217728);}}else value=a&UINT64_C({output_mask});")
-            } else {
-                "value=0;fpsr|=UINT32_C(134217728);".into()
-            };
-            let low = if upper {
-                format!("c->vregs[{dst}][0]")
-            } else {
-                "0".into()
-            };
-            let start = if upper { 64 } else { 0 };
-            let lanes = if scalar { 1 } else { 8 / bytes };
-            format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{{low},0}};uint32_t fpsr=c->fpsr;for(unsigned lane=0;lane<{lanes};lane++){{unsigned offset=lane*{inbits},out={start}+lane*{bits};uint64_t a=(source[offset/64]>>(offset%64))&UINT64_C({input_mask}),value;if({negative}){{{handle_negative}}}else if(a>UINT64_C({max})){{value=UINT64_C({max});fpsr|=UINT32_C(134217728);}}else value=a;output[out/64]|=value<<(out%64);}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];c->fpsr=fpsr;}}\n")
-        }
-
+        } => narrow(Narrow {
+            bytes,
+            dst,
+            src,
+            scalar,
+            upper,
+            kind,
+            amount: 0,
+            rounding: false,
+        }),
         VectorInteger::Saturating {
             bytes,
             total,
@@ -255,4 +283,78 @@ pub fn emit(op: VectorInteger) -> String {
             format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},sum=0;for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits};uint64_t value=(source[offset/64]>>(offset%64))&UINT64_C({input_mask});sum+={value};}}c->vregs[{dst}][0]=sum&UINT64_C({output_mask});c->vregs[{dst}][1]=0;}}\n",total/bytes)
         }
     }
+}
+
+struct Narrow {
+    bytes: u8,
+    dst: u8,
+    src: u8,
+    scalar: bool,
+    upper: bool,
+    kind: NarrowKind,
+    amount: u8,
+    rounding: bool,
+}
+fn narrow(
+    Narrow {
+        bytes,
+        dst,
+        src,
+        scalar,
+        upper,
+        kind,
+        amount,
+        rounding,
+    }: Narrow,
+) -> String {
+    let bits = bytes * 8;
+    let inbits = bits * 2;
+    let input_mask = mask(bytes * 2);
+    let output_mask = mask(bytes);
+    let sign = 1u64 << (inbits - 1);
+    let signed_input = kind != NarrowKind::Unsigned;
+    let signed_output = kind == NarrowKind::Signed;
+    let max = if signed_output {
+        (1u64 << (bits - 1)) - 1
+    } else {
+        output_mask
+    };
+    let min = 1u64 << (bits - 1);
+    let threshold = input_mask - min + 1;
+    let negative = if signed_input {
+        format!("(a&UINT64_C({sign}))!=0")
+    } else {
+        "0".into()
+    };
+    let handle_negative = if signed_output {
+        format!("if(a<UINT64_C({threshold})){{value=UINT64_C({min});fpsr|=UINT32_C(134217728);}}else value=a&UINT64_C({output_mask});")
+    } else {
+        "value=0;fpsr|=UINT32_C(134217728);".into()
+    };
+    let transform = if amount == 0 {
+        String::new()
+    } else {
+        let round = if rounding {
+            format!("((a>>{})&UINT64_C(1))", amount - 1)
+        } else {
+            "UINT64_C(0)".into()
+        };
+        let fill = if signed_input {
+            format!(
+                "((a&UINT64_C({sign}))?UINT64_C({}):UINT64_C(0))",
+                input_mask ^ (input_mask >> amount)
+            )
+        } else {
+            "UINT64_C(0)".into()
+        };
+        format!("uint64_t increment={round};a=((a>>{amount})|{fill});a=(a+increment)&UINT64_C({input_mask});")
+    };
+    let low = if upper {
+        format!("c->vregs[{dst}][0]")
+    } else {
+        "0".into()
+    };
+    let start = if upper { 64 } else { 0 };
+    let lanes = if scalar { 1 } else { 8 / bytes };
+    format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{{low},0}};uint32_t fpsr=c->fpsr;for(unsigned lane=0;lane<{lanes};lane++){{unsigned offset=lane*{inbits},out={start}+lane*{bits};uint64_t a=(source[offset/64]>>(offset%64))&UINT64_C({input_mask}),value;{transform}if({negative}){{{handle_negative}}}else if(a>UINT64_C({max})){{value=UINT64_C({max});fpsr|=UINT32_C(134217728);}}else value=a;output[out/64]|=value<<(out%64);}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];c->fpsr=fpsr;}}\n")
 }

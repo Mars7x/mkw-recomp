@@ -211,3 +211,7 @@ SQADD/UQADD/SQSUB/UQSUB and SQXTN/UQXTN/SQXTUN encodings were independently cons
 ## Register shift provenance
 
 SSHL/USHL masks and scalar/vector width constraints were independently constructed and privately cross-checked. Native code uses bounded unsigned shifts and sign-fill masks; the independent oracle copies individual source bits based on signed low-byte counts. Every count byte is represented, with nonzero unrelated upper count bits, extrema and aliases. No upstream or game code was copied; software-only and target-configuration limits remain.
+
+## Saturating shift/narrow and widening arithmetic provenance
+
+All immediate narrowing-shift and widening add/subtract encodings were independently constructed and privately checked with Capstone. Native narrowing shifts round via an extracted bit after bounded unsigned arithmetic shifting, while independent i128 expectations add before mathematical floor division and clamp. Widening arithmetic independently uses i128 values and truncation. Tests cover all legal immediate amounts, 64-bit boundaries, source/destination aliases, upper halves and sticky state. An additional private staged H-to-B experiment exhaustively matched 3,145,728 cases at O2 with fatal UBSan; the mandatory public suites provide broader scalar/vector O0/O2/QEMU coverage. All new code/fixtures are original; no upstream or game code was copied.
