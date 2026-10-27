@@ -69,6 +69,13 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
         0x1e214000 => Some(7),
         0x1e20c000 => Some(8),
         0x1e21c000 => Some(9),
+        0x1e244000 => Some(19),
+        0x1e24c000 => Some(20),
+        0x1e254000 => Some(21),
+        0x1e25c000 => Some(22),
+        0x1e264000 => Some(23),
+        0x1e274000 => Some(24),
+        0x1e27c000 => Some(25),
         _ => None,
     };
     if let Some(operation) = unary {
@@ -413,6 +420,52 @@ mod minmax_tests {
             }
             for ty in [2, 3] {
                 assert!(crate::decode(0x1e220820 | (encoded << 12) | (ty << 22), 0).is_err());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod rounding_tests {
+    use super::*;
+    #[test]
+    fn integral_rounding_widths_and_reserved_types() {
+        for (base, operation) in [
+            (0x1e244000, 19),
+            (0x1e24c000, 20),
+            (0x1e254000, 21),
+            (0x1e25c000, 22),
+            (0x1e264000, 23),
+            (0x1e274000, 24),
+            (0x1e27c000, 25),
+        ] {
+            for (ty, bytes) in [(0, 4), (1, 8)] {
+                let Op::Floating(v) = crate::decode(base | (ty << 22) | 0x3ff, 0).unwrap().op
+                else {
+                    panic!()
+                };
+                assert_eq!(
+                    (v.operation, v.bytes, v.dst, v.lhs),
+                    (operation, bytes, 31, 31)
+                );
+            }
+            for ty in [2, 3] {
+                assert!(crate::decode(base | (ty << 22) | 0x20, 0).is_err());
+            }
+        }
+        for q in 0..2 {
+            for size in 0..2 {
+                for base in [
+                    0x0e218820, 0x0ea18820, 0x0e219820, 0x0ea19820, 0x2e218820, 0x2e219820,
+                    0x2ea19820,
+                ] {
+                    let w = base | (q << 30) | (size << 22);
+                    if q == 0 && size == 1 {
+                        assert!(crate::decode(w, 0).is_err());
+                    } else {
+                        assert!(matches!(crate::decode(w, 0).unwrap().op, Op::VectorFp(_)));
+                    }
+                }
             }
         }
     }

@@ -179,6 +179,13 @@ for q in range(2):
  for size in range(4):
   for base in [0x0e303800,0x2e303800,0x0e31b800]:
    for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(q<<30)|(size<<22)|(rn<<5)|rd)
+for ty in range(4):
+ for base in [0x1e244000,0x1e24c000,0x1e254000,0x1e25c000,0x1e264000,0x1e274000,0x1e27c000]:
+  for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(ty<<22)|(rn<<5)|rd)
+for q in range(2):
+ for size in range(2):
+  for base in [0x0e218800,0x0ea18800,0x0e219800,0x0ea19800,0x2e218800,0x2e219800,0x2ea19800]:
+   for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(q<<30)|(size<<22)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -223,7 +230,7 @@ for row in rows:
   if ins.mnemonic!=expected[v['bytes']][int(v['castagnoli'])]:errors.append({'word':hex(word),'error':'CRC variant differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='VectorFp':
   v=op['VectorFp']
-  expected={'fadd','fsub','fmul','fdiv','fmla','fmls','faddp','fmax','fmin','fmaxnm','fminnm','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
+  expected={'fadd','fsub','fmul','fdiv','fmla','fmls','faddp','fmax','fmin','fmaxnm','fminnm','frintn','frintp','frintm','frintz','frinta','frintx','frinti','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'vector numeric family differs','reference':ins.mnemonic+' '+ins.op_str})
   scalar=ins.op_str.startswith(('s','d'))
   size=8 if ((word>>22)&1) else 4
@@ -240,7 +247,7 @@ for row in rows:
  elif kind=='Convert':
   if ins.mnemonic not in {'scvtf','ucvtf','fcvtns','fcvtnu','fcvtps','fcvtpu','fcvtms','fcvtmu','fcvtzs','fcvtzu','fcvtas','fcvtau'}:errors.append({'word':hex(word),'error':'conversion family differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind in {'Floating','FloatSelect','SystemRegister','Barrier'}:
-  expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd','fneg','fabs','fsqrt','fnmul','fmsub','fnmadd','fnmsub','fcvt','fmax','fmin','fmaxnm','fminnm'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]
+  expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd','fneg','fabs','fsqrt','fnmul','fmsub','fnmadd','fnmsub','fcvt','fmax','fmin','fmaxnm','fminnm','frintn','frintp','frintm','frintz','frinta','frintx','frinti'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'FP/system/barrier family differs','reference':ins.mnemonic+' '+ins.op_str})
   if kind=='Floating' and op['Floating']['operation']==14:
    source='s' if op['Floating']['bytes']==4 else 'd'

@@ -108,6 +108,13 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
                 0x0ea0f800 => 8,
                 0x2ea0f800 => 7,
                 0x2ea1f800 => 9,
+                0x0e218800 => 19,
+                0x0ea18800 => 20,
+                0x0e219800 => 21,
+                0x0ea19800 => 22,
+                0x2e218800 => 23,
+                0x2e219800 => 24,
+                0x2ea19800 => 25,
                 _ => return None,
             })
         }

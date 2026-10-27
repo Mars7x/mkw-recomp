@@ -120,6 +120,12 @@ pub fn run(root: &Path) -> Result<()> {
                                 features.push("vector_fp");
                                 if matches!(
                                     v.kind,
+                                    mkw_arm64::vector_fp::VectorFpKind::Arithmetic(19..=25)
+                                ) {
+                                    features.push("fp_integral_rounding");
+                                }
+                                if matches!(
+                                    v.kind,
                                     mkw_arm64::vector_fp::VectorFpKind::Arithmetic(15..=18)
                                 ) {
                                     features.push("fp_minmax");
@@ -133,6 +139,9 @@ pub fn run(root: &Path) -> Result<()> {
                             }
                             Op::Floating(f) => {
                                 features.push("scalar_fp");
+                                if (19..=25).contains(&f.operation) {
+                                    features.push("fp_integral_rounding");
+                                }
                                 if (15..=18).contains(&f.operation) {
                                     features.push("fp_minmax");
                                 }

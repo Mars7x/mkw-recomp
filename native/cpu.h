@@ -15,7 +15,7 @@ typedef struct MkwCpu MkwCpu;
 typedef int (*MkwConvert)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,uint64_t,uint64_t*,uint32_t*);
 /* Data barriers: DMB=0, DSB=1, followed by architectural option bits. */
 typedef int (*MkwBarrier)(void*,uint32_t,uint32_t);
-/* FP operations add/sub/mul/div/compare/compare-signaling/fused-add/negate/abs/sqrt/negated-multiply = 0..10; fused-subtract/negated-fused-add/negated-fused-subtract = 11..13; S/D format conversion = 14 (bytes is input width); max/min/max-number/min-number = 15..18.
+/* FP operations add/sub/mul/div/compare/compare-signaling/fused-add/negate/abs/sqrt/negated-multiply = 0..10; fused-subtract/negated-fused-add/negated-fused-subtract = 11..13; S/D format conversion = 14 (bytes is input width); max/min/max-number/min-number = 15..18; integral round N/P/M/Z/A/X/I = 19..25.
  * Output buffers commit only on success. Unsupported FPCR profiles refuse. */
 typedef int (*MkwFloating)(uint32_t,uint32_t,uint32_t,uint32_t,uint64_t,uint64_t,uint64_t,uint64_t*,uint32_t*);
 typedef int (*MkwOrderedMemory)(void*,uint32_t,int,uint64_t,uint64_t*,unsigned);
