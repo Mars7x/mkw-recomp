@@ -58,3 +58,9 @@ The attributed [public claim](https://x.com/willfaustcuber/status/21150466249385
 - Coverage gain remains **+0 default / +0 beyond v1**, 214,521 strict extents and 214,585 conditional extents. Runtime integration value is demonstrated resource transport, not an invented runnable-function count.
 
 Next: validate actual target configuration and SDK data layouts; bind the supported closure without bypassing structural boundaries; adapt bounded thread/TLS primitives; identify the required NVN2/shader interfaces before selecting renderer source. No existing acceptance rules or required correctness checks have been relaxed.
+
+## Follow-up runtime and shader evidence
+
+The scoped worker adapter in THREADING.md now implements the bounded ownership/launch/join part of priority 2 for synthetic native code. It uses explicit caller-owned TLS/TLR storage and the existing coherent memory/call authority, retaining borrowed library lifetimes through every join. No native ARM64/Mach context machinery or guessed SDK layouts were imported. Dynamic Horizon lifecycle/waits and actual startup configuration remain open.
+
+A private bounded container experiment evaluated selected unmodified `ctl_len`, `check` and `bnsh_shaders` functions from pinned nxnative `dm/gfx/tools/shader_split.py`, after independent range checks. Four existing sampled archive entries contain eight BNSH occurrences; three standalone entries are duplicates. Each occurrence reaches a rejection of the old control section validator. This is evidence against direct reuse of that sampled extraction/control-layout path. It neither establishes ISA incompatibility nor tests a complete shader translator or graphics backend. All samples, hashes, generated/private test artifacts and input-derived details remain private.

@@ -69,6 +69,11 @@ pub struct Router<'code> {
     max_depth: u16,
 }
 impl<'code> Router<'code> {
+    pub(crate) fn native_base(&self, address: GuestAddr) -> Option<u64> {
+        self.targets.get(&address).and_then(|target| {
+            matches!(&target.body, Body::Native(_)).then_some(target.module_base)
+        })
+    }
     pub fn new(targets: Vec<Target<'code>>, max_depth: u16) -> Result<Self, String> {
         if !(1..=128).contains(&max_depth) {
             return Err("exclusive-v2 depth must be 1..=128".into());

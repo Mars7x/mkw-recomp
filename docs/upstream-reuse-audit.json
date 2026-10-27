@@ -28,7 +28,8 @@
         "dm/host/hle_audio.c": "04dc9e30a6ba4d5de4527bb8b69d0ac7971d8cf11e9551a637faca9d2970b31d",
         "dm/host/hle_hid.c": "d268e448a9341765679b9f4832c7ce559d553be09e173ddde4cea92169d1e7bb",
         "dm/tools/patch_nso.py": "d273ea32d0d3364e2f4d87d7b279151a39bae92c6fb98347a6eb5373de59ee84",
-        "dm/third_party/README.md": "9d24b4e609f0ae12f4ce3fbfeddd43d5f821844424ffaeaf7319496f6a4c3aae"
+        "dm/third_party/README.md": "9d24b4e609f0ae12f4ce3fbfeddd43d5f821844424ffaeaf7319496f6a4c3aae",
+        "dm/gfx/tools/shader_split.py": "2ea7f0c3a04abac898fd493eef3fbe2b9057bf8c9c5d757e6e3370563fe6f1b6"
       }
     },
     {
@@ -154,5 +155,20 @@
     ],
     "not_a_semantic_failure_proof": true
   },
-  "selected_component": "nxnative read-only nn::fs hooks, ported behind checked native HLE boundary with complete MIT notices"
+  "selected_component": "nxnative read-only nn::fs hooks, ported behind checked native HLE boundary with complete MIT notices",
+  "bounded_shader_followup": {
+    "selected_unmodified_functions": [
+      "ctl_len",
+      "check",
+      "bnsh_shaders"
+    ],
+    "independent_range_checks_before_upstream": true,
+    "sampled_archive_entries": 4,
+    "bnsh_occurrences": 8,
+    "standalone_duplicate_entries": 3,
+    "result": "all sampled occurrences reject old control section validator",
+    "shader_isa_compatibility_established": false,
+    "shader_bytes_or_input_hashes_published": false,
+    "not_full_upstream_tool_or_backend_test": true
+  }
 }

@@ -1,5 +1,5 @@
-//! Safe guest memory and a load-time relocation planner. No service emulation,
-//! native execution, TLS runtime, instruction fetching or host-pointer casts.
+//! Owned checked guest memory, relocation planning and explicit native/HLE bridges.
+//! Original startup remains gated; no instruction-fetch interpreter or raw guest-pointer casts.
 pub mod abi;
 pub mod atomics;
 pub mod bridge;
@@ -15,6 +15,7 @@ mod linker;
 pub mod romfs_hle;
 #[cfg(target_os = "linux")]
 pub mod romfs_hooks;
+pub mod thread_runner;
 pub use linker::LinkScopes;
 use mkw_formats::{Nso, Result};
 use serde::Serialize;
