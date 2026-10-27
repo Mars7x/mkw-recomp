@@ -117,6 +117,11 @@ pub fn run(root: &Path) -> Result<()> {
                         };
                         match instruction.op {
                             Op::Prefetch(_) => features.push("prefetch_hint"),
+                            Op::PointerAuth { .. }
+                                if instruction.word & 0xfffffc00 == 0xdac10400 =>
+                            {
+                                features.push("register_pointer_sign")
+                            }
                             Op::YieldHint => features.push("yield_hint"),
                             Op::FloatSelect { .. } => features.push("fp_conditional_select"),
                             Op::Convert(v) => {
@@ -145,6 +150,18 @@ pub fn run(root: &Path) -> Result<()> {
                                 "unsigned_absolute_difference"
                             }),
                             Op::ReciprocalStep { .. } => features.push("reciprocal_refinement"),
+                            Op::RoundedRegisterShift(v) => features.push(if v.saturating {
+                                "signed_saturating_rounded_register_shift"
+                            } else {
+                                "signed_rounded_register_shift"
+                            }),
+                            Op::RoundedShiftNarrow(_) => features.push("rounded_narrow_shift"),
+                            Op::SaturatingLongAccumulate(_) => {
+                                features.push("saturating_long_accumulate")
+                            }
+                            Op::LongSignedPairAccumulate { .. } => {
+                                features.push("signed_long_pair_accumulate")
+                            }
                             Op::SecureHash(v) => {
                                 use mkw_arm64::vector_integer::HashKind::*;
                                 features.push(match v.kind {

@@ -5,7 +5,7 @@ import argparse,collections,itertools,json,sys
 ROOT=Path(__file__).resolve().parents[1]
 # Engineering estimates in minutes, excluding the fixed full validation gate.
 # Scoped from observed forms and reusable fixtures; half-precision FCVT needs new backend work.
-EFFORT={'pmull':(6,15),'pmull2':(6,15),'uabd':(4,10),'uabdl':(4,10),'fcvtl':(3,8),'fcvt':(90,210),'sqshl':(5,15),'sminp':(4,10),'smaxp':(4,10),'saddlp':(6,18),'frecpe.2s':(90,180),'clz':(20,45),'frecps':(2,5),'frsqrts':(90,180),'prfm':(10,25),'prfum':(10,25),'xpaci':(20,45),'shsub':(25,60),'uhsub':(25,60),'shadd':(25,60),'uhadd':(25,60),'srhadd':(25,60),'urhadd':(25,60),'mla':(20,45),'mls':(20,45),'sha1c':(3,7),'sha1p':(1,3),'sha1m':(1,3),'sha1h':(1,2),'sha1su0':(2,4),'sha1su1':(2,4),'sha256su0':(2,4),'sha256su1':(2,4),'sha256h':(3,7),'sha256h2':(1,3),'frecpe':(90,180),'frsqrte':(120,240)}
+EFFORT={'pacib':(2,5),'sqrshl':(2,5),'srshl':(3,8),'sadalp':(1,3),'rshrn':(2,5),'rshrn2':(1,2),'sqdmlal':(4,10),'sqdmlal2':(1,2),'pmull':(6,15),'pmull2':(6,15),'uabd':(4,10),'uabdl':(4,10),'fcvtl':(3,8),'fcvt':(90,210),'sqshl':(5,15),'sminp':(4,10),'smaxp':(4,10),'saddlp':(6,18),'frecpe.2s':(90,180),'clz':(20,45),'frecps':(2,5),'frsqrts':(90,180),'prfm':(10,25),'prfum':(10,25),'xpaci':(20,45),'shsub':(25,60),'uhsub':(25,60),'shadd':(25,60),'uhadd':(25,60),'srhadd':(25,60),'urhadd':(25,60),'mla':(20,45),'mls':(20,45),'sha1c':(3,7),'sha1p':(1,3),'sha1m':(1,3),'sha1h':(1,2),'sha1su0':(2,4),'sha1su1':(2,4),'sha256su0':(2,4),'sha256su1':(2,4),'sha256h':(3,7),'sha256h2':(1,3),'frecpe':(90,180),'frsqrte':(120,240)}
 RUNTIME={'svc','hvc','smc','udf','brk','hlt','eret','drps','wfe','wfi','sev','sevl','clrex'}
 EXCLUSIVE=('ldxr','ldaxr','ldxp','ldaxp','stxr','stlxr','stxp','stlxp')
 
@@ -24,6 +24,9 @@ def family_cost(names):
     if {'pmull','pmull2'}<=set(names):low-=4;high-=10
     if {'uabd','uabdl'}<=set(names):low-=2;high-=5
     if {'sha1c','sha1p','sha1m','sha1h','sha1su0','sha1su1','sha256h','sha256h2','sha256su0','sha256su1'}<=set(names):low-=3;high-=6
+    if {'sqrshl','srshl'}<=set(names):low-=1;high-=3
+    if {'rshrn','rshrn2'}<=set(names):low-=1;high-=2
+    if {'sqdmlal','sqdmlal2'}<=set(names):low-=1;high-=2
     return low,high
 
 def candidates(buckets,validation_minutes):
@@ -31,7 +34,7 @@ def candidates(buckets,validation_minutes):
     candidates={frozenset([n]) for k in buckets for n in k}
     candidates.update(k for k in buckets if len(k)>1)
     pure=[k for k in buckets if not any(n.startswith(('runtime:','configuration:','opaque:','policy:','control_flow:'))for n in k)]
-    for count in [2,3]:candidates.update(frozenset().union(*items)for items in itertools.combinations(pure,count))
+    for count in range(2,min(5,len(pure))+1):candidates.update(frozenset().union(*items)for items in itertools.combinations(pure,count))
     names=sorted({n for k in buckets for n in k if not n.startswith(('runtime:','configuration:','opaque:','policy:','control_flow:'))})
     for size in [2,3,4,5]:candidates.update(map(frozenset,itertools.combinations(names,size)))
     for names in [('prfm','prfum'),('mla','mls'),('shsub','uhsub'),('sha1c','sha1p','sha1m'),('sha256h','sha256h2'),('frecpe','frsqrte')]:
@@ -103,7 +106,7 @@ def run(validation_minutes):
     for item in ranked:
         fixed=set(item['fixes']);item['linear_corroborated_cfg_gain']=sum(n for (required,linear),n in corroborated.items()if required<=fixed and linear<=fixed)
         item['score']=round(item['score'],2)
-    report={'classification_reference':f'Capstone {__version__}','acceptance_rules_changed':False,'guest_code_executed':False,'rejected_extents':rows_count,'structural_blocked_extents':structural,'baseline_cfg_edge_failures':baseline_edges,'nonstructural_pure_isa_extents':pure_isa,'runtime_configuration_opaque_or_policy_blocked_extents':runtime_blocked,'structural_and_other_barrier_counts_overlap':True,'blocker_sets_larger_than_three':large_sets,'candidate_enumeration':'All singles/pairs/triples/quadruples/quintuples plus complete observed requirement sets and unions of up to three pure complete sets; larger coherent bundles retain explicit full costs.','method':'Every rejected extent: strict baseline, optimistic CFG continuation after failures, plus complete linear-span inventory. Supported control edges/tail policy unchanged. Rankings assume implemented non-control instructions fall through and retain acceptance. Linear inventory can include unreachable data; estimates are conditional, not actual acceptance or runnable functions. Re-survey after every fix.','effort_basis':'Engineering estimates in minutes including implementation/correctness work, plus explicit fixed validation budget; unknown ISA defaults 60..180. Runtime/configuration/opaque/policy/control-flow candidates excluded. Shared-family estimates explicit.','ranked_candidates':ranked,'families':[{'family':name,'cfg_extents_containing':n,'cfg_instruction_occurrences':occurrences[name],'linear_span_extents_containing':linear_presence[name],'sole_nonstructural_blocker_extents':buckets[frozenset([name])]}for name in sorted(extent_presence.keys()|linear_presence.keys(),key=lambda n:(-extent_presence[n],-linear_presence[n],n))for n in [extent_presence[name]]]}
+    report={'classification_reference':f'Capstone {__version__}','acceptance_rules_changed':False,'guest_code_executed':False,'rejected_extents':rows_count,'structural_blocked_extents':structural,'baseline_cfg_edge_failures':baseline_edges,'nonstructural_pure_isa_extents':pure_isa,'runtime_configuration_opaque_or_policy_blocked_extents':runtime_blocked,'structural_and_other_barrier_counts_overlap':True,'blocker_sets_larger_than_three':large_sets,'candidate_enumeration':'All singles/pairs/triples/quadruples/quintuples plus complete observed requirement sets and unions of up to five pure complete sets; larger coherent bundles retain explicit full costs.','method':'Every rejected extent: strict baseline, optimistic CFG continuation after failures, plus complete linear-span inventory. Supported control edges/tail policy unchanged. Rankings assume implemented non-control instructions fall through and retain acceptance. Linear inventory can include unreachable data; estimates are conditional, not actual acceptance or runnable functions. Re-survey after every fix.','effort_basis':'Engineering estimates in minutes including implementation/correctness work, plus explicit fixed validation budget; unknown ISA defaults 60..180. Runtime/configuration/opaque/policy/control-flow candidates excluded. Shared-family estimates explicit.','ranked_candidates':ranked,'families':[{'family':name,'cfg_extents_containing':n,'cfg_instruction_occurrences':occurrences[name],'linear_span_extents_containing':linear_presence[name],'sole_nonstructural_blocker_extents':buckets[frozenset([name])]}for name in sorted(extent_presence.keys()|linear_presence.keys(),key=lambda n:(-extent_presence[n],-linear_presence[n],n))for n in [extent_presence[name]]]}
     (ROOT/'private/analysis/cpu-blocker-rankings.json').write_text(json.dumps(report,indent=2)+'\n')
     with (ROOT/'private/analysis/cpu-blocker-requirements.jsonl').open('w')as out:
         for row in details:out.write(json.dumps(row)+'\n')

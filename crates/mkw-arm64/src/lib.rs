@@ -58,6 +58,13 @@ pub enum Op {
         rhs: u8,
         total: u8,
     },
+    RoundedRegisterShift(vector_integer::RoundedRegisterShift),
+    RoundedShiftNarrow(vector_integer::RoundedShiftNarrow),
+    SaturatingLongAccumulate(vector_integer::SaturatingLongAccumulate),
+    LongSignedPairAccumulate {
+        dst: u8,
+        src: u8,
+    },
     SecureHash(vector_integer::SecureHash),
     PolynomialMultiply(vector_integer::PolynomialMultiply),
     WidenSingleVector {
@@ -329,6 +336,16 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
             rhs: ((word >> 16) & 31) as u8,
             total: if word & (1 << 30) != 0 { 16 } else { 8 },
         }
+    } else if word & 0xfffffc00 == 0xdac10400 {
+        Op::PointerAuth {
+            register: reg(word & 31, false),
+            modifier: reg((word >> 5) & 31, true),
+            key: 1,
+            operation: 0,
+        }
+    } else if let Some(result) = vector_integer::decode_remaining(word) {
+        result
+            .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
     } else if let Some(result) = vector_integer::decode_hash(word) {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
@@ -1034,6 +1051,41 @@ mod reciprocal_step_tests {
             assert!(!matches!(
                 decode(w, 0).map(|v| v.op),
                 Ok(Op::ReciprocalStep { .. })
+            ));
+        }
+    }
+}
+
+#[cfg(test)]
+mod register_pacib_tests {
+    use super::*;
+    #[test]
+    fn pacib_register_and_sp_modifiers() {
+        for d in 0..32 {
+            for n in 0..32 {
+                let Op::PointerAuth {
+                    register,
+                    modifier,
+                    key,
+                    operation,
+                } = decode(0xdac10400 | (n << 5) | d, 0).unwrap().op
+                else {
+                    panic!()
+                };
+                assert_eq!(
+                    (register, modifier, key, operation),
+                    (reg(d, false), reg(n, true), 1, 0)
+                );
+            }
+        }
+        for w in [0xdac10000, 0xdac10800, 0x5ac10400] {
+            assert!(!matches!(
+                decode(w, 0).map(|v| v.op),
+                Ok(Op::PointerAuth {
+                    key: 1,
+                    operation: 0,
+                    ..
+                })
             ));
         }
     }

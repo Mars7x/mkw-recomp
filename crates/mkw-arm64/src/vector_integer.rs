@@ -1657,3 +1657,169 @@ mod secure_hash_tests {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct RoundedRegisterShift {
+    pub bytes: u8,
+    pub dst: u8,
+    pub lhs: u8,
+    pub rhs: u8,
+    pub saturating: bool,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct RoundedShiftNarrow {
+    pub bytes: u8,
+    pub dst: u8,
+    pub src: u8,
+    pub amount: u8,
+    pub upper: bool,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct SaturatingLongAccumulate {
+    pub bytes: u8,
+    pub dst: u8,
+    pub lhs: u8,
+    pub rhs: u8,
+    pub rhs_lane: Option<u8>,
+    pub upper: bool,
+}
+pub fn decode_remaining(w: u32) -> Option<Result<Op, String>> {
+    let dst = (w & 31) as u8;
+    let lhs = ((w >> 5) & 31) as u8;
+    let rhs = ((w >> 16) & 31) as u8;
+    match w & 0xffe0fc00 {
+        0x4ea05400 | 0x4ee05400 | 0x4ea05c00 => {
+            return Some(Ok(Op::RoundedRegisterShift(RoundedRegisterShift {
+                bytes: if w & (1 << 22) != 0 { 8 } else { 4 },
+                dst,
+                lhs,
+                rhs,
+                saturating: w & 0x800 != 0,
+            })))
+        }
+        _ => {}
+    }
+    if w & 0xfffffc00 == 0x4e606800 {
+        return Some(Ok(Op::LongSignedPairAccumulate { dst, src: lhs }));
+    }
+    if w & 0xbf80fc00 == 0x0f008c00 {
+        let imm = ((w >> 16) & 127) as u8;
+        if imm < 8 {
+            return None;
+        }
+        if imm >= 64 {
+            return Some(Err("reserved rounded narrowing width".into()));
+        }
+        let bits = 1u8 << (7 - imm.leading_zeros());
+        return Some(Ok(Op::RoundedShiftNarrow(RoundedShiftNarrow {
+            bytes: bits / 8,
+            dst,
+            src: lhs,
+            amount: bits * 2 - imm,
+            upper: w & (1 << 30) != 0,
+        })));
+    }
+    let regular = w & 0xbf20fc00 == 0x0e209000;
+    let indexed = w & 0xbf00f400 == 0x0f003000;
+    if regular || indexed {
+        let size = ((w >> 22) & 3) as u8;
+        if !matches!(size, 1 | 2) {
+            return Some(Err("reserved saturating long accumulate size".into()));
+        }
+        let lane = if indexed {
+            Some(if size == 1 {
+                (((w >> 11) & 1) * 4 + ((w >> 21) & 1) * 2 + ((w >> 20) & 1)) as u8
+            } else {
+                (((w >> 11) & 1) * 2 + ((w >> 21) & 1)) as u8
+            })
+        } else {
+            None
+        };
+        return Some(Ok(Op::SaturatingLongAccumulate(SaturatingLongAccumulate {
+            bytes: 1 << size,
+            dst,
+            lhs,
+            rhs: if indexed && size == 1 { rhs & 15 } else { rhs },
+            rhs_lane: lane,
+            upper: w & (1 << 30) != 0,
+        })));
+    }
+    None
+}
+#[cfg(test)]
+mod remaining_integer_tests {
+    use super::*;
+    #[test]
+    fn rounded_forms_and_reserved_neighbors() {
+        for (base, bytes, saturating) in [
+            (0x4ea05400, 4, false),
+            (0x4ee05400, 8, false),
+            (0x4ea05c00, 4, true),
+        ] {
+            let Op::RoundedRegisterShift(v) = crate::decode(base | (31 << 16) | (7 << 5) | 31, 0)
+                .unwrap()
+                .op
+            else {
+                panic!()
+            };
+            assert_eq!(
+                (v.bytes, v.dst, v.lhs, v.rhs, v.saturating),
+                (bytes, 31, 7, 31, saturating)
+            );
+        }
+        for q in 0..2 {
+            for imm in 8..64 {
+                let Op::RoundedShiftNarrow(v) =
+                    crate::decode(0x0f008c00 | (q << 30) | (imm << 16) | 0x3ff, 0)
+                        .unwrap()
+                        .op
+                else {
+                    panic!()
+                };
+                assert_eq!((v.dst, v.src, v.upper), (31, 31, q != 0));
+                assert_eq!(u32::from(v.bytes) * 16 - u32::from(v.amount), imm);
+                assert!(v.amount > 0 && v.amount <= v.bytes * 8);
+            }
+        }
+        for base in [0x0f008c00, 0x0f408c00, 0x4f408c00] {
+            assert!(!matches!(
+                crate::decode(base, 0).map(|v| v.op),
+                Ok(Op::RoundedShiftNarrow(_))
+            ));
+        }
+    }
+    #[test]
+    fn saturating_long_fields_and_index_lanes() {
+        for size in 1..3 {
+            for q in 0..2 {
+                for lane in 0..if size == 1 { 8 } else { 4 } {
+                    let bits = if size == 1 {
+                        ((lane >> 2) << 11) | (((lane >> 1) & 1) << 21) | ((lane & 1) << 20)
+                    } else {
+                        ((lane >> 1) << 11) | ((lane & 1) << 21)
+                    };
+                    let Op::SaturatingLongAccumulate(v) = crate::decode(
+                        0x0f003000 | (size << 22) | (q << 30) | bits | (7 << 16) | (31 << 5) | 31,
+                        0,
+                    )
+                    .unwrap()
+                    .op
+                    else {
+                        panic!()
+                    };
+                    assert_eq!(
+                        (v.bytes, v.dst, v.lhs, v.rhs, v.rhs_lane, v.upper),
+                        (1 << size, 31, 31, 7, Some(lane as u8), q != 0)
+                    );
+                }
+            }
+        }
+        for base in [0x0e209000, 0x0ee09000, 0x0f003000, 0x0fc03000] {
+            assert!(crate::decode(base, 0).is_err());
+        }
+        assert!(matches!(
+            crate::decode(0x4e606bff, 0).unwrap().op,
+            Op::LongSignedPairAccumulate { dst: 31, src: 31 }
+        ));
+    }
+}

@@ -129,6 +129,22 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
                 out += &vector_fp::emit_reciprocal_step(dst, lhs, rhs, total);
                 out += &next;
             }
+            Op::RoundedRegisterShift(v) => {
+                out += &vector_integer::emit_rounded_register(v);
+                out += &next;
+            }
+            Op::RoundedShiftNarrow(v) => {
+                out += &vector_integer::emit_rounded_narrow(v);
+                out += &next;
+            }
+            Op::SaturatingLongAccumulate(v) => {
+                out += &vector_integer::emit_saturating_long(v);
+                out += &next;
+            }
+            Op::LongSignedPairAccumulate { dst, src } => {
+                out += &vector_integer::emit_long_pair_accumulate(dst, src);
+                out += &next;
+            }
             Op::SecureHash(v) => {
                 out += &vector_integer::emit_hash(v);
                 out += &next;

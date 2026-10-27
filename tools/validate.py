@@ -60,6 +60,7 @@ if args.game:
     run('all rejected-extent blocker diagnostics', [str(binary), 'cpu-blockers', str(game)])
     if (ROOT/'private/tools/python/capstone').is_dir():
         run('all-blocker coverage prioritization', [sys.executable, str(ROOT/'tools/rank_blockers.py')])
+        run('static runtime contract inventory', [sys.executable, str(ROOT/'tools/survey_runtime_contracts.py')])
     link = run('real module link diagnostic', [str(binary), 'link-check', str(game)])
     results[-1]['classification'] = 'implemented and tested' if link.returncode == 0 else 'blocked before guest execution'
     candidate = None
@@ -91,3 +92,7 @@ run('five-fix candidate ranking', [sys.executable, str(ROOT / 'tools/test_rank_f
 run('complete-set bundle ranking', [sys.executable, str(ROOT / 'tools/test_rank_bundles.py')])
 
 run('fixed half-conversion ranking policy', [sys.executable, str(ROOT / 'tools/test_rank_policy.py')])
+
+run('remaining complete-set ranking', [sys.executable, str(ROOT / 'tools/test_rank_remaining.py')])
+
+run('runtime contract inventory synthetic checks', [sys.executable, str(ROOT / 'tools/test_runtime_contracts.py')])

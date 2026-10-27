@@ -9,7 +9,7 @@
 | Function discovery | Partially implemented | 223,856 validated CIE/FDE extents plus candidates; indirect resolution incomplete |
 | Synthetic native translation | Implemented and tested | Host x86-64 executable ran; limited instruction subset |
 | Guest memory/relocation foundation | Partially implemented | Synthetic Rust/native memory and dispatcher tests pass; 309,844 relocations apply/read back; serialized diagnostic ordering |
-| Actual game CPU translation | Partially implemented | 214,515 subset-liftable indexed extents with possible unbound tails; 122 object samples; no complete module |
+| Actual game CPU translation | Partially implemented | 214,521 subset-liftable indexed extents with possible unbound tails; 125 object samples; no complete module |
 | Actual runtime bootstrap | Not started | No guest instruction execution |
 | Vulkan/shaders/game frame | Not started | Container observations only |
 | SDL3 input/audio, VFS/saves | Not started | No runtime implementations |
@@ -152,3 +152,6 @@ Complete SHA1/SHA256 operations add nine strict survey acceptances. Independent 
 
 
 The same publication additionally includes 2S/4S FRECPS, yielding **ten total gains** over the preceding polynomial/widening/difference package. Independent exact and QEMU checks pass, including atomic callback failure and exceptional inputs. Only six feasible pure ISA opportunities remain. Representative selection combines features into 122 objects; none execute. Every previous correctness gate, acceptance rule and test remains unchanged.
+
+
+The remaining scoped arithmetic/PAC package adds six strict acceptances, with independent native/QEMU/failure/budget checks and unchanged prior tests/ABI v9. The current complete diagnostic now has zero feasible pure ISA/nonstructural requirement sets; this does not establish complete ISA or module support. Runtime inventory exposes 167 contract-only extents, including conditional exclusive-monitor/counter opportunities, while retaining other barriers. Runtime/profile effort remains unpriced and original execution stays gated. No real monitor/service placeholder or invented clock is used to inflate acceptance.

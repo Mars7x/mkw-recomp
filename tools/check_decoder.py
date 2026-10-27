@@ -350,6 +350,15 @@ for rn in [0,1,31]:
  for rd in [0,1,31]:
   for q in range(2):
    for rm in [0,7,31]:
+    for base in [0x4ea05400,0x4ee05400,0x4ea05c00]:words.add(base|(rm<<16)|(rn<<5)|rd)
+    for size in range(4):
+     words.add(0x0e209000|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+     for lane in range(8 if size==1 else 4):
+      lane_bits=((lane>>2)<<11)|(((lane>>1)&1)<<21)|((lane&1)<<20)if size==1 else((lane>>1)<<11)|((lane&1)<<21)
+      words.add(0x0f003000|(q<<30)|(size<<22)|lane_bits|((rm&(15 if size==1 else 31))<<16)|(rn<<5)|rd)
+    for imm in range(128):words.add(0x0f008c00|(q<<30)|(imm<<16)|(rn<<5)|rd)
+    words.add(0x4e606800|(rn<<5)|rd)
+    words.add(0xdac10400|(rn<<5)|rd)
     for base in [0x0e20fc00,0x0e60fc00]:words.add(base|(q<<30)|(rm<<16)|(rn<<5)|rd)
     for base in [0x5e000000,0x5e001000,0x5e002000,0x5e003000,0x5e004000,0x5e005000,0x5e006000]:
      for delta in [0,1<<30,1<<22]:words.add((base|(rm<<16)|(rn<<5)|rd)^delta)
@@ -401,9 +410,24 @@ for row in rows:
   if word&0xffffffe0==0xdac143e0:
    reg='xzr' if v['register']=='Zero' else 'x'+str(v['register']['Gpr'])
    if (ins.mnemonic,ins.op_str)!=('xpaci',reg) or v['operation']!=2 or v['key']!=0 or v['modifier']!='Zero':errors.append({'word':hex(word),'error':'XPACI operands/profile differ','reference':ins.mnemonic+' '+ins.op_str})
+  if word&0xfffffc00==0xdac10400:
+   reg=lambda r:'sp'if r=='Sp'else'xzr'if r=='Zero'else'x'+str(r['Gpr']);operands=reg(v['register'])+', '+reg(v['modifier'])
+   if(ins.mnemonic,ins.op_str)!=('pacib',operands)or v['operation']!=0 or v['key']!=1:errors.append({'word':hex(word),'error':'PACIB operands/profile differ','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='UnsignedAbsDifference':
   v=op[kind];b=v['bytes'];letters={1:'b',2:'h',4:'s',8:'d'};reg=lambda r,b,t:'v'+str(r)+'.'+str(t//b)+letters[b];name='uabdl2'if v['upper']else'uabdl'if v['long']else'uabd';source_total=16 if v['upper']else 8 if v['long']else v['total'];operands=reg(v['dst'],b*2 if v['long']else b,v['total'])+', '+reg(v['lhs'],b,source_total)+', '+reg(v['rhs'],b,source_total)
   if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'unsigned absolute operands differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='RoundedRegisterShift':
+  v=op[kind];shape='.4s'if v['bytes']==4 else'.2d';name='sqrshl'if v['saturating']else'srshl';operands=', '.join('v'+str(v[k])+shape for k in ['dst','lhs','rhs'])
+  if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'rounded register shift operands differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='LongSignedPairAccumulate':
+  v=op[kind];operands='v'+str(v['dst'])+'.4s, v'+str(v['src'])+'.8h'
+  if (ins.mnemonic,ins.op_str)!=('sadalp',operands):errors.append({'word':hex(word),'error':'long pair accumulate differs','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='RoundedShiftNarrow':
+  v=op[kind];b=v['bytes'];letters={1:'b',2:'h',4:'s',8:'d'};name='rshrn2'if v['upper']else'rshrn';total=16 if v['upper']else 8;prefix=f"v{v['dst']}.{total//b}{letters[b]}, v{v['src']}.{8//b}{letters[b*2]}, "
+  if ins.mnemonic!=name or not ins.op_str.startswith(prefix)or ins.operands[-1].imm!=v['amount']:errors.append({'word':hex(word),'error':'rounded narrow operands differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='SaturatingLongAccumulate':
+  v=op[kind];b=v['bytes'];letters={2:'h',4:'s',8:'d'};total=16 if v['upper']else 8;name='sqdmlal2'if v['upper']else'sqdmlal';right=f"v{v['rhs']}.{total//b}{letters[b]}"if v['rhs_lane']is None else f"v{v['rhs']}.{letters[b]}[{v['rhs_lane']}]";operands=f"v{v['dst']}.{8//b}{letters[b*2]}, v{v['lhs']}.{total//b}{letters[b]}, {right}"
+  if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'saturating long operands differ','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='ReciprocalStep':
   v=op[kind];shape='.4s'if v['total']==16 else'.2s';operands=', '.join('v'+str(v[k])+shape for k in ['dst','lhs','rhs'])
   if (ins.mnemonic,ins.op_str)!=('frecps',operands):errors.append({'word':hex(word),'error':'reciprocal step operands differ','reference':ins.mnemonic+' '+ins.op_str})

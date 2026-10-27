@@ -585,3 +585,47 @@ pub fn emit_hash(v: mkw_arm64::vector_integer::SecureHash) -> String {
     s+=&format!("c->vregs[{}][0]=(uint64_t)output[0]|((uint64_t)output[1]<<32);c->vregs[{}][1]=(uint64_t)output[2]|((uint64_t)output[3]<<32);}}\n",v.dst,v.dst);
     s
 }
+
+pub fn emit_rounded_register(v: mkw_arm64::vector_integer::RoundedRegisterShift) -> String {
+    let bits = v.bytes * 8;
+    let m = mask(v.bytes);
+    let sign = 1u64 << (bits - 1);
+    let saturation = if v.saturating {
+        format!("__int128 value=(__int128)(raw^UINT64_C({sign}))-((__int128)1<<{}),minimum=-((__int128)1<<{}),maximum=((__int128)1<<{})-1,wide;if(count>={bits}){{wide=value<0?minimum:value>0?maximum:0;if(value)fpsr|=UINT32_C(0x08000000);}}else{{wide=value*((__int128)1<<count);if(wide<minimum){{wide=minimum;fpsr|=UINT32_C(0x08000000);}}if(wide>maximum){{wide=maximum;fpsr|=UINT32_C(0x08000000);}}}}result=(uint64_t)wide&UINT64_C({m});",bits-1,bits-1,bits-1)
+    } else {
+        format!("result=count>={bits}?0:(raw<<count)&UINT64_C({m});")
+    };
+    format!("{{uint64_t a[2]={{c->vregs[{}][0],c->vregs[{}][1]}},b[2]={{c->vregs[{}][0],c->vregs[{}][1]}},out[2]={{0,0}};uint32_t fpsr=c->fpsr;for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits};uint64_t raw=(a[offset/64]>>(offset%64))&UINT64_C({m}),count_raw=b[offset/64]>>(offset%64),result=0;int count=(int)(count_raw&255);if(count>=128)count-=256;if(count>=0){{{saturation}}}else{{unsigned amount=(unsigned)(-count);if(amount<{bits}){{uint64_t extension=(raw&UINT64_C({sign}))?(UINT64_C({m})^((UINT64_C(1)<<({bits}-amount))-1)):0;result=((raw>>amount)|extension)+((raw>>(amount-1))&1);result&=UINT64_C({m});}}}}out[offset/64]|=result<<(offset%64);}}c->vregs[{}][0]=out[0];c->vregs[{}][1]=out[1];c->fpsr=fpsr;}}\n",v.lhs,v.lhs,v.rhs,v.rhs,16/v.bytes,v.dst,v.dst)
+}
+pub fn emit_rounded_narrow(v: mkw_arm64::vector_integer::RoundedShiftNarrow) -> String {
+    let input_bits = v.bytes * 16;
+    let bits = v.bytes * 8;
+    let input_mask = mask(v.bytes * 2);
+    let out_mask = mask(v.bytes);
+    let start = if v.upper { 64 } else { 0 };
+    let low = if v.upper {
+        format!("c->vregs[{}][0]", v.dst)
+    } else {
+        "0".into()
+    };
+    format!("{{uint64_t source[2]={{c->vregs[{}][0],c->vregs[{}][1]}},out[2]={{{low},0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{input_bits},dest={start}+lane*{bits};uint64_t raw=(source[offset/64]>>(offset%64))&UINT64_C({input_mask});__uint128_t rounded=((__uint128_t)raw+((__uint128_t)1<<({}-1)))>>{};out[dest/64]|=((uint64_t)rounded&UINT64_C({out_mask}))<<(dest%64);}}c->vregs[{}][0]=out[0];c->vregs[{}][1]=out[1];}}\n",v.src,v.src,8/v.bytes,v.amount,v.amount,v.dst,v.dst)
+}
+pub fn emit_long_pair_accumulate(dst: u8, src: u8) -> String {
+    format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},old[2]={{c->vregs[{dst}][0],c->vregs[{dst}][1]}},out[2]={{0,0}};for(unsigned lane=0;lane<4;lane++){{unsigned offset=lane*32;uint64_t raw=source[offset/64]>>(offset%64);int64_t a=(int64_t)((raw&65535)^32768)-32768,b=(int64_t)(((raw>>16)&65535)^32768)-32768;uint64_t value=((old[offset/64]>>(offset%64))+(uint64_t)(a+b))&UINT64_C(0xffffffff);out[offset/64]|=value<<(offset%64);}}c->vregs[{dst}][0]=out[0];c->vregs[{dst}][1]=out[1];}}\n")
+}
+pub fn emit_saturating_long(v: mkw_arm64::vector_integer::SaturatingLongAccumulate) -> String {
+    let bits = v.bytes * 8;
+    let wide_bits = bits * 2;
+    let m = mask(v.bytes);
+    let wm = mask(v.bytes * 2);
+    let sign = 1u64 << (bits - 1);
+    let ws = 1u64 << (wide_bits - 1);
+    let start = if v.upper { 64 } else { 0 };
+    let right = if let Some(lane) = v.rhs_lane {
+        let offset = u32::from(lane) * u32::from(bits);
+        format!("(b[{}]>>{})", offset / 64, offset % 64)
+    } else {
+        "(b[offset/64]>>(offset%64))".into()
+    };
+    format!("{{uint64_t a[2]={{c->vregs[{}][0],c->vregs[{}][1]}},b[2]={{c->vregs[{}][0],c->vregs[{}][1]}},old[2]={{c->vregs[{}][0],c->vregs[{}][1]}},out[2]={{0,0}};uint32_t fpsr=c->fpsr;for(unsigned lane=0;lane<{};lane++){{unsigned offset={start}+lane*{bits},dest=lane*{wide_bits};uint64_t ar=(a[offset/64]>>(offset%64))&UINT64_C({m}),br={right}&UINT64_C({m}),cr=(old[dest/64]>>(dest%64))&UINT64_C({wm});__int128 left=(__int128)(ar^UINT64_C({sign}))-((__int128)1<<{}),rhs=(__int128)(br^UINT64_C({sign}))-((__int128)1<<{}),acc=(__int128)(cr^UINT64_C({ws}))-((__int128)1<<{}),minimum=-((__int128)1<<{}),maximum=((__int128)1<<{})-1,value=left*rhs*2;if(value>maximum){{value=maximum;fpsr|=UINT32_C(0x08000000);}}if(value<minimum){{value=minimum;fpsr|=UINT32_C(0x08000000);}}value+=acc;if(value>maximum){{value=maximum;fpsr|=UINT32_C(0x08000000);}}if(value<minimum){{value=minimum;fpsr|=UINT32_C(0x08000000);}}out[dest/64]|=((uint64_t)value&UINT64_C({wm}))<<(dest%64);}}c->vregs[{}][0]=out[0];c->vregs[{}][1]=out[1];c->fpsr=fpsr;}}\n",v.lhs,v.lhs,v.rhs,v.rhs,v.dst,v.dst,8/v.bytes,bits-1,bits-1,wide_bits-1,wide_bits-1,wide_bits-1,v.dst,v.dst)
+}

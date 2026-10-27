@@ -286,3 +286,10 @@ Original SHA lane packing, round arithmetic and scheduling follow instruction fa
 ## Reciprocal-step provenance
 
 Original FRECPS lowering follows instruction and fused-step facts in [Arm's reference](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85). It reuses the existing attributed fused-subtract callback; no reference implementation was copied. The project's independent nine-limb exact oracle is adapted to 2−a×b at scale 2^-298 and cross-checked with known answers, a double-rounding adversary and synthetic QEMU. Original test files, ABI v9, FPCR refusal and pre-execution configuration gates remain unchanged.
+
+
+## Remaining arithmetic and runtime-contract provenance
+
+Original shift rounding, signed pair accumulation, and separate doubled-product/accumulator saturation follow instruction facts in [Arm's A64 reference](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85) and [armasm arrangement tables](https://documentation-service.arm.com/static/5f3fa899428f7a6b3328fd44). No reference instruction implementation was copied. Independent byte/i128 expectations and synthetic QEMU verify edge counts, narrowing carry, double saturation, QC and aliases. PACIB transport reuses the existing attributed QARMA5/39-bit backend; private Capstone checks all operand classes, and QEMU sign/strip round trips compare canonical reconstructed addresses while preserving explicit profile differences.
+
+The runtime inventory is original static accounting over existing diagnostic receipts. SVC immediates remain numerical observations, not verified service mappings. Contract-only predictions retain structural, ISA, opaque, policy and control-flow barriers; no original instruction executes. Existing tests, third-party attribution, ABI v9 compatibility and target/bootstrap gates remain unchanged.
