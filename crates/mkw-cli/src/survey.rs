@@ -99,7 +99,9 @@ pub fn run(root: &Path) -> Result<()> {
                         .any(|i| matches!(i.op, mkw_arm64::Op::OrderedMemory { .. })));
                     row["requires_memory_backend"] = json!(ir.iter().any(|i| matches!(
                         i.op,
-                        mkw_arm64::Op::OrderedMemory { .. } | mkw_arm64::Op::Memory(_)
+                        mkw_arm64::Op::OrderedMemory { .. }
+                            | mkw_arm64::Op::Memory(_)
+                            | mkw_arm64::Op::Structure(_)
                     )));
                     let mut features = Vec::new();
                     for instruction in &ir {
@@ -154,6 +156,11 @@ pub fn run(root: &Path) -> Result<()> {
                                 }
                             }
                             Op::Crc32 { .. } => features.push("crc32"),
+                            Op::Structure(v) => features.push(if v.replicate == 0 {
+                                "simd_lane_memory"
+                            } else {
+                                "simd_replicate_memory"
+                            }),
                             Op::IntegerUnary { .. } | Op::CarryArithmetic { .. } => {
                                 features.push("integer_bits_carry")
                             }

@@ -7,6 +7,7 @@ mod floating;
 mod integer;
 mod memory;
 mod simd;
+mod structures;
 mod vector_fp;
 use mkw_arm64::{Instruction, MemoryOrder, Op, Reg, Width};
 fn r(reg: Reg) -> String {
@@ -37,6 +38,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("bitops.rs"),
     include_str!("integer.rs"),
     include_str!("simd.rs"),
+    include_str!("structures.rs"),
     include_str!("atomics.rs"),
     include_str!("floating.rs"),
     include_str!("vector_fp.rs"),
@@ -131,6 +133,10 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
             }
             Op::Atomic(op) => {
                 out += &atomics::emit(op);
+                out += &next;
+            }
+            Op::Structure(op) => {
+                out += &structures::emit(op);
                 out += &next;
             }
             Op::Simd(op) => {

@@ -6,6 +6,7 @@ pub mod floating;
 pub mod integer;
 pub mod memory;
 pub mod simd;
+pub mod structures;
 pub mod vector_fp;
 use serde::Serialize;
 pub const SOURCE_INPUTS: &[&str] = &[
@@ -14,6 +15,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("bitops.rs"),
     include_str!("integer.rs"),
     include_str!("simd.rs"),
+    include_str!("structures.rs"),
     include_str!("atomics.rs"),
     include_str!("floating.rs"),
     include_str!("vector_fp.rs"),
@@ -40,6 +42,7 @@ pub enum MemoryOrder {
 pub enum Op {
     Nop,
     VectorFp(vector_fp::VectorFp),
+    Structure(structures::Structure),
     Crc32 {
         dst: Reg,
         lhs: Reg,
@@ -274,7 +277,10 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
     };
     let rd = word & 31;
     let rn = (word >> 5) & 31;
-    let op = if let Some(result) = vector_fp::decode(word) {
+    let op = if let Some(result) = structures::decode(word) {
+        result
+            .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if let Some(result) = vector_fp::decode(word) {
         result.map_err(|error| format!("{error} at {pc:#x}"))?
     } else if let Some(result) = floating::decode(word) {
         result.map_err(|error| format!("{error} at {pc:#x}"))?

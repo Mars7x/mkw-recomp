@@ -270,3 +270,96 @@ fn build_vector_elf(cases: &[VectorCase], conversion: bool) -> Vec<u8> {
     }
     bytes
 }
+
+/// Single-structure fixtures: Q0/Q31, sixteen memory bytes, base delta and NZCV.
+/// The returned address lets native tests map exactly the same guest bytes.
+pub fn structure_elf(cases: &[u32]) -> (Vec<u8>, u64) {
+    const BASE: u64 = 0x400000;
+    const TEXT: usize = 4096;
+    let mut code = Vec::new();
+    immediate(&mut code, 28, 0);
+    immediate(&mut code, 26, 0);
+    let mut loads = Vec::new();
+    for &w in cases {
+        for (offset, reg) in [(0, 30), (16, 0), (32, 31)] {
+            loads.push((code.len(), offset, 0x9c000000 | reg));
+            code.push(0);
+            if reg == 30 {
+                code.push(0x3d80035e);
+            } // reset mutable memory via Q30
+        }
+        code.push(0x91000341);
+        code.push(0x9100035f); // X1 and SP = memory
+        immediate(&mut code, 0, 9);
+        immediate(&mut code, 2, 5);
+        immediate(&mut code, 27, 0xb0000000);
+        code.push(0xd51b421b);
+        code.push(w);
+        code.extend([0x3d800380, 0x3d80079f, 0x3dc0035e, 0x3d800b9e]);
+        code.push(if (w >> 5) & 31 == 31 {
+            0x910003fb
+        } else {
+            0x9100003b
+        });
+        code.extend([0xcb1a037b, 0xf9001b9b, 0xd53b421b, 0xf9001f9b, 0x9101039c]);
+    }
+    let write_at = code.len();
+    immediate(&mut code, 0, 1);
+    immediate(&mut code, 1, 0);
+    immediate(&mut code, 2, cases.len() as u64 * 64);
+    immediate(&mut code, 8, 64);
+    code.push(0xd4000001);
+    immediate(&mut code, 0, 0);
+    immediate(&mut code, 8, 93);
+    code.push(0xd4000001);
+    let pool = TEXT + code.len() * 4;
+    let output = (pool + 64 + 15) & !15;
+    let memory = BASE + (pool + 48) as u64;
+    let mut patch = Vec::new();
+    immediate(&mut patch, 28, BASE + output as u64);
+    immediate(&mut patch, 26, memory);
+    code[..8].copy_from_slice(&patch);
+    patch.clear();
+    immediate(&mut patch, 1, BASE + output as u64);
+    code[write_at + 4..write_at + 8].copy_from_slice(&patch);
+    for (at, offset, op) in loads {
+        let delta = (pool + offset) as i64 - (TEXT + at * 4) as i64;
+        assert!(delta.abs() < 1024 * 1024 && delta % 4 == 0);
+        code[at] = op | (((delta / 4) as u32 & 0x7ffff) << 5);
+    }
+    let mut bytes = vec![0u8; output + cases.len() * 64];
+    bytes[..7].copy_from_slice(b"\x7fELF\x02\x01\x01");
+    put16(&mut bytes, 16, 2);
+    put16(&mut bytes, 18, 183);
+    put32(&mut bytes, 20, 1);
+    put64(&mut bytes, 24, BASE + TEXT as u64);
+    put64(&mut bytes, 32, 64);
+    put16(&mut bytes, 52, 64);
+    put16(&mut bytes, 54, 56);
+    put16(&mut bytes, 56, 1);
+    put32(&mut bytes, 64, 1);
+    put32(&mut bytes, 68, 7);
+    put64(&mut bytes, 80, BASE);
+    put64(&mut bytes, 88, BASE);
+    let len = bytes.len() as u64;
+    put64(&mut bytes, 96, len);
+    put64(&mut bytes, 104, len);
+    put64(&mut bytes, 112, 4096);
+    for (i, w) in code.into_iter().enumerate() {
+        put32(&mut bytes, TEXT + i * 4, w);
+    }
+    for (i, v) in [
+        0x0706050403020100,
+        0x0f0e0d0c0b0a0908,
+        INITIAL_V[0][0],
+        INITIAL_V[0][1],
+        INITIAL_V[3][0],
+        INITIAL_V[3][1],
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        put64(&mut bytes, pool + i * 8, v);
+    }
+    (bytes, memory)
+}

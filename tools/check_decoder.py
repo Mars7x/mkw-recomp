@@ -145,6 +145,15 @@ for q in range(2):
   for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(0x2e20d400|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
 for size in range(2):
  for rd,rn in [(0,1),(0,0),(31,31)]:words.add(0x7e30d800|(size<<22)|(rn<<5)|rd)
+for q in range(2):
+ for post in range(2):
+  for load in range(2):
+   for r in range(2):
+    for opcode in range(8):
+     for lane_s in range(2):
+      for size in range(4):
+       for rm in [0,2,31]:
+        for rt,rn in [(0,1),(31,31),(0,2)]:words.add(0x0d000000|(q<<30)|(post<<23)|(load<<22)|(r<<21)|(rm<<16)|(opcode<<13)|(lane_s<<12)|(size<<10)|(rn<<5)|rt)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -157,7 +166,17 @@ for row in rows:
  word=row['word'];decoded=list(decoder.disasm(word.to_bytes(4,'little'),0x1000));op=row['instruction']['op'];kind=next(iter(op))if isinstance(op,dict)else op;counts[kind]+=1
  if len(decoded)!=1:errors.append({'word':hex(word),'error':'accepted encoding not decoded by Capstone'});continue
  ins=decoded[0]
- if kind=='Crc32':
+ if kind=='Structure':
+  v=op['Structure'];expected='ld1r' if v['replicate'] else 'ld1' if v['load'] else 'st1'
+  if ins.mnemonic!=expected:errors.append({'word':hex(word),'error':'single structure family differs','reference':ins.mnemonic+' '+ins.op_str})
+  if v['replicate']:
+   prefix='{v'+str(v['vector'])+'.'+str(v['replicate']//v['bytes'])+{1:'b',2:'h',4:'s',8:'d'}[v['bytes']]+'}'
+   if not ins.op_str.startswith(prefix):errors.append({'word':hex(word),'error':'replication arrangement differs','reference':ins.op_str})
+  else:
+   prefix='{v'+str(v['vector'])+'.'+{1:'b',2:'h',4:'s',8:'d'}[v['bytes']]+'}'
+   if not ins.op_str.startswith(prefix):errors.append({'word':hex(word),'error':'structure register/element width differs','reference':ins.op_str})
+   if ins.operands[0].vector_index!=v['lane']:errors.append({'word':hex(word),'error':'structure lane differs','reference':ins.op_str})
+ elif kind=='Crc32':
   expected={1:('crc32b','crc32cb'),2:('crc32h','crc32ch'),4:('crc32w','crc32cw'),8:('crc32x','crc32cx')}
   v=op['Crc32']
   if ins.mnemonic!=expected[v['bytes']][int(v['castagnoli'])]:errors.append({'word':hex(word),'error':'CRC variant differs','reference':ins.mnemonic+' '+ins.op_str})
