@@ -13,6 +13,10 @@
     "libraries/libvapours/include/vapours/results/svc_results.hpp": {
       "blob": "7a01b56990875616ff428f9046866f951abd7709",
       "sha256": "c12650fcee37730f6039da87b3f412714db850fb33c1ae6efe59da9eb4d8fa4f"
+    },
+    "libraries/libvapours/include/vapours/svc/svc_common.hpp": {
+      "blob": "0227e9bfcb9052e01b75459fdb41f2f939693acc",
+      "sha256": "c3f03b33dc88df48aed295a215320977d9e287f611d71a744977b689061a4881"
     }
   },
   "purpose": "semantic/result facts only, not implementation adoption",
