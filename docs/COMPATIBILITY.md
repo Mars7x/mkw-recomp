@@ -133,3 +133,10 @@ The 1,280 QEMU XPACI comparisons use addresses shared by the diagnostic and QEMU
 Independent real-valued midpoint expectations cover 1,040,912 native cases per optimization, including every normal exponent/bucket edge, subnormal boundaries, signs and exceptional controls. All 25,728 synthetic QEMU cases match O0/O2 with fatal UBSan. Missing-backend and unsupported-profile tests preserve destination/FPSR state.
 
 2S SIMD CLZ snapshots sources, counts each lane and clears the unused upper half while preserving GPR/control/FP/fault state. Independent leading-zero expectations check 262,144 native cases per optimization; 3,864 synthetic QEMU cases match O0/O2 with fatal UBSan. No helper/ABI extension is required. Target access/FP configuration remains unverified and original execution stays gated.
+
+
+## Reciprocal square-root estimates and refinements
+
+FRSQRTE/FRSQRTS support exact 2S/4S encodings. Original integer midpoint/boundary search computes estimates, including NaNs, negative inputs, signed zeros and infinities. Refinement preserves one final S rounding through existing callbacks: exact S-to-D conversion, D fused subtraction toward zero, exact halving, odd-bit jamming when inexact, then D-to-S conversion in the original mode. Nonzero finite refinement magnitudes lie between 2^-47 and 2^255, keeping the intermediate D-normal. Exact-zero signs and exceptional inputs have explicit handling.
+
+CPU ABI v9 and all callback operations remain unchanged. The original FPCR whitelist still refuses traps/flush/alternative profiles; output vectors/FPSR commit only after every lane/callback succeeds. An independent 576-bit fixed-point oracle checks refinement, including an adversary where naive D-to-S double rounding fails. Independent midpoint expectations check 1,040,784 native estimate cases per optimization; exact refinement checks 102,144. All 102,144 synthetic QEMU cases match O0/O2 with fatal UBSan. Stage-by-stage failures, aliases and missing/unsupported profiles also pass. These are software/synthetic results; target FP configuration and hardware behavior remain unverified.

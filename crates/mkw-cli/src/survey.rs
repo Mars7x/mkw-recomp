@@ -238,6 +238,13 @@ pub fn run(root: &Path) -> Result<()> {
                                 }
                             }
                             Op::VectorFp(v) => {
+                                if matches!(
+                                    v.kind,
+                                    mkw_arm64::vector_fp::VectorFpKind::ReciprocalSqrtEstimate
+                                        | mkw_arm64::vector_fp::VectorFpKind::ReciprocalSqrtStep
+                                ) {
+                                    features.push("vector_reciprocal_sqrt");
+                                }
                                 if v.kind == mkw_arm64::vector_fp::VectorFpKind::ReciprocalEstimate
                                 {
                                     features.push("two_s_reciprocal_estimate");

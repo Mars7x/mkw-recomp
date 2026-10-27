@@ -340,6 +340,12 @@ for q in range(2):
  for size in range(4):
   for rn in [0,1,31]:
    for rd in [0,1,31]:words.add(0x2e204800|(q<<30)|(size<<22)|(rn<<5)|rd)
+for q in range(2):
+ for size in range(2):
+  for rn in [0,1,31]:
+   for rd in [0,1,31]:
+    words.add(0x2ea1d800|(q<<30)|(size<<22)|(rn<<5)|rd)
+    for rm in [0,2,31]:words.add(0x0ea0fc00|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -467,8 +473,11 @@ for row in rows:
   if ins.mnemonic!=expected[v['bytes']][int(v['castagnoli'])]:errors.append({'word':hex(word),'error':'CRC variant differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='VectorFp':
   v=op['VectorFp']
-  expected={'frecpe','fadd','fsub','fmul','fdiv','fmla','fmls','faddp','fmaxp','fminp','fmaxnmp','fminnmp','fmaxv','fminv','fmaxnmv','fminnmv','fabd','fmax','fmin','fmaxnm','fminnm','frintn','frintp','frintm','frintz','frinta','frintx','frinti','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
+  expected={'frsqrte','frsqrts','frecpe','fadd','fsub','fmul','fdiv','fmla','fmls','faddp','fmaxp','fminp','fmaxnmp','fminnmp','fmaxv','fminv','fmaxnmv','fminnmv','fabd','fmax','fmin','fmaxnm','fminnm','frintn','frintp','frintm','frintz','frinta','frintx','frinti','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'vector numeric family differs','reference':ins.mnemonic+' '+ins.op_str})
+  if v['kind'] in ['ReciprocalSqrtEstimate','ReciprocalSqrtStep']:
+   name='frsqrte' if v['kind']=='ReciprocalSqrtEstimate' else 'frsqrts';reg=lambda n:'v'+str(n)+'.'+str(v['total']//4)+'s';operands=reg(v['dst'])+', '+reg(v['lhs'])+(', '+reg(v['rhs']) if name=='frsqrts' else '')
+   if(ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'reciprocal sqrt kind/operands differ','reference':ins.mnemonic+' '+ins.op_str})
   if v['kind']=='ReciprocalEstimate':
    operands='v'+str(v['dst'])+'.2s, v'+str(v['lhs'])+'.2s'
    if (ins.mnemonic,ins.op_str)!=('frecpe',operands):errors.append({'word':hex(word),'error':'2S estimate operands differ','reference':ins.mnemonic+' '+ins.op_str})

@@ -1,20 +1,21 @@
 # Status — October 27, 2026
 
-2S reciprocal estimates, SIMD leading-zero counts and coverage-driven complete blocker analysis are implemented and tested; automatic source-only publication and periodic continuations remain active. **No game-derived function has executed. Mario Kart World has not booted, rendered or become playable.**
+Reciprocal square-root estimation/refinement and coverage-driven complete blocker analysis are implemented and tested; automatic source-only publication and periodic continuations remain active. **No game-derived function has executed. Mario Kart World has not booted, rendered or become playable.**
 
 ## Latest implementation
 
-- Added 2S FRECPE and 2S SIMD CLZ. **Measured gain: +18**, exactly the complete-set combination prediction, reaching **214,464** accepted extents with no prior acceptance lost. All 15 estimate and 3 leading-zero opportunities are covered; the existing global 4S FRECPE rejection test, FPCR whitelist, CPU ABI v9 and all acceptance rules remain unchanged.
-- Original integer estimate quantization passes **1,040,912 independent native cases per optimization** and **25,728 QEMU comparisons**. Leading-zero lowering passes **262,144 native cases per optimization** and **3,864 QEMU comparisons**. Native O0/O2 tests use fatal UBSan and preserve complete state/flags; missing-backend/profile failures do not partially commit.
-- The estimate prototype reused the earlier reciprocal assessment, and the narrow CLZ prototype took **2.06 wall minutes** through isolated checks while the preceding publication ran. Combining the completed prototypes shares one full validation gate; original from-scratch effort bands were conservative and are not measured engineering times.
-- MLA/XPACI was validated and pushed as **`99c4358`: +9**, total 214,446. Its scoped implementation-to-publication interval took **41.88 minutes / 12.89 gained extents per hour**, including overlapping work and added feature sampling; the full gate took 15.13 minutes and all 220 Rust tests passed.
-- Earlier measured commits: halving **`481eb98`: +11 / 29.14 minutes / 22.65 per hour**; prefetch **`f752c08`: +228 / 43.90 minutes / 311.62 per hour**, excluding shared initial blocker analysis. Scoped overlapping intervals are not additive engineer-hours.
-- **Runtime/CFG ceiling:** 8,550 of 9,392 strict rejections are boundary failures, with 9,132 diagnostic edge-blocked extents and only **59** feasible purely ISA/nonstructural opportunities. The next highest package is **FRSQRTE+FRSQRTS: 24 conditional gains / 210–420 estimated engineering minutes**, plus validation. Its prescribed estimate and single-rounding refinement/exception behavior require further implementation and independent tests; no such source is integrated here.
-- PAC/VA/TBI/access/FP/counter configuration, services, concurrency and unbound callees still block actual execution. A separate XPACI test records the QEMU top-tag/no-TBI profile difference. Automatic source-only publication remains active; README, inputs/generated code, credentials and private artifacts remain excluded. **No original function, boot, frame or gameplay is claimed.**
+- Added 2S/4S FRSQRTE/FRSQRTS with original estimate boundary search and correctly rounded refinement through existing callbacks. **Measured gain: +24**, exactly the complete-set prediction, reaching **214,488** accepted extents without losing prior acceptances. CPU ABI v9, the FPCR whitelist, existing tests and all strict acceptance rules remain unchanged.
+- Independent midpoint expectations check **1,040,784 native estimate cases per optimization**; an independent **576-bit exact oracle checks 102,144 refinements**, including a double-rounding adversary. All **102,144 QEMU comparisons** pass O0/O2 with fatal UBSan. Stage-by-stage callback failures do not partially commit vector/FPSR state; exceptional values, modes and aliases pass.
+- Estimate/CLZ was validated and pushed as **`3545b9c`: +18**, total 214,464; all 229 Rust tests passed and the full gate took **15.31 minutes**. GitHub's verified main-head push timestamp gives a scoped 52.59-minute interval (**20.54 extents/hour**); adding the separately recorded 7.66-minute earlier reciprocal assessment gives **17.93/hour**. Overlapping intervals are not additive engineer-hours.
+- Earlier measured commits: MLA/XPACI **`99c4358`: +9 / 41.88 minutes / 12.89 per hour**; halving **`481eb98`: +11 / 29.14 minutes / 22.65 per hour**; prefetch **`f752c08`: +228 / 43.90 minutes / 311.62 per hour**, excluding shared initial blocker analysis.
+- Complete blocker ranking now evaluates singles/pairs/triples/quadruples and complete larger observed requirement sets. Existing ranking self-tests remain unchanged; three additional tests verify four-fix synergy, complete six-fix visibility and runtime exclusions. Operand-form/code inspection refines the next costs: observed 4S immediate SQSHL, 2S signed min/max pairs and long pair sums reuse existing arithmetic/oracles.
+- The leading next package is **SQSHL+SMINP+SMAXP+SADDLP: 11 conditional gains / 16–45 estimated engineering minutes**, plus validation; the three-fix SQSHL/min/max package predicts 8 / 10–27 minutes. These overlapping effort bands are forecasts, not measured completion times. Details are in [coverage analysis](COVERAGE.md).
+- **Runtime/CFG ceiling:** 8,551 of 9,368 strict rejections are boundary failures; diagnostic edge-blocked extents stay 9,132. Only **35** feasible purely ISA/nonstructural opportunities remain. Services, concurrency, target FP/PAC/VA/TBI/counter/access configuration and unbound targets increasingly limit further static gains. No successful stubs or changed boundaries inflate acceptance.
+- Source-only automatic publication remains active; README, inputs/generated code, credentials and private artifacts remain excluded. **No game-derived function has executed; no boot, frame or gameplay is claimed.**
 
 ## Supplied-binary evidence
 
-All **223,856 indexed CIE/FDE extents** validate. The survey lowers **214,464 indexed extents**, including **127,078 with PAC operations**, up from 214,446 under the same tail policy. **38 accepted extents contain contiguous LD1 lists and 61 contain LD3/LD4 interleaving** (categories overlap). **58,474 contain direct extent tails; 14,171 contain indirect BR** (categories overlap). Configuration/helpers/callees/targets remain incomplete or unbound; these are not runnable-function or full-module counts. **115 representative game-derived samples compile into native objects, 74 with PAC; none execute.**
+All **223,856 indexed CIE/FDE extents** validate. The survey lowers **214,488 indexed extents**, including **127,091 with PAC operations**, up from 214,464 under the same tail policy. **38 accepted extents contain contiguous LD1 lists and 61 contain LD3/LD4 interleaving** (categories overlap). **58,474 contain direct extent tails; 14,171 contain indirect BR** (categories overlap). Configuration/helpers/callees/targets remain incomplete or unbound; these are not runnable-function or full-module counts. **117 representative game-derived samples compile into native objects, 75 with PAC; none execute.**
 
 Native samples now have a 4,096-instruction representative limit. Three oversized sample candidates are explicitly deferred; every observed feature still has a compiled representative in its module. Representative counts can decrease when newly accepted extents combine features previously selected separately. These object counts use the new sampling policy and are not directly comparable with prior first-feature selections.
 
@@ -22,13 +23,15 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 
 ## Validation
 
+- **102,144 reciprocal-square-root QEMU fixtures** match O0/O2; independent midpoint and 576-bit exact expectations check **1,040,784 estimate / 102,144 refinement native cases per optimization**. Stage-by-stage callback faults and unsupported profiles preserve destination/FPSR state. The naive double-rounding adversary is explicitly checked.
+- Three additional complete-candidate enumeration tests pass; every original ranking self-test, acceptance gate and pre-existing test file remains unchanged.
 - **25,728 2S estimate fixtures** match QEMU at O0/O2; independent midpoint expectations check **1,040,912 native cases per optimization**, with exceptional inputs/controls and unchanged 4S/profile rejection.
 - **3,864 2S CLZ fixtures** match QEMU at O0/O2; independent leading-zero expectations check **262,144 native cases per optimization**, including zero, varied lanes, aliases and complete state preservation.
 - **31,200 MLA fixtures** match QEMU at O0/O2; independent byte/u128 expectations check **46,800 native cases per optimization** across register/indexed operands, accumulator/source aliases and wrap.
 - **1,280 XPACI fixtures** match QEMU on shared canonical pointer cases; **111,264 native cases per optimization** check the explicit no-TBI strip profile, all register/zero destinations, budgets and full state preservation. Additional probes check callback operands, faults and missing backend/context. A separate test asserts the expected QEMU top-tag profile difference. The two earlier PAC native integration tests still pass unchanged.
 - **18,720 halving fixtures** match QEMU at O0/O2; independent byte/i128 expectations check **28,080 native cases per optimization**, including odd negative results, extrema, aliases, distinct lanes and unchanged flags. Pre-existing files under crate test directories remain byte-identical to the preceding snapshot.
 - **928 prefetch fixtures** match QEMU at O0/O2; **8,352 native cases per optimization** check register/control/fault preservation, exact shared budgets, PC rebasing and zero memory callbacks. Existing SP-prefetch and reserved-form refusal tests remain unchanged.
-- **229 Rust tests pass**, including extended memory capacity, multiple structures and stale-ABI refusal checks and earlier scaled conversion/rounding/integer SIMD/FP/memory semantics, plus all prior native thread-register, bit/carry, conversion, FP, SIMD, LSE, PAC and control-flow regressions.
+- **235 Rust tests pass**, including extended memory capacity, multiple structures and stale-ABI refusal checks and earlier scaled conversion/rounding/integer SIMD/FP/memory semantics, plus all prior native thread-register, bit/carry, conversion, FP, SIMD, LSE, PAC and control-flow regressions.
 - **6,656 AES fixtures** match QEMU at O0/O2; independent polynomial/byte expectations check 13,312 native cases per optimization. Two complete AES-128 standard encryption/decryption known answers also pass per optimization.
 - **31,200 ordinary SIMD MUL fixtures** match QEMU at O0/O2; independent u128 byte-array expectations check 46,800 native cases per optimization across register/indexed forms and aliases.
 - **16 YIELD fixtures** match QEMU at O0/O2; native shared-budget/state tests check exact accounting, rebased PC, zero memory callbacks and unchanged register/control state.
@@ -57,10 +60,10 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 - **86,304 SIMD numeric fixtures** match QEMU at O0/O2, covering lane selection/arrangements, overlapping sources/destinations, rounding/default-NaN controls and sticky FPSR.
 - **7,232 conversion fixtures** match QEMU 8.2.2 at native O0/O2 with fatal UBSan, checking vector/general-register results, FPSR, NZCV and FPCR across W/X and S/D, controls, integer boundaries, fractions, signed zeros, infinities and quiet/signaling NaNs.
 - The expanded **26,416 FP/selection fixtures** also match QEMU at O0/O2. Earlier **2,741 SIMD**, **160 LSE** and **4,096 QARMA5** software comparisons remain passing. QEMU shares broad SoftFloat lineage and is not a hardware oracle; optional unavailability is explicitly recorded.
-- **163,446 constructed encodings**, including **75,812 accepted encodings**, pass private Capstone family/width/immediate checks. This checks decoding, not runtime semantics or hardware behavior.
+- **163,590 constructed encodings**, including **75,884 accepted encodings**, pass private Capstone family/width/immediate checks. This checks decoding, not runtime semantics or hardware behavior.
 - Native semantic cases run at O0/O2 with fatal undefined-behavior instrumentation. Synthetic programs only are executed; native game sample objects are compilation evidence.
 - **4,096 independent QARMA5 comparisons pass** against privately compiled QEMU reference code. The game's PAC profile is still unverified. The legacy/QARMA5/39-bit/no-TBI backend remains diagnostic and selected only by synthetic tests.
-- Complete blocker diagnostics preserve the exact strict baseline across all 9,392 rejects / 4,400,316 bytes with zero omissions. Three diagnostic invariants and synthetic ranking checks pass; detailed effort/ranking artifacts remain private.
+- Complete blocker diagnostics preserve the exact strict baseline across all 9,368 rejects / 4,373,452 bytes with zero omissions. Three diagnostic invariants and synthetic ranking checks pass; detailed effort/ranking artifacts remain private.
 - Four mandatory publication snapshot guard tests pass. Source file membership/content and copied checkout must match the snapshot that entered validation before commit/push.
 - Formatting, Clippy with warnings denied, exact ExeFS/segment hashes, changed-identity refusal and truncated-CFG refusal pass. Public artifact checks exclude original inputs and all generated/private data.
 - Reproduction: `python3 tools/validate.py --game base`. Actual outputs are in `private/testing/validation.json`. Optional `tools/classify_survey.py` uses private Capstone to classify first blockers per indexed function; those counts are not execution frequencies.
@@ -75,13 +78,13 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 |---|---|---|
 | 0 investigation | Partially implemented | Retail version/completeness, graphics/resource analysis |
 | 1 foundation | Partially implemented | Synthetic native/Rust bridges pass; ISA and runtime semantics incomplete |
-| 2 game CPU translation | Partially implemented | 214,464 subset-liftable indexed extents with possible unbound tails/profiles; 115 objects; no complete module |
+| 2 game CPU translation | Partially implemented | 214,488 subset-liftable indexed extents with possible unbound tails/profiles; 117 objects; no complete module |
 | 3 runtime bootstrap | Not started | Load-time linking passes; no actual game execution/startup |
 | 4–8 graphics through packaging | Not started | No genuine game frame, native input/audio or gameplay |
 
 ## Files changed this session
 
-2S estimate and CLZ IR/decoders/emitters, independent native/QEMU/profile tests, feature-specific supplied-binary sampling and Capstone checks; coverage/CPU/compatibility/research/status documentation. Eight implementation files match the isolated tested snapshot. CPU ABI v9 and every prior correctness/acceptance gate remain unchanged; all pre-existing test files remain byte-identical. Original inputs remain unchanged and all binary-derived outputs stay private.
+Reciprocal-square-root IR/decoders/emitter and independent native/QEMU/failure tests; feature sampling and Capstone checks; complete-candidate enumeration, scoped effort calibration and additional ranking tests; CPU/compatibility/research/coverage/status documentation. Five CPU implementation files match the isolated tested snapshot. CPU ABI v9 and all prior correctness/acceptance gates remain unchanged; pre-existing test files stay byte-identical. Original inputs remain unchanged and all binary-derived outputs stay private.
 
 ## Measured commit gains
 
@@ -98,10 +101,11 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 | `f752c08` | 214,426 | +228 |
 | `481eb98` | 214,437 | +11 |
 | `99c4358` | 214,446 | +9 |
-| Current 2S estimate/CLZ work | 214,464 | +18 |
+| `3545b9c` | 214,464 | +18 |
+| Current reciprocal-square-root work | 214,488 | +24 |
 
 Future commits will report measured strict gain against the preceding commit and compare it with the blocker-set prediction. Earlier stages did not record comparable end-to-end effort timings; new validation receipts record gate durations.
 
 ## Next concrete dependencies
 
-Select work from the [complete feasible blocker rankings](COVERAGE.md). The measured estimate/CLZ combination confirms +18. FRSQRTE+FRSQRTS is next (24 conditional gains); estimate quantization, fused refinement rounding/flags, aliases and transactional callback failure need independent native/QEMU proof. Preserve all existing tests, CPU ABI v9 and strict acceptance rules. Re-survey and report measured gain after each commit. Runtime service/concurrency contracts, target configuration and CFG boundaries increasingly limit the value of further survey work. No successful stubs or relaxed policies inflate acceptance; original bootstrap remains gated.
+Use [complete feasible blocker rankings](COVERAGE.md). The measured reciprocal-square-root gain confirms +24. Scoped operand analysis and shared arithmetic now prioritize SQSHL immediate + signed pairwise min/max + SADDLP (11 conditional gains); test saturation/QC, signed comparisons, widening, aliases and upper clearing without changing existing gates. Re-survey and report measured gain after each commit. Runtime/configuration contracts and CFG boundaries dominate; no successful stubs or relaxed policies inflate acceptance, and original bootstrap remains gated.

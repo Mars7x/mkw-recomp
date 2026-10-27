@@ -7,6 +7,8 @@ pub enum VectorFpKind {
     Conversion(u8),
     ScaledConversion { operation: u8, fractional_bits: u8 },
     ReciprocalEstimate,
+    ReciprocalSqrtEstimate,
+    ReciprocalSqrtStep,
     PairwiseAdd,
     PairwiseMinMax(u8),
     ReduceMinMax(u8),
@@ -22,6 +24,24 @@ pub struct VectorFp {
     pub kind: VectorFpKind,
 }
 pub fn decode(w: u32) -> Option<Result<Op, String>> {
+    let estimate = w & 0xbffffc00 == 0x2ea1d800;
+    let step = w & 0xbfe0fc00 == 0x0ea0fc00;
+    if estimate || step {
+        return Some(Ok(Op::VectorFp(VectorFp {
+            bytes: 4,
+            total: if w & (1 << 30) != 0 { 16 } else { 8 },
+            dst: (w & 31) as u8,
+            lhs: ((w >> 5) & 31) as u8,
+            rhs: if step { ((w >> 16) & 31) as u8 } else { 0 },
+            rhs_lane: None,
+            kind: if estimate {
+                VectorFpKind::ReciprocalSqrtEstimate
+            } else {
+                VectorFpKind::ReciprocalSqrtStep
+            },
+        })));
+    }
+
     if w & 0xfffffc00 == 0x0ea1d800 {
         return Some(Ok(Op::VectorFp(VectorFp {
             bytes: 4,
@@ -446,6 +466,61 @@ mod estimate_tests {
                             bytes: 4,
                             total: 8,
                             kind: VectorFpKind::ReciprocalEstimate,
+                            ..
+                        }),
+                        ..
+                    })
+                ),
+                "{w:x}"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod rsqrt_tests {
+    use super::*;
+    #[test]
+    fn single_precision_vector_rsqrt_fields() {
+        for q in 0..2 {
+            for (base, kind) in [
+                (0x2ea1d800, VectorFpKind::ReciprocalSqrtEstimate),
+                (0x0ea0fc00 | (31 << 16), VectorFpKind::ReciprocalSqrtStep),
+            ] {
+                let Op::VectorFp(v) = crate::decode(base | (q << 30) | (31 << 5) | 31, 0)
+                    .unwrap()
+                    .op
+                else {
+                    panic!()
+                };
+                assert_eq!(
+                    (v.bytes, v.total, v.dst, v.lhs, v.kind),
+                    (4, 8 << q, 31, 31, kind)
+                );
+                assert_eq!(
+                    v.rhs,
+                    if kind == VectorFpKind::ReciprocalSqrtStep {
+                        31
+                    } else {
+                        0
+                    }
+                );
+            }
+        }
+    }
+    #[test]
+    fn other_rsqrt_domains_never_alias_single_precision_vectors() {
+        for w in [
+            0x2ee1d820, 0x6ee1d820, 0x7ea1d820, 0x7ee1d820, 0x4ee2fc20, 0x5ea2fc20, 0x0ee2fc20,
+        ] {
+            assert!(
+                !matches!(
+                    crate::decode(w, 0),
+                    Ok(crate::Instruction {
+                        op: Op::VectorFp(VectorFp {
+                            bytes: 4,
+                            kind: VectorFpKind::ReciprocalSqrtEstimate
+                                | VectorFpKind::ReciprocalSqrtStep,
                             ..
                         }),
                         ..

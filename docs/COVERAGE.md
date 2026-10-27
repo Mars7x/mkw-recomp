@@ -12,7 +12,7 @@ The original strict result has 8,548 CFG-boundary failures. Diagnostic continuat
 
 ## Priorities at the AES baseline
 
-The ranker evaluates individual fixes and all pairs/triples of candidate families. Predicted gain counts a rejected extent only when the complete diagnostic CFG blocker set is covered and no structural issue remains. Engineering effort is an explicit estimate, with a separate assumed 15-minute validation gate; ranges are not measured implementation times. Shared-family savings are stated in the tool. Cache/system-register, syscall, exclusive-monitor, exception, opaque and unsupported control-flow work is identified separately rather than assigned a cheap ISA score.
+The initial ranking evaluated individual fixes and all pairs/triples of candidate families; the current tool additionally evaluates quadruples and complete larger observed requirement sets. Predicted gain counts a rejected extent only when the complete diagnostic CFG blocker set is covered and no structural issue remains. Engineering effort is an explicit estimate, with a separate assumed 15-minute validation gate; ranges are not measured implementation times. Shared-family savings are stated in the tool. Cache/system-register, syscall, exclusive-monitor, exception, opaque and unsupported control-flow work is identified separately rather than assigned a cheap ISA score.
 
 | Fix or small combination | Conditional predicted gain | Implementation estimate | Observation |
 |---|---:|---:|---|
@@ -110,3 +110,20 @@ All **9,392 rejects / 4,400,316 bytes** are inventoried with zero omissions. Str
 The next highest package is **FRSQRTE+FRSQRTS**, predicting **24** gains with a 210–420-minute from-scratch engineering band plus the validation gate (**3.31–6.40/hour**). Appending other listed singles currently gains nothing additional and costs more. Correct estimate/refinement rounding and exceptions are concrete dependencies; a larger accepted count still cannot establish the missing runtime/configuration contracts.
 
 MLA/XPACI commit `99c4358` measured **+9**, with a scoped 41.88-minute implementation-to-publication interval (**12.89/hour**) and a 15.13-minute complete gate. Prior test files and acceptance rules remained unchanged. These overlapping wall intervals are explicitly scoped and must not be added as engineer-hours.
+
+
+## Measured reciprocal-square-root result and refined next costs
+
+FRSQRTE+FRSQRTS produces **+24**, exactly the complete-set prediction: **214,488 accepted extents**, with no prior acceptance lost. All **9,368 rejects / 4,373,452 bytes** are scanned with zero omissions. One further removed ISA failure reveals a later strict boundary, giving **8,551** first-boundary failures; diagnostic structural barriers remain **9,132**. Only **35** feasible pure ISA/nonstructural opportunities remain.
+
+Inspection of every remaining blocker shows SQSHL uses the 4S **immediate** form, signed pairwise min/max use 2S, and SADDLP uses ordinary long pair sums. Existing arithmetic and independent fixtures permit narrower bands than the previous 60–180-minute unknown-family defaults: SQSHL 5–15, each min/max 4–10 (together 5–12), SADDLP 6–18 minutes. These are scoped forecasts with explicit sharing, not reductions in validation or claims of actual elapsed implementation.
+
+| Next small combination | Conditional gain | Engineering estimate | Gain/hour including unchanged 15-minute gate |
+|---|---:|---:|---:|
+| SQSHL + SMINP + SMAXP + SADDLP | 11 | 16–45 min | 11.00–21.29 |
+| SQSHL + SMINP + SMAXP | 8 | 10–27 min | 11.43–19.20 |
+| SQSHL + SMINP + SADDLP | 10 | 15–43 min | 10.34–20.00 |
+
+The four-fix combination leads by midpoint estimate only; intervals overlap. Quadruples and complete observed bundles now appear in the ranking, including larger SHA dependency sets that no single fix unlocks. Three new synthetic checks enforce four-fix synergy, full six-fix accounting and runtime exclusion; original self-tests remain unchanged. Strict acceptance and semantic gates are unchanged.
+
+Commit `3545b9c` measured **+18**, all 229 Rust tests passing, with a 15.31-minute complete gate. The verified repository push timestamp gives **52.59 minutes / 20.54 extents per hour** over the final scoped estimate/CLZ interval; including its separately recorded earlier 7.66-minute reciprocal assessment gives **17.93/hour**. These scoped, overlapping intervals are not additive engineer-hours. The runtime ceiling remains material despite faster arithmetic prototypes.

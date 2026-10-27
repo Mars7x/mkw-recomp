@@ -4,7 +4,8 @@ from pathlib import Path
 import argparse,collections,itertools,json,sys
 ROOT=Path(__file__).resolve().parents[1]
 # Engineering estimates in minutes, excluding the fixed full validation gate.
-EFFORT={'frecpe.2s':(90,180),'clz':(20,45),'frecps':(60,120),'frsqrts':(90,180),'prfm':(10,25),'prfum':(10,25),'xpaci':(20,45),'shsub':(25,60),'uhsub':(25,60),'shadd':(25,60),'uhadd':(25,60),'srhadd':(25,60),'urhadd':(25,60),'mla':(20,45),'mls':(20,45),'sha1c':(60,120),'sha1p':(25,60),'sha1m':(25,60),'sha1h':(20,45),'sha1su0':(40,90),'sha1su1':(30,75),'sha256su0':(40,90),'sha256su1':(50,100),'sha256h':(60,120),'sha256h2':(30,75),'frecpe':(90,180),'frsqrte':(120,240)}
+# Revised from observed 4S immediate SQSHL / 2S min-max shapes and reusable fixtures.
+EFFORT={'sqshl':(5,15),'sminp':(4,10),'smaxp':(4,10),'saddlp':(6,18),'frecpe.2s':(90,180),'clz':(20,45),'frecps':(60,120),'frsqrts':(90,180),'prfm':(10,25),'prfum':(10,25),'xpaci':(20,45),'shsub':(25,60),'uhsub':(25,60),'shadd':(25,60),'uhadd':(25,60),'srhadd':(25,60),'urhadd':(25,60),'mla':(20,45),'mls':(20,45),'sha1c':(60,120),'sha1p':(25,60),'sha1m':(25,60),'sha1h':(20,45),'sha1su0':(40,90),'sha1su1':(30,75),'sha256su0':(40,90),'sha256su1':(50,100),'sha256h':(60,120),'sha256h2':(30,75),'frecpe':(90,180),'frsqrte':(120,240)}
 RUNTIME={'svc','hvc','smc','udf','brk','hlt','eret','drps','wfe','wfi','sev','sevl','clrex'}
 EXCLUSIVE=('ldxr','ldaxr','ldxp','ldaxp','stxr','stlxr','stxp','stlxp')
 
@@ -15,14 +16,15 @@ def family_cost(names):
     if set(names)<={'prfm','prfum'} and len(names)==2:return (15,35)
     if set(names)<={'mla','mls'} and len(names)==2:return (25,60)
     if len(names)>1 and all(n in {'shsub','uhsub','shadd','uhadd','srhadd','urhadd'}for n in names):return (30,75)
+    if {'sminp','smaxp'}<=set(names):low-=3;high-=8
     return low,high
 
 def candidates(buckets,validation_minutes):
     singles={next(iter(k)) for k in buckets if len(k)==1}
     candidates={frozenset([n]) for k in buckets for n in k}
-    candidates.update(k for k in buckets if 1<len(k)<=3)
+    candidates.update(k for k in buckets if len(k)>1)
     names=sorted({n for k in buckets for n in k if not n.startswith(('runtime:','configuration:','opaque:','policy:','control_flow:'))})
-    for size in [2,3]:candidates.update(map(frozenset,itertools.combinations(names,size)))
+    for size in [2,3,4]:candidates.update(map(frozenset,itertools.combinations(names,size)))
     for names in [('prfm','prfum'),('mla','mls'),('shsub','uhsub'),('sha1c','sha1p','sha1m'),('sha256h','sha256h2'),('frecpe','frsqrte')]:
         if any(n in singles or any(n in k for k in buckets) for n in names):candidates.add(frozenset(names))
     rows=[]
@@ -91,7 +93,7 @@ def run(validation_minutes):
     for item in ranked:
         fixed=set(item['fixes']);item['linear_corroborated_cfg_gain']=sum(n for (required,linear),n in corroborated.items()if required<=fixed and linear<=fixed)
         item['score']=round(item['score'],2)
-    report={'classification_reference':f'Capstone {__version__}','acceptance_rules_changed':False,'guest_code_executed':False,'rejected_extents':rows_count,'structural_blocked_extents':structural,'baseline_cfg_edge_failures':baseline_edges,'nonstructural_pure_isa_extents':pure_isa,'runtime_configuration_opaque_or_policy_blocked_extents':runtime_blocked,'structural_and_other_barrier_counts_overlap':True,'blocker_sets_larger_than_three':large_sets,'method':'Every rejected extent: strict baseline, optimistic CFG continuation after failures, plus complete linear-span inventory. Supported control edges/tail policy unchanged. Rankings assume implemented non-control instructions fall through and retain acceptance. Linear inventory can include unreachable data; estimates are conditional, not actual acceptance or runnable functions. Re-survey after every fix.','effort_basis':'Engineering estimates in minutes including implementation/correctness work, plus explicit fixed validation budget; unknown ISA defaults 60..180. Runtime/configuration/opaque/policy/control-flow candidates excluded. Shared-family estimates explicit.','ranked_candidates':ranked,'families':[{'family':name,'cfg_extents_containing':n,'cfg_instruction_occurrences':occurrences[name],'linear_span_extents_containing':linear_presence[name],'sole_nonstructural_blocker_extents':buckets[frozenset([name])]}for name in sorted(extent_presence.keys()|linear_presence.keys(),key=lambda n:(-extent_presence[n],-linear_presence[n],n))for n in [extent_presence[name]]]}
+    report={'classification_reference':f'Capstone {__version__}','acceptance_rules_changed':False,'guest_code_executed':False,'rejected_extents':rows_count,'structural_blocked_extents':structural,'baseline_cfg_edge_failures':baseline_edges,'nonstructural_pure_isa_extents':pure_isa,'runtime_configuration_opaque_or_policy_blocked_extents':runtime_blocked,'structural_and_other_barrier_counts_overlap':True,'blocker_sets_larger_than_three':large_sets,'candidate_enumeration':'All singles/pairs/triples/quadruples plus complete observed requirement sets; larger coherent bundles retain explicit full costs.','method':'Every rejected extent: strict baseline, optimistic CFG continuation after failures, plus complete linear-span inventory. Supported control edges/tail policy unchanged. Rankings assume implemented non-control instructions fall through and retain acceptance. Linear inventory can include unreachable data; estimates are conditional, not actual acceptance or runnable functions. Re-survey after every fix.','effort_basis':'Engineering estimates in minutes including implementation/correctness work, plus explicit fixed validation budget; unknown ISA defaults 60..180. Runtime/configuration/opaque/policy/control-flow candidates excluded. Shared-family estimates explicit.','ranked_candidates':ranked,'families':[{'family':name,'cfg_extents_containing':n,'cfg_instruction_occurrences':occurrences[name],'linear_span_extents_containing':linear_presence[name],'sole_nonstructural_blocker_extents':buckets[frozenset([name])]}for name in sorted(extent_presence.keys()|linear_presence.keys(),key=lambda n:(-extent_presence[n],-linear_presence[n],n))for n in [extent_presence[name]]]}
     (ROOT/'private/analysis/cpu-blocker-rankings.json').write_text(json.dumps(report,indent=2)+'\n')
     with (ROOT/'private/analysis/cpu-blocker-requirements.jsonl').open('w')as out:
         for row in details:out.write(json.dumps(row)+'\n')

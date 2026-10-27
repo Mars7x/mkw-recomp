@@ -261,3 +261,8 @@ The observed QEMU top-byte difference is consistent with [its parameterized poin
 The original 2S estimate implementation follows [Arm's defined reciprocal quantization](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85). The emitted integer ratio and normalization differ from the test oracle's real-valued midpoint construction. Private QEMU compares results and flags; no reference implementation was copied. The existing 4S test constraint is preserved, and alternative/increased-precision FP modes remain outside the established diagnostic profile.
 
 The 2S CLZ form covers every remaining observed leading-zero blocker. Its C bit scan is checked against an independent native leading-zero primitive and synthetic QEMU; existing test files are unchanged. This small scoped addition was validated while the preceding publication ran and shares the estimate publication gate.
+
+
+## Reciprocal square-root provenance
+
+The original estimate/refinement lowering follows the instruction facts in [Arm's reference](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85). The generated integer boundary search differs from the independent test's real midpoint construction. Refinement uses the round-to-odd concept discussed by [Boldo and Melquiond](https://guillaume.melquiond.fr/doc/05-imacs17_1-article.pdf); the full instruction's bounds, signs, flags and failure behavior are additionally checked by an original 576-bit exact oracle and QEMU. No implementation or proof script was copied. Existing attributed SoftFloat callbacks and CPU ABI v9 are unchanged, and no hardware/game profile is established by these tests.
