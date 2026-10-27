@@ -13,6 +13,19 @@ pub fn decode(word: u32, width: Width) -> Option<Result<Op, String>> {
     let rd = reg(word & 31, false);
     let lhs = reg((word >> 5) & 31, false);
     let rhs = reg((word >> 16) & 31, false);
+    if word & 0x7fe0e000 == 0x1ac04000 {
+        let size = (word >> 10) & 3;
+        if (width == Width::X64) != (size == 3) {
+            return Some(Err("reserved CRC input width".into()));
+        }
+        return Some(Ok(Op::Crc32 {
+            dst: rd,
+            lhs,
+            rhs,
+            bytes: 1 << size,
+            castagnoli: word & (1 << 12) != 0,
+        }));
+    }
     if word & 0x1fe0fc00 == 0x1a000000 {
         return Some(Ok(Op::CarryArithmetic {
             width,
@@ -96,5 +109,28 @@ mod bit_carry_tests {
                 ..
             }
         ));
+    }
+}
+
+#[cfg(test)]
+mod crc_tests {
+    use super::*;
+    #[test]
+    fn crc_widths_zero_registers_and_reserved_sf() {
+        for size in 0..4 {
+            for castagnoli in [false, true] {
+                let word = 0x1adf43ff
+                    | (size << 10)
+                    | (u32::from(castagnoli) << 12)
+                    | (if size == 3 { 1 << 31 } else { 0 });
+                assert!(
+                    matches!(crate::decode(word,0).unwrap().op,Op::Crc32 {dst:super::super::Reg::Zero,lhs:super::super::Reg::Zero,rhs:super::super::Reg::Zero,bytes,castagnoli:c} if bytes==1<<size && c==castagnoli)
+                );
+                assert!(crate::decode(word ^ (1 << 31), 0).is_err());
+            }
+        }
+        for word in [0x1ac06020, 0x1ac0e020, 0x1ae04020] {
+            assert!(crate::decode(word, 0).is_err());
+        }
     }
 }

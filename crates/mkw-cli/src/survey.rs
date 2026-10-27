@@ -119,6 +119,9 @@ pub fn run(root: &Path) -> Result<()> {
                             }
                             Op::Floating(f) => {
                                 features.push("scalar_fp");
+                                if f.operation == 14 {
+                                    features.push("fp_format_conversion");
+                                }
                                 if (11..=13).contains(&f.operation) {
                                     features.push("fused_sign_fp");
                                 }
@@ -133,6 +136,7 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::Barrier { .. } => features.push("data_barrier"),
                             Op::Atomic(_) => features.push("lse_atomic"),
                             Op::Simd(_) => features.push("simd_register_bits"),
+                            Op::Crc32 { .. } => features.push("crc32"),
                             Op::IntegerUnary { .. } | Op::CarryArithmetic { .. } => {
                                 features.push("integer_bits_carry")
                             }

@@ -2,6 +2,24 @@ use super::{r, ty, write};
 use mkw_arm64::{integer::MultiplyKind, Op, Width};
 pub fn emit(op: Op) -> Result<String, String> {
     Ok(match op {
+        Op::Crc32 {
+            dst,
+            lhs,
+            rhs,
+            bytes,
+            castagnoli,
+        } => {
+            let polynomial = if castagnoli {
+                0x82f63b78u32
+            } else {
+                0xedb88320u32
+            };
+            let mut out=format!("{{uint32_t crc=(uint32_t)({});uint64_t data={};for(unsigned bit=0;bit<{};bit++){{uint32_t low=(crc^(uint32_t)data)&1;crc=(crc>>1)^(UINT32_C({polynomial})&(UINT32_C(0)-low));data>>=1;}}\n",r(lhs),r(rhs),u32::from(bytes)*8);
+            out += &write(dst, Width::W32, "crc");
+            out += "}\n";
+            out
+        }
+
         Op::IntegerUnary {
             width,
             dst,

@@ -129,6 +129,13 @@ for scalar in range(2):
      for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:
       for base in [0x0f801000,0x0f805000,0x0f809000,0x2f809000]:
        words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(low<<21)|(high<<11)|(rm<<16)|(rn<<5)|rd)
+for sf in range(2):
+ for size in range(4):
+  for c in range(2):
+   for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(1,2,1)]:words.add(0x1ac04000|(sf<<31)|(size<<10)|(c<<12)|(rm<<16)|(rn<<5)|rd)
+for source in range(4):
+ for dest in range(4):
+  for rd,rn in [(0,1),(0,0),(31,31)]:words.add(0x1e224000|(source<<22)|(dest<<15)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -141,7 +148,11 @@ for row in rows:
  word=row['word'];decoded=list(decoder.disasm(word.to_bytes(4,'little'),0x1000));op=row['instruction']['op'];kind=next(iter(op))if isinstance(op,dict)else op;counts[kind]+=1
  if len(decoded)!=1:errors.append({'word':hex(word),'error':'accepted encoding not decoded by Capstone'});continue
  ins=decoded[0]
- if kind=='VectorFp':
+ if kind=='Crc32':
+  expected={1:('crc32b','crc32cb'),2:('crc32h','crc32ch'),4:('crc32w','crc32cw'),8:('crc32x','crc32cx')}
+  v=op['Crc32']
+  if ins.mnemonic!=expected[v['bytes']][int(v['castagnoli'])]:errors.append({'word':hex(word),'error':'CRC variant differs','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='VectorFp':
   v=op['VectorFp']
   expected={'fadd','fsub','fmul','fdiv','fmla','fmls','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'vector numeric family differs','reference':ins.mnemonic+' '+ins.op_str})
@@ -160,8 +171,12 @@ for row in rows:
  elif kind=='Convert':
   if ins.mnemonic not in {'scvtf','ucvtf','fcvtns','fcvtnu','fcvtps','fcvtpu','fcvtms','fcvtmu','fcvtzs','fcvtzu','fcvtas','fcvtau'}:errors.append({'word':hex(word),'error':'conversion family differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind in {'Floating','FloatSelect','SystemRegister','Barrier'}:
-  expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd','fneg','fabs','fsqrt','fnmul','fmsub','fnmadd','fnmsub'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]
+  expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd','fneg','fabs','fsqrt','fnmul','fmsub','fnmadd','fnmsub','fcvt'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'FP/system/barrier family differs','reference':ins.mnemonic+' '+ins.op_str})
+  if kind=='Floating' and op['Floating']['operation']==14:
+   source='s' if op['Floating']['bytes']==4 else 'd'
+   destination='d' if source=='s' else 's'
+   if decoder.reg_name(ins.operands[0].reg)[0]!=destination or decoder.reg_name(ins.operands[1].reg)[0]!=source:errors.append({'word':hex(word),'error':'format conversion direction differs','reference':ins.op_str})
  elif kind=='OrderedMemory':
   if ins.mnemonic not in {'ldapr','ldaprb','ldaprh'}:errors.append({'word':hex(word),'error':'ordered-memory family differs','reference':ins.mnemonic})
  elif kind=='Atomic':

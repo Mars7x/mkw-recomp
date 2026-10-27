@@ -134,3 +134,9 @@ The new vector path uses the already attributed scalar SoftFloat adapters per la
 ## Fused sign and indexed-lane validation
 
 Arm distinguishes fused subtract/negated fused operations from multiplying then subtracting with two roundings. Original glue now transforms the required raw input signs before calling the established fused adapter. Mandatory cancellation and NaN-sign fixtures and expanded independent QEMU tests check this ordering. Indexed S/D FMUL/FMLA/FMLS reuse source snapshots with a statically decoded element index; all legal source indices and overlap cases are compared. No Arm/QEMU implementation source was copied. [Arm instruction reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab).
+
+## Format conversion and CRC evidence
+
+The pinned SoftFloat subset now includes unchanged f32_to_f64/f64_to_f32 and four ARM-VFPv2 common-NaN helpers. Copies were compared with exact Git blobs at the recorded revision and hashed in provenance. Original glue retains guest rounding/exception state and canonicalizes default NaNs in the output format. The independent synthetic QEMU matrix covers 8,768 cases; no host casts/fenv are used. [SoftFloat source](https://github.com/ucb-bar/berkeley-softfloat-3/tree/497c81c1f5016dc6ef5b3219ece2f3c261d4d8f1/source).
+
+Original CRC lowering uses the architectural CRC-32/CRC-32C polynomials with explicit raw seed semantics and input bit widths. A separate polynomial-division oracle and known string checks validate the recurrence; QEMU additionally checks 40 synthetic encoding fixtures. No Arm pseudocode or reference implementation was copied. [Arm instruction reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab).

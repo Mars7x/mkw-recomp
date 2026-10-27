@@ -54,6 +54,17 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
             },
         })));
     }
+    if matches!(w & 0xfffffc00, 0x1e22c000 | 0x1e624000) {
+        return Some(Ok(Op::Floating(Floating {
+            bytes: if w & (1 << 22) != 0 { 8 } else { 4 },
+            operation: 14,
+            dst: (w & 31) as u8,
+            lhs: ((w >> 5) & 31) as u8,
+            rhs: 0,
+            accumulate: 0,
+            zero: false,
+        })));
+    }
     let unary = match w & 0xff3ffc00 {
         0x1e214000 => Some(7),
         0x1e20c000 => Some(8),
@@ -357,6 +368,23 @@ mod fused_tests {
             for ty in [2, 3] {
                 assert!(crate::decode(0x1f020c20 | signs | (ty << 22), 0).is_err());
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod format_tests {
+    use super::*;
+    #[test]
+    fn format_conversion_directions_and_reserved_or_half_types() {
+        for (base, bytes) in [(0x1e22c000, 4), (0x1e624000, 8)] {
+            let Op::Floating(f) = crate::decode(base | 0x3ff, 0).unwrap().op else {
+                panic!()
+            };
+            assert_eq!((f.bytes, f.operation, f.dst, f.lhs), (bytes, 14, 31, 31));
+        }
+        for w in [0x1e224020, 0x1e62c020, 0x1ee24020, 0x1e23c020, 0x1ea24020] {
+            assert!(crate::decode(w, 0).is_err(), "{w:08x}");
         }
     }
 }

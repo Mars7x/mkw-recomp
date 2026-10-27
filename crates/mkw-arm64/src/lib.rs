@@ -40,6 +40,13 @@ pub enum MemoryOrder {
 pub enum Op {
     Nop,
     VectorFp(vector_fp::VectorFp),
+    Crc32 {
+        dst: Reg,
+        lhs: Reg,
+        rhs: Reg,
+        bytes: u8,
+        castagnoli: bool,
+    },
     IntegerUnary {
         width: Width,
         dst: Reg,

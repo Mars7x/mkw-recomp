@@ -139,6 +139,7 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
             }
             operation @ (Op::Multiply { .. }
             | Op::Divide { .. }
+            | Op::Crc32 { .. }
             | Op::IntegerUnary { .. }
             | Op::CarryArithmetic { .. }) => {
                 out += &integer::emit(operation)?;

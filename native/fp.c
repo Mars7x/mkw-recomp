@@ -5,12 +5,19 @@ static uint64_t exponent_mask(unsigned bytes){return bytes==4?UINT64_C(0x7f80000
 static uint64_t fraction_mask(unsigned bytes){return bytes==4?UINT64_C(0x007fffff):UINT64_C(0x000fffffffffffff);}
 static int nan_bits(uint64_t value,unsigned bytes){return (value&exponent_mask(bytes))==exponent_mask(bytes)&&(value&fraction_mask(bytes))!=0;}
 unsigned mkw_fp_abi_version(void){return MKW_CPU_ABI_VERSION;}
-/* Operations: add=0, sub=1, mul=2, div=3, quiet compare=4, signaling compare=5, fused multiply-add=6, negate=7, absolute=8, square-root=9, negated multiply=10, fused subtract=11, negated fused add=12, negated fused subtract=13.
+/* Operations: add=0, sub=1, mul=2, div=3, quiet compare=4, signaling compare=5, fused multiply-add=6, negate=7, absolute=8, square-root=9, negated multiply=10, fused subtract=11, negated fused add=12, negated fused subtract=13, S/D format conversion=14.
  * Result is raw IEEE bits or NZCV nibble. Nonzero status leaves outputs intact.
  * Supported FPCR: rounding and default-NaN; traps/flush/alternative/merge refuse. */
 int mkw_fp(uint32_t operation,uint32_t bytes,uint32_t fpcr,uint32_t fpsr,
            uint64_t left,uint64_t right,uint64_t accumulate,uint64_t *result,uint32_t *status){
-    if((bytes!=4&&bytes!=8)||operation>13||(fpcr&~UINT32_C(0x02c00000)))return 3;
+    if((bytes!=4&&bytes!=8)||operation>14||(fpcr&~UINT32_C(0x02c00000)))return 3;
+    if(operation==14){
+        MkwFpEnvironment saved=mkw_fp_begin(fpcr);uint64_t value;unsigned output_bytes;
+        if(bytes==4){float32_t a={(uint32_t)left};value=f32_to_f64(a).v;output_bytes=8;}
+        else{float64_t a={left};value=f64_to_f32(a).v;output_bytes=4;}
+        if((fpcr&UINT32_C(0x02000000))&&nan_bits(value,output_bytes))value=output_bytes==4?UINT64_C(0x7fc00000):UINT64_C(0x7ff8000000000000);
+        uint32_t flags=mkw_fp_end(saved,fpsr);*result=value;*status=flags;return 0;
+    }
     if(operation>=11){
         uint64_t sign=bytes==4?UINT64_C(0x80000000):UINT64_C(0x8000000000000000);
         /* Fused subtract/negation flips inputs before the fused NaN/rounding rules. */
