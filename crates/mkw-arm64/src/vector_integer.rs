@@ -42,6 +42,62 @@ pub enum NarrowKind {
     SignedUnsigned,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct Halving {
+    pub bytes: u8,
+    pub total: u8,
+    pub dst: u8,
+    pub lhs: u8,
+    pub rhs: u8,
+    pub signed: bool,
+    pub subtract: bool,
+}
+
+#[cfg(test)]
+mod halving_tests {
+    use super::*;
+    #[test]
+    fn signed_and_unsigned_halving_fields() {
+        for q in 0..2 {
+            for size in 0..3 {
+                for (base, signed, subtract) in [
+                    (0x0e200400, true, false),
+                    (0x0e202400, true, true),
+                    (0x2e200400, false, false),
+                ] {
+                    let Op::HalvingInteger(Halving {
+                        bytes,
+                        total,
+                        dst,
+                        lhs,
+                        rhs,
+                        signed: a,
+                        subtract: b,
+                    }) = crate::decode(
+                        base | (q << 30) | (size << 22) | (31 << 16) | (31 << 5) | 31,
+                        0,
+                    )
+                    .unwrap()
+                    .op
+                    else {
+                        panic!()
+                    };
+                    assert_eq!(
+                        (bytes, total, dst, lhs, rhs, a, b),
+                        (1 << size, 8 << q, 31, 31, 31, signed, subtract)
+                    );
+                }
+            }
+        }
+    }
+    #[test]
+    fn halving_reserved_width_and_scalar_forms_reject() {
+        for w in [0x0ee20420, 0x4ee22420, 0x2ee20420, 0x5e220420, 0x5e222420] {
+            assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum VectorInteger {
     MultiplyLow {
         bytes: u8,
@@ -158,6 +214,26 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let bytes = 1 << size;
     let dst = (w & 31) as u8;
     let lhs = ((w >> 5) & 31) as u8;
+    let halving = match w & 0xbf20fc00 {
+        0x0e200400 => Some((true, false)),
+        0x0e202400 => Some((true, true)),
+        0x2e200400 => Some((false, false)),
+        _ => None,
+    };
+    if let Some((signed, subtract)) = halving {
+        if size == 3 {
+            return Some(Err("reserved halving integer width".into()));
+        }
+        return Some(Ok(Op::HalvingInteger(Halving {
+            bytes,
+            total: if q { 16 } else { 8 },
+            dst,
+            lhs,
+            rhs: ((w >> 16) & 31) as u8,
+            signed,
+            subtract,
+        })));
+    }
     let multiply_low_regular = w & 0xbf20fc00 == 0x0e209c00;
     let multiply_low_indexed = w & 0xbf00f400 == 0x0f008000;
     if multiply_low_regular || multiply_low_indexed {

@@ -50,6 +50,7 @@ pub enum Op {
     YieldHint,
     VectorFp(vector_fp::VectorFp),
     VectorInteger(vector_integer::VectorInteger),
+    HalvingInteger(vector_integer::Halving),
     VectorCompare(vector_compare::Compare),
     Structure(structures::Structure),
     InterleavedStructure(structures::Interleaved),

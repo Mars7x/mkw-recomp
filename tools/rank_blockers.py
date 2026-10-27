@@ -4,7 +4,7 @@ from pathlib import Path
 import argparse,collections,itertools,json,sys
 ROOT=Path(__file__).resolve().parents[1]
 # Engineering estimates in minutes, excluding the fixed full validation gate.
-EFFORT={'clz':(20,45),'frecps':(60,120),'frsqrts':(90,180),'prfm':(10,25),'prfum':(10,25),'xpaci':(20,45),'shsub':(25,60),'uhsub':(25,60),'shadd':(25,60),'uhadd':(25,60),'srhadd':(25,60),'urhadd':(25,60),'mla':(20,45),'mls':(20,45),'sha1c':(60,120),'sha1p':(25,60),'sha1m':(25,60),'sha1h':(20,45),'sha1su0':(40,90),'sha1su1':(30,75),'sha256su0':(40,90),'sha256su1':(50,100),'sha256h':(60,120),'sha256h2':(30,75),'frecpe':(90,180),'frsqrte':(120,240)}
+EFFORT={'frecpe.2s':(90,180),'clz':(20,45),'frecps':(60,120),'frsqrts':(90,180),'prfm':(10,25),'prfum':(10,25),'xpaci':(20,45),'shsub':(25,60),'uhsub':(25,60),'shadd':(25,60),'uhadd':(25,60),'srhadd':(25,60),'urhadd':(25,60),'mla':(20,45),'mls':(20,45),'sha1c':(60,120),'sha1p':(25,60),'sha1m':(25,60),'sha1h':(20,45),'sha1su0':(40,90),'sha1su1':(30,75),'sha256su0':(40,90),'sha256su1':(50,100),'sha256h':(60,120),'sha256h2':(30,75),'frecpe':(90,180),'frsqrte':(120,240)}
 RUNTIME={'svc','hvc','smc','udf','brk','hlt','eret','drps','wfe','wfi','sev','sevl','clrex'}
 EXCLUSIVE=('ldxr','ldaxr','ldxp','ldaxp','stxr','stlxr','stxp','stlxp')
 
@@ -52,7 +52,9 @@ def run(validation_minutes):
         if not ins:result=('opaque:undecoded','opaque')
         else:
             ins=ins[0];name=ins.mnemonic
-            if name in {'prfm','prfum'} and ((word>>5)&31)==31 and (word&0xff000000)!=0xd8000000:result=('configuration:prefetch-sp','configuration')
+            if name=='frecpe' and word&0xfffffc00==0x4ea1d800:result=('policy:frecpe.4s.fixed-test','policy')
+            elif name=='frecpe' and word&0xfffffc00==0x0ea1d800:result=('frecpe.2s','isa')
+            elif name in {'prfm','prfum'} and ((word>>5)&31)==31 and (word&0xff000000)!=0xd8000000:result=('configuration:prefetch-sp','configuration')
             elif name in RUNTIME or name.startswith(EXCLUSIVE):result=('runtime:'+name,'runtime')
             elif name in {'dc','ic','tlbi','at','sys','sysl','isb','dsb','dmb'}:result=('configuration:'+name,'configuration')
             elif name in {'mrs','msr'}:
@@ -61,6 +63,8 @@ def run(validation_minutes):
             elif 'constrained' in issue['error']:result=('policy:'+name,'policy')
             else:result=(name,'isa')
         cache[key]=result;return result
+    # The preserved vector_compare negative test excludes the whole 4S FRECPE arrangement.
+    # Valid 2S ISA work remains separately ranked; no register-specific blacklist.
     buckets=collections.Counter();corroborated=collections.Counter();occurrences=collections.Counter();extent_presence=collections.Counter();linear_presence=collections.Counter();classes=collections.Counter();structural=0;runtime_blocked=0;rows_count=0;large_sets=0;baseline_edges=0;pure_isa=0;details=[]
     for line in (ROOT/'private/analysis/cpu-all-blockers.jsonl').open():
         row=json.loads(line);rows_count+=1

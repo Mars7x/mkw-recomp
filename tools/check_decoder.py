@@ -317,6 +317,12 @@ for hint in range(32):
    for shift in range(2):
     for rm in [2,31]:words.add(0xf8a00800|(rm<<16)|(option<<13)|(shift<<12)|(rn<<5)|hint)
  for imm in [0,1,0x3ffff,0x40000,0x7ffff]:words.add(0xd8000000|(imm<<5)|hint)
+for q in range(2):
+ for size in range(4):
+  for base in [0x0e200400,0x0e202400,0x2e200400]:
+   for rn in [0,1,31]:
+    for rm in [0,2,31]:
+     for rd in [0,1,31]:words.add(base|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -349,6 +355,10 @@ for row in rows:
   elif ins.mnemonic==name and ins.operands[-1].imm!=v['amount']:errors.append({'word':hex(word),'error':'SIMD shift amount differs','reference':ins.op_str})
  elif kind=='YieldHint':
   if word!=0xd503203f or ins.mnemonic!='yield':errors.append({'word':hex(word),'error':'YIELD exact hint differs'})
+ elif kind=='HalvingInteger':
+  v=op['HalvingInteger'];letters={1:'b',2:'h',4:'s'};name=('s' if v['signed'] else 'u')+('hsub' if v['subtract'] else 'hadd');reg=lambda n:'v'+str(n)+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
+  operands=', '.join(reg(v[k])for k in ['dst','lhs','rhs'])
+  if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'halving kind/operands differ','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='VectorInteger':
   variant,v=next(iter(op['VectorInteger'].items()));letters={1:'b',2:'h',4:'s',8:'d'}
   if variant=='MultiplyLow':

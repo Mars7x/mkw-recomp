@@ -105,6 +105,10 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
                 out += &vector_compare::emit(op);
                 out += &next;
             }
+            Op::HalvingInteger(v) => {
+                out += &vector_integer::emit_halving(v);
+                out += &next;
+            }
             Op::VectorInteger(op) => {
                 out += &vector_integer::emit(op);
                 out += &next;

@@ -240,3 +240,10 @@ Work selection now follows [complete rejected-extent blocker requirements](COVER
 ## Prefetch hints and unchanged acceptance gates
 
 Original PRFM/PRFUM decoding and no-cache-effect lowering follow the instruction facts in [Arm's reference](https://support.arm.com/documentation/ddi0602/2022-06/Base-Instructions/PRFM--immediate---Prefetch-Memory--immediate--) and [hint intrinsic documentation](https://support.arm.com/documentation/101028/0010/Synchronization--barrier--and-hint-intrinsics?lang=en). Operand fields are independently checked with private Capstone; synthetic QEMU and native state/budget/fault tests establish only the chosen diagnostic profile. No implementation was copied. SP-based forms remain rejected under the pre-existing test, with no predicted coverage loss in the measured candidate set. Cache/access/trap and target configuration remain unresolved.
+
+
+## Halving arithmetic and test-constrained reciprocal scope
+
+SHADD/SHSUB/UHADD lowering and i128/byte oracles are original implementations of widened integer arithmetic. [Arm's armasm reference](https://documentation-service.arm.com/static/5f3fa899428f7a6b3328fd44) identifies the supported lane arrangements; independent synthetic QEMU and Capstone checks corroborate semantics and fields. No instruction implementation was copied.
+
+The [official Arm A64 reference](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85) was read privately to assess reciprocal estimate/refinement semantics. A preserved existing comparison-decoder negative test explicitly rejects a valid 4S FRECPE encoding. That whole arrangement is therefore excluded from feasible rankings under the user's unchanged-tests constraint; 2S is ranked separately. No per-register blacklist was added to a decoder. The initial reciprocal experiment remains private and unintegrated.

@@ -59,3 +59,26 @@ The remaining 9,430 rejects contain 4,588,952 inventoried bytes, with zero omiss
 The first package leads by midpoint estimate only; these wide ranges overlap. Its approximation, exceptional-input and rounding requirements must be assessed before committing engineering time. The preceding complete gate actually took 16.91 minutes, close to the explicit 15-minute ranking assumption; no validation work is omitted to improve throughput.
 
 Prefetch implementation start through isolated verification and strict supplied-binary measurement took 28.15 minutes (**486 gained extents/hour**), excluding upfront shared portfolio analysis and the final publication gate. A private effort receipt records timestamps and the baseline commit. Publication completion is recorded after push, avoiding invented historical timings. These diagnostic gains do not remove the runtime ceiling described above.
+
+
+## Feasibility correction under fixed tests
+
+The preserved `vector_compare::tests::comparison_relations_scalar_zero_and_reserved_forms` test requires one valid 4S FRECPE encoding to reject. Keeping the entire 4S arrangement unsupported avoids a register-specific exception. The ranker now classifies that arrangement as a fixed-test policy constraint, not an architecturally reserved instruction; valid 2S FRECPE work is ranked separately. Reciprocal implementation remains deferred and private.
+
+This reduces the FRECPE/FRECPS package from 40 to **16 feasible conditional gains** (15 from 2S FRECPE alone). Before the halving implementation, feasible pure ISA/nonstructural opportunities were **97**, with 25 additional extents classified as policy constrained. SHADD+SHSUB+UHADD consequently became the highest-value feasible package: **11 predicted gains / 30–75 engineering minutes**, plus the unchanged validation gate. This revision illustrates why effort and feasibility estimates must be updated after inspecting the actual dependencies.
+
+Prefetch was validated and pushed as `f752c08`: **+228**, total **214,426**. Implementation start through verified publication took **43.90 minutes**, or **311.62 gained extents/hour**, excluding upfront shared blocker analysis. The complete publication gate took **14.70 minutes**; all 207 Rust tests and required supplied-input/negative checks passed.
+
+
+## Measured halving result
+
+SHADD+SHSUB+UHADD produces **+11**, exactly the feasible package prediction: **214,437 accepted extents**, with no prior acceptance lost. The remaining **9,419** rejected spans contain **4,576,276 bytes**, all scanned with zero omissions. Strict boundary failures stay at **8,548**; diagnostic edge-blocked extents stay at **9,132**. Feasible pure ISA/nonstructural opportunities fall to **86**. Runtime/configuration/opaque/policy barriers occur in **787** extents, overlapping structural barriers and including the newly identified fixed-test constraint.
+
+| Next feasible package | Conditional predicted gain | Implementation estimate | Gain/hour including 15-minute validation |
+|---|---:|---:|---:|
+| MLA + XPACI | 9 | 40–90 min | 5.14–9.82 |
+| 2S FRECPE + MLA + XPACI | 24 | 130–270 min | 5.05–9.93 |
+| 2S FRECPE + XPACI | 20 | 110–225 min | 5.00–9.60 |
+| CLZ + MLA + XPACI | 12 | 60–135 min | 4.80–9.60 |
+
+The expected return is now dramatically lower than prefetch's measured 311.62 extents/hour. These static wins do not bind runtime services or make the accepted extents runnable. The next package retains the same correctness/acceptance gates and explicit PAC configuration; original execution remains blocked before bootstrap.

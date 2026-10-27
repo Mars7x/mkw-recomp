@@ -428,3 +428,25 @@ fn narrow(
     let lanes = if scalar { 1 } else { 8 / bytes };
     format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{{low},0}};uint32_t fpsr=c->fpsr;for(unsigned lane=0;lane<{lanes};lane++){{unsigned offset=lane*{inbits},out={start}+lane*{bits};uint64_t a=(source[offset/64]>>(offset%64))&UINT64_C({input_mask}),value;{transform}if({negative}){{{handle_negative}}}else if(a>UINT64_C({max})){{value=UINT64_C({max});fpsr|=UINT32_C(134217728);}}else value=a;output[out/64]|=value<<(out%64);}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];c->fpsr=fpsr;}}\n")
 }
+
+pub fn emit_halving(op: mkw_arm64::vector_integer::Halving) -> String {
+    let mkw_arm64::vector_integer::Halving {
+        bytes,
+        total,
+        dst,
+        lhs,
+        rhs,
+        signed,
+        subtract,
+    } = op;
+    let bits = bytes * 8;
+    let mask = mask(bytes);
+    let sign = 1u64 << (bits - 1);
+    let calculation = if signed {
+        format!("int64_t a=(int64_t)(ua^UINT64_C({sign}))-(int64_t)UINT64_C({sign}),b=(int64_t)(ub^UINT64_C({sign}))-(int64_t)UINT64_C({sign}),wide=a{}b;uint64_t value=(uint64_t)(wide/2-(wide<0&&wide%2!=0));",if subtract{"-"}else{"+"})
+    } else {
+        "uint64_t value=(ua+ub)/2;".into()
+    };
+    format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned bit=lane*{bits},half=bit/64,shift=bit%64;uint64_t ua=(left[half]>>shift)&UINT64_C({mask}),ub=(right[half]>>shift)&UINT64_C({mask});{calculation}output[half]|=(value&UINT64_C({mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}
+",total/bytes)
+}

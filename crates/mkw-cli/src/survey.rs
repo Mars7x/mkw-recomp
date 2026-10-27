@@ -127,6 +127,7 @@ pub fn run(root: &Path) -> Result<()> {
                             }
                             Op::ConditionalFloat { .. } => features.push("conditional_fp_compare"),
                             Op::VectorCompare(_) => features.push("simd_fp_comparison"),
+                            Op::HalvingInteger(_) => features.push("integer_halving"),
                             Op::VectorInteger(v) => {
                                 features.push("simd_integer_lanes_reduction");
                                 if let mkw_arm64::vector_integer::VectorInteger::MultiplyLow {

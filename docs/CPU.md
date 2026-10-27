@@ -272,3 +272,10 @@ The independent matrix checks 13,312 native cases per optimization; 6,656 synthe
 PRFM supports GPR-based unsigned-scaled and register-offset forms, plus PC-relative literals; PRFUM supports GPR-based signed-unscaled offsets. All 32 hint fields are retained in typed IR. Register extensions are exactly UXTW/LSL/SXTW/SXTX, shifted by zero or three. Neighboring reserved, writeback and unprivileged encodings remain rejected. SP-based forms remain unsupported, preserving the existing negative test and leaving stack/access trap policy gated.
 
 The diagnostic profile chooses no cache effect: hints consume their normal instruction budget and advance PC without probing guest memory or calling a memory backend. Native tests cover 928 constructed instructions and 8,352 state/budget/fault-preservation cases per optimization, including invalid/unmapped address values. All 928 synthetic QEMU cases match at O0/O2 with fatal UBSan. This supplies no cache-performance, hardware access/trap or target-configuration equivalence and does not authorize original execution. CPU ABI v9 is unchanged.
+
+
+## Halving integer arithmetic
+
+SHADD/SHSUB and UHADD support 8/16/32-bit lanes in 64/128-bit vectors. The decoder preserves scalar, 64-bit-lane and adjacent unsupported-family rejection. Original C lowering snapshots all sources, widens before arithmetic, explicitly floors signed halves and clears unused upper bits; it changes no QC/NZCV/FP state and requires no callback or ABI change.
+
+Independent byte/i128 expectations check 28,080 native cases per optimization across extrema, odd negative results, full-width differences, aliases and distinct lanes. All 18,720 synthetic QEMU cases match O0/O2 with fatal UBSan. Existing correctness tests and CPU ABI v9 remain unchanged; this supplies no target access-configuration or original execution evidence.
