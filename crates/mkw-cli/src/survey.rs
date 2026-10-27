@@ -141,8 +141,21 @@ pub fn run(root: &Path) -> Result<()> {
                                 ) {
                                     features.push("fp_minmax");
                                 }
-                                if v.kind == mkw_arm64::vector_fp::VectorFpKind::PairwiseAdd {
+                                if matches!(
+                                    v.kind,
+                                    mkw_arm64::vector_fp::VectorFpKind::PairwiseAdd
+                                        | mkw_arm64::vector_fp::VectorFpKind::PairwiseMinMax(_)
+                                ) {
                                     features.push("pairwise_fp");
+                                }
+                                if matches!(
+                                    v.kind,
+                                    mkw_arm64::vector_fp::VectorFpKind::PairwiseMinMax(_)
+                                ) {
+                                    features.push("pairwise_fp_minmax");
+                                }
+                                if v.kind == mkw_arm64::vector_fp::VectorFpKind::Arithmetic(26) {
+                                    features.push("fp_absolute_difference");
                                 }
                                 if v.rhs_lane.is_some() {
                                     features.push("indexed_vector_fp");

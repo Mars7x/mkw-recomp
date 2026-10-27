@@ -142,9 +142,11 @@ for q in range(2):
    for operation in [1,2,3,5,6,7]:words.add(0x0e000800|(q<<30)|(size<<22)|(operation<<12)|(rm<<16)|(rn<<5)|rd)
 for q in range(2):
  for size in range(2):
-  for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(0x2e20d400|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+  for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:
+   for base in [0x2e20d400,0x2e20f400,0x2ea0f400,0x2e20c400,0x2ea0c400]:words.add(base|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
 for size in range(2):
- for rd,rn in [(0,1),(0,0),(31,31)]:words.add(0x7e30d800|(size<<22)|(rn<<5)|rd)
+ for rd,rn in [(0,1),(0,0),(31,31)]:
+  for base in [0x7e30d800,0x7e30f800,0x7eb0f800,0x7e30c800,0x7eb0c800]:words.add(base|(size<<22)|(rn<<5)|rd)
 for q in range(2):
  for post in range(2):
   for load in range(2):
@@ -195,6 +197,10 @@ for scalar in range(2):
  for q in range(2):
   for imm in range(128):
    for base in [0x0f00e400,0x2f00e400,0x0f00fc00,0x2f00fc00]:words.add(base|(scalar<<28)|(q<<30)|(imm<<16)|(1<<5))
+for scalar in range(2):
+ for q in range(2):
+  for size in range(2):
+   for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(0x2ea0d400|(scalar<<28)|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
 for q in range(2):
  for size in range(4):
   for base in [0x0e200800,0x2e200800,0x0e201800,0x2e205800,0x2e605800]:
@@ -262,8 +268,12 @@ for row in rows:
   if ins.mnemonic!=expected[v['bytes']][int(v['castagnoli'])]:errors.append({'word':hex(word),'error':'CRC variant differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='VectorFp':
   v=op['VectorFp']
-  expected={'fadd','fsub','fmul','fdiv','fmla','fmls','faddp','fmax','fmin','fmaxnm','fminnm','frintn','frintp','frintm','frintz','frinta','frintx','frinti','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
+  expected={'fadd','fsub','fmul','fdiv','fmla','fmls','faddp','fmaxp','fminp','fmaxnmp','fminnmp','fabd','fmax','fmin','fmaxnm','fminnm','frintn','frintp','frintm','frintz','frinta','frintx','frinti','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'vector numeric family differs','reference':ins.mnemonic+' '+ins.op_str})
+  if isinstance(v['kind'],dict) and 'PairwiseMinMax' in v['kind']:
+   name={15:'fmaxp',16:'fminp',17:'fmaxnmp',18:'fminnmp'}[v['kind']['PairwiseMinMax']]
+   if ins.mnemonic!=name:errors.append({'word':hex(word),'error':'pairwise minmax kind differs','reference':ins.mnemonic})
+  if isinstance(v['kind'],dict) and v['kind'].get('Arithmetic')==26 and ins.mnemonic!='fabd':errors.append({'word':hex(word),'error':'absolute difference differs','reference':ins.mnemonic})
   scalar=ins.op_str.startswith(('s','d'))
   size=8 if ((word>>22)&1) else 4
   total=size if scalar else (16 if ((word>>30)&1) else 8)

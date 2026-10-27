@@ -147,3 +147,12 @@ MVN complements selected raw vector bits; RBIT reverses each byte independently.
 SHL/SSHR/USHR and SLI/SRI support every legal immediate and valid scalar-D/vector arrangement. Signed right shifts use unsigned sign-fill; full-width shifts have explicit results rather than undefined C shifts. Insert forms select old destination bits explicitly. SSHLL/USHLL and their upper-half variants select a source half and widen before shifting; outputs occupy 128 bits. All computations use defined unsigned native operations and preserve GPR/NZCV/FPCR/FPSR without helpers. Saturating/rounding/narrowing/register shifts and the separate SHLL format remain unimplemented.
 
 Independent byte-array/builtin and i128/bit-selection tests verify 16,384 transform and 68,352 shift cases per O0/O2 optimization, with separate QEMU matrices of 64 and 34,176 cases. These raw-register diagnostic results do not establish actual access-trap/configuration behavior or original-hardware equivalence. Original functions remain unexecuted.
+
+
+## Pairwise min/max and absolute difference
+
+Scalar/vector S/D FMAXP/FMINP/FMAXNMP/FMINNMP capture adjacent source pairs and reuse checked min/max operations 15..18, preserving signaling-NaN priority, number semantics and signed-zero ties. Vector outputs concatenate pairs from the left then right register; scalar outputs use one pair and clear unused bits. Scalar fixed opcode fields are never treated as a second source register in alias fixtures.
+
+FABD uses checked helper operation 26: guest-mode subtraction followed by raw result-sign clearing. Rounding and NaN processing occur before the absolute bit operation; cumulative subtraction flags are retained. No host floating arithmetic implements this operation. Unsupported FPCR profiles refuse, and every lane completes before destination/FPSR commit. ABI v7 signatures/layout and upstream source provenance remain unchanged.
+
+The expanded SIMD numeric matrix compares 52,640 synthetic cases with QEMU at O0/O2 with fatal UBSan. Mandatory native expectations additionally cover adjacent-pair ordering, numeric/NaN selection, signed zero, overflow/inexact flags and later-lane refusal. This is software-oracle evidence under the existing restricted FP profile; original functions remain unexecuted.

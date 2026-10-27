@@ -7,6 +7,7 @@ pub enum VectorFpKind {
     Conversion(u8),
     ScaledConversion { operation: u8, fractional_bits: u8 },
     PairwiseAdd,
+    PairwiseMinMax(u8),
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct VectorFp {
@@ -58,8 +59,24 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
             })));
         }
     }
-    let scalar_pairwise = w & 0xffbffc00 == 0x7e30d800;
-    if scalar_pairwise || w & 0xbfa0fc00 == 0x2e20d400 {
+    let scalar_kind = match w & 0xffbffc00 {
+        0x7e30d800 => Some(VectorFpKind::PairwiseAdd),
+        0x7e30f800 => Some(VectorFpKind::PairwiseMinMax(15)),
+        0x7eb0f800 => Some(VectorFpKind::PairwiseMinMax(16)),
+        0x7e30c800 => Some(VectorFpKind::PairwiseMinMax(17)),
+        0x7eb0c800 => Some(VectorFpKind::PairwiseMinMax(18)),
+        _ => None,
+    };
+    let vector_kind = match w & 0xbfa0fc00 {
+        0x2e20d400 => Some(VectorFpKind::PairwiseAdd),
+        0x2e20f400 => Some(VectorFpKind::PairwiseMinMax(15)),
+        0x2ea0f400 => Some(VectorFpKind::PairwiseMinMax(16)),
+        0x2e20c400 => Some(VectorFpKind::PairwiseMinMax(17)),
+        0x2ea0c400 => Some(VectorFpKind::PairwiseMinMax(18)),
+        _ => None,
+    };
+    let scalar_pairwise = scalar_kind.is_some();
+    if let Some(kind) = scalar_kind.or(vector_kind) {
         let bytes = if w & (1 << 22) != 0 { 8 } else { 4 };
         let total = if scalar_pairwise {
             bytes
@@ -82,7 +99,30 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
                 ((w >> 16) & 31) as u8
             },
             rhs_lane: None,
-            kind: VectorFpKind::PairwiseAdd,
+            kind,
+        })));
+    }
+    if (w & (1 << 28) == 0 || w & (1 << 30) != 0) && w & 0xafa0fc00 == 0x2ea0d400 {
+        let bytes = if w & (1 << 22) != 0 { 8 } else { 4 };
+        let scalar = w & (1 << 28) != 0;
+        let total = if scalar {
+            bytes
+        } else if w & (1 << 30) != 0 {
+            16
+        } else {
+            8
+        };
+        if !scalar && bytes == 8 && total == 8 {
+            return Some(Err("reserved single-D absolute difference".into()));
+        }
+        return Some(Ok(Op::VectorFp(VectorFp {
+            bytes,
+            total,
+            dst: (w & 31) as u8,
+            lhs: ((w >> 5) & 31) as u8,
+            rhs: ((w >> 16) & 31) as u8,
+            rhs_lane: None,
+            kind: VectorFpKind::Arithmetic(26),
         })));
     }
     let indexed = match w & 0xaf80f400 {
@@ -214,11 +254,7 @@ mod tests {
                 assert_eq!((v.bytes, v.total), (4 << size, 4 << size));
             }
         }
-        for unsupported in [
-            0x4e22d420 ^ (1 << 21),
-            0x4e22d420 | (1 << 23) | (1 << 29),
-            0x4e21d820 ^ (1 << 10),
-        ] {
+        for unsupported in [0x4e22d420 ^ (1 << 21), 0x4e21d820 ^ (1 << 10)] {
             assert!(decode(unsupported).is_none());
         }
     }
@@ -278,5 +314,43 @@ mod pairwise_tests {
         for w in [0x2e62d420, 0x7e30dc20, 0x7ef0d820] {
             assert!(crate::decode(w, 0).is_err());
         }
+    }
+}
+
+#[cfg(test)]
+mod pairwise_minmax_tests {
+    use super::*;
+    #[test]
+    fn pairwise_and_absolute_difference_domains() {
+        for (vector, scalar, operation) in [
+            (0x2e20f400, 0x7e30f800, 15),
+            (0x2ea0f400, 0x7eb0f800, 16),
+            (0x2e20c400, 0x7e30c800, 17),
+            (0x2ea0c400, 0x7eb0c800, 18),
+        ] {
+            for size in 0..2 {
+                for base in [vector | (1 << 30) | (31 << 16), scalar] {
+                    let Op::VectorFp(v) = crate::decode(base | (size << 22) | (31 << 5) | 31, 0)
+                        .unwrap()
+                        .op
+                    else {
+                        panic!()
+                    };
+                    assert_eq!(v.kind, VectorFpKind::PairwiseMinMax(operation));
+                    assert_eq!((v.dst, v.lhs, v.bytes), (31, 31, 4 << size));
+                }
+                if size == 1 {
+                    assert!(crate::decode(vector | (size << 22), 0).is_err());
+                }
+            }
+        }
+        for w in [0x2ea2d420, 0x6ea2d420, 0x6ee2d420, 0x7ea2d420, 0x7ee2d420] {
+            let Op::VectorFp(v) = crate::decode(w, 0).unwrap().op else {
+                panic!()
+            };
+            assert_eq!(v.kind, VectorFpKind::Arithmetic(26));
+        }
+        assert!(crate::decode(0x2ee2d420, 0).is_err());
+        assert!(decode(0x3ea2d420).is_none());
     }
 }

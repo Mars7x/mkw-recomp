@@ -12,7 +12,8 @@ fn words() -> Vec<u32> {
         for base in [
             0x0e22d420, 0x0ea2d420, 0x2e22dc20, 0x2e22fc20, 0x0e22cc20, 0x0e22f420, 0x0ea2f420,
             0x0e22c420, 0x0ea2c420, 0x2e22d420, 0x0ea2cc20, 0x0ea0f820, 0x2ea0f820, 0x2ea1f820,
-            0x0e21d820, 0x2e21d820, 0x0ea1b820, 0x2ea1b820,
+            0x0e21d820, 0x2e21d820, 0x0ea1b820, 0x2ea1b820, 0x2e22f420, 0x2ea2f420, 0x2e22c420,
+            0x2ea2c420, 0x2ea2d420,
         ] {
             words.push(base | arrangement);
         }
@@ -42,6 +43,11 @@ fn words() -> Vec<u32> {
         }
     }
     words.extend([0x7e30d820, 0x7e70d820]);
+    for size in [0, 1 << 22] {
+        for base in [0x7e30f820, 0x7eb0f820, 0x7e30c820, 0x7eb0c820, 0x7ea2d420] {
+            words.push(base | size);
+        }
+    }
     let originals = words.clone();
     for w in originals {
         words.push(w & !(31 << 5)); // destination aliases first source
@@ -51,9 +57,13 @@ fn words() -> Vec<u32> {
         if matches!(
             v.kind,
             mkw_arm64::vector_fp::VectorFpKind::Arithmetic(
-                0 | 1 | 2 | 3 | 6 | 11 | 15 | 16 | 17 | 18
+                0 | 1 | 2 | 3 | 6 | 11 | 15 | 16 | 17 | 18 | 26
             )
-        ) || (v.kind == mkw_arm64::vector_fp::VectorFpKind::PairwiseAdd && v.total > v.bytes)
+        ) || (matches!(
+            v.kind,
+            mkw_arm64::vector_fp::VectorFpKind::PairwiseAdd
+                | mkw_arm64::vector_fp::VectorFpKind::PairwiseMinMax(_)
+        ) && v.total > v.bytes)
         {
             words.push(w & !(31 << 16)); // destination aliases second source
             words.push(w & !((31 << 16) | (31 << 5)));
@@ -232,6 +242,71 @@ fn known_lanes_overlap_upper_clearing_and_transactional_refusal() {
         assert_eq!(cpu.fpsr, 0);
         for (w, left, right, expected, flags) in [
             (
+                0x6e22f420,
+                [0x400000003f800000, 0x4080000040400000],
+                [0x40c0000040a00000, 0x4100000040e00000],
+                [0x4080000040000000, 0x4100000040c00000],
+                0,
+            ),
+            (
+                0x2ea2f420,
+                [0x400000003f800000, 0],
+                [0x40c0000040a00000, 0],
+                [0x40a000003f800000, 0],
+                0,
+            ),
+            (
+                0x7e30c820,
+                [0x3f800000ffc12345, 123],
+                [0, 0],
+                [0x3f800000, 0],
+                0,
+            ),
+            (
+                0x7eb0c820,
+                [0x8000000000000000, 123],
+                [0, 0],
+                [0x80000000, 0],
+                0,
+            ),
+            (
+                0x7e30f820,
+                [0x3f800000ff812345, 123],
+                [0, 0],
+                [0xffc12345, 0],
+                1,
+            ),
+            (0x7e70f820, [0x8000000000000000, 0], [0, 0], [0, 0], 0),
+            (
+                0x6ea2d420,
+                [0xbf8000003f800000; 2],
+                [0x4000000040000000; 2],
+                [0x404000003f800000; 2],
+                0,
+            ),
+            (
+                0x7ea2d420,
+                [0xff812345, 123],
+                [0x3f800000, 0],
+                [0x7fc12345, 0],
+                1,
+            ),
+            (
+                0x7ee2d420,
+                [0xbff0000000000000, 123],
+                [0x4000000000000000, 0],
+                [0x4008000000000000, 0],
+                0,
+            ),
+            (
+                0x7ea2d420,
+                [0x7f7fffff, 123],
+                [0xff7fffff, 0],
+                [0x7f800000, 0],
+                20,
+            ),
+            (0x7ea2d420, [0x3f800000, 123], [1, 0], [0x3f800000, 0], 16),
+            (
                 0x4e22c420,
                 [0x000000007fc12345, 0x800000007f812345],
                 [0x800000003f800000, 0x000000003f800000],
@@ -321,40 +396,65 @@ fn known_lanes_overlap_upper_clearing_and_transactional_refusal() {
             assert_eq!(cpu.vregs[0], expected, "numeric {w:x}");
             assert_eq!(cpu.fpsr, 0x08000080 | flags);
         }
-        let pairwise = unsafe { library.get::<Entry>(b"vector_2e22d420\0").unwrap() };
-        let mut cpu = Cpu {
-            fpsr: 0x08000080,
-            floating: Some(fail_second),
-            ..Cpu::default()
-        };
-        cpu.vregs[0] = [123, 456];
-        cpu.vregs[1] = [1, 0];
-        cpu.vregs[2] = [2, 0];
-        assert_eq!(unsafe { pairwise(&mut cpu, 10) }, 3);
-        assert_eq!(cpu.vregs[0], [123, 456]);
-        assert_eq!(cpu.fpsr, 0x08000080);
-        let native = unsafe { library.get::<Entry>(b"vector_4e22d420\0").unwrap() };
-        for mode in 0..3 {
+        for word in [
+            0x2e22d420, 0x2e22f420, 0x2ea2f420, 0x2e22c420, 0x2ea2c420, 0x6ea2d420,
+        ] {
+            let pairwise = unsafe {
+                library
+                    .get::<Entry>(format!("vector_{word:x}\0").as_bytes())
+                    .unwrap()
+            };
             let mut cpu = Cpu {
                 fpsr: 0x08000080,
-                fpcr: if mode == 1 { 1 << 24 } else { 0 },
+                floating: Some(fail_second),
                 ..Cpu::default()
             };
             cpu.vregs[0] = [123, 456];
-            cpu.vregs[1] = [0x0000000200000001, 0];
-            if mode == 0 {
-                assert_eq!(unsafe { native(&mut cpu, 10) }, 3);
-            }
-            if mode == 1 {
-                let mut a = backend.attach(&mut cpu);
-                assert_eq!(unsafe { native(a.cpu_mut(), 10) }, 3);
-            }
-            if mode == 2 {
-                cpu.floating = Some(fail_second);
-                assert_eq!(unsafe { native(&mut cpu, 10) }, 3);
-            }
+            cpu.vregs[1] = if word == 0x6ea2d420 {
+                [0x0000000200000001, 0]
+            } else {
+                [1, 0]
+            };
+            cpu.vregs[2] = [2, 0];
+            assert_eq!(unsafe { pairwise(&mut cpu, 10) }, 3);
             assert_eq!(cpu.vregs[0], [123, 456]);
             assert_eq!(cpu.fpsr, 0x08000080);
+        }
+        for word in [
+            0x4e22d420, 0x6e22f420, 0x6ea2f420, 0x6e22c420, 0x6ea2c420, 0x6ea2d420, 0x7ee2d420,
+        ] {
+            let native = unsafe {
+                library
+                    .get::<Entry>(format!("vector_{word:x}\0").as_bytes())
+                    .unwrap()
+            };
+            for mode in 0..3 {
+                let mut cpu = Cpu {
+                    fpsr: 0x08000080,
+                    fpcr: if mode == 1 { 1 << 24 } else { 0 },
+                    ..Cpu::default()
+                };
+                cpu.vregs[0] = [123, 456];
+                cpu.vregs[1] = if word == 0x7ee2d420 {
+                    [2, 0]
+                } else {
+                    [0x0000000200000001, 0]
+                };
+                cpu.vregs[2] = [2, 0];
+                if mode == 0 {
+                    assert_eq!(unsafe { native(&mut cpu, 10) }, 3);
+                }
+                if mode == 1 {
+                    let mut a = backend.attach(&mut cpu);
+                    assert_eq!(unsafe { native(a.cpu_mut(), 10) }, 3);
+                }
+                if mode == 2 {
+                    cpu.floating = Some(fail_second);
+                    assert_eq!(unsafe { native(&mut cpu, 10) }, 3);
+                }
+                assert_eq!(cpu.vregs[0], [123, 456]);
+                assert_eq!(cpu.fpsr, 0x08000080);
+            }
         }
     }
 }
@@ -479,7 +579,7 @@ fn vector_results_and_flags_match_qemu() {
                 cpu.vregs[0][0],
                 cpu.vregs[0][1],
                 u64::from(cpu.fpsr),
-                0xb0000000,
+                u64::from((cpu.n << 31) | (cpu.z << 30) | (cpu.c << 29) | (cpu.v << 28)),
             ]
             .into_iter()
             .flat_map(u64::to_le_bytes)
@@ -492,6 +592,7 @@ fn vector_results_and_flags_match_qemu() {
                 c.fpcr
             );
             assert_eq!(cpu.vregs[1..4], c.vectors[1..4]);
+            assert_eq!(cpu.fpcr, c.fpcr);
         }
     }
     std::fs::write(path.join("receipt.json"),serde_json::to_vec_pretty(&serde_json::json!({"synthetic_cases":cases.len(),"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false})).unwrap()).unwrap();

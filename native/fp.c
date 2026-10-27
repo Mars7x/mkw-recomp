@@ -5,12 +5,20 @@ static uint64_t exponent_mask(unsigned bytes){return bytes==4?UINT64_C(0x7f80000
 static uint64_t fraction_mask(unsigned bytes){return bytes==4?UINT64_C(0x007fffff):UINT64_C(0x000fffffffffffff);}
 static int nan_bits(uint64_t value,unsigned bytes){return (value&exponent_mask(bytes))==exponent_mask(bytes)&&(value&fraction_mask(bytes))!=0;}
 unsigned mkw_fp_abi_version(void){return MKW_CPU_ABI_VERSION;}
-/* Operations: add=0, sub=1, mul=2, div=3, quiet compare=4, signaling compare=5, fused multiply-add=6, negate=7, absolute=8, square-root=9, negated multiply=10, fused subtract=11, negated fused add=12, negated fused subtract=13, S/D format conversion=14, max/min/max-number/min-number=15..18, integral round N/P/M/Z/A/X/I=19..25.
+/* Operations: add=0, sub=1, mul=2, div=3, quiet compare=4, signaling compare=5, fused multiply-add=6, negate=7, absolute=8, square-root=9, negated multiply=10, fused subtract=11, negated fused add=12, negated fused subtract=13, S/D format conversion=14, max/min/max-number/min-number=15..18, integral round N/P/M/Z/A/X/I=19..25, absolute difference=26.
  * Result is raw IEEE bits or NZCV nibble. Nonzero status leaves outputs intact.
  * Supported FPCR: rounding and default-NaN; traps/flush/alternative/merge refuse. */
 int mkw_fp(uint32_t operation,uint32_t bytes,uint32_t fpcr,uint32_t fpsr,
            uint64_t left,uint64_t right,uint64_t accumulate,uint64_t *result,uint32_t *status){
-    if((bytes!=4&&bytes!=8)||operation>25||(fpcr&~UINT32_C(0x02c00000)))return 3;
+    if((bytes!=4&&bytes!=8)||operation>26||(fpcr&~UINT32_C(0x02c00000)))return 3;
+    if(operation==26){
+        uint64_t difference=0;uint32_t flags=fpsr;
+        int rc=mkw_fp(1,bytes,fpcr,fpsr,left,right,0,&difference,&flags);
+        if(rc){return rc;}
+        /* Absolute value follows subtraction rounding and NaN processing. */
+        *result=difference&~(bytes==4?UINT64_C(0x80000000):UINT64_C(0x8000000000000000));
+        *status=flags;return 0;
+    }
     if(operation==14){
         MkwFpEnvironment saved=mkw_fp_begin(fpcr);uint64_t value;unsigned output_bytes;
         if(bytes==4){float32_t a={(uint32_t)left};value=f32_to_f64(a).v;output_bytes=8;}
