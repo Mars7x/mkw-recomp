@@ -107,6 +107,7 @@ pub fn run(root: &Path) -> Result<()> {
                         mkw_arm64::Op::OrderedMemory { .. }
                             | mkw_arm64::Op::Memory(_)
                             | mkw_arm64::Op::Structure(_)
+                            | mkw_arm64::Op::InterleavedStructure(_)
                     )));
                     let mut features = Vec::new();
                     for instruction in &ir {
@@ -238,6 +239,9 @@ pub fn run(root: &Path) -> Result<()> {
                             }
                             Op::Crc32 { .. } => features.push("crc32"),
                             Op::SimdShift(_) => features.push("simd_immediate_shift"),
+                            Op::InterleavedStructure(_) => {
+                                features.push("interleaved_two_structure")
+                            }
                             Op::Structure(v) => features.push(if v.replicate == 0 {
                                 "simd_lane_memory"
                             } else {

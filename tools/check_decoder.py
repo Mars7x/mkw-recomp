@@ -224,6 +224,14 @@ for scalar in range(2):
   for size in range(2):
    for base in [0x2e30f800,0x2eb0f800,0x2e30c800,0x2eb0c800]:
     for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rn<<5)|rd)
+for q in range(2):
+ for post in range(2):
+  for load in range(2):
+   for reserved in range(2):
+    for opcode in range(16):
+     for size in range(4):
+      for rm in [0,1,2,31]:
+       for rt,rn in [(0,1),(31,31),(31,1)]:words.add(0x0c000000|(q<<30)|(post<<23)|(load<<22)|(reserved<<21)|(rm<<16)|(opcode<<12)|(size<<10)|(rn<<5)|rt)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -266,6 +274,13 @@ for row in rows:
   scalar=bool(word&(1<<28));size=8 if word&(1<<22) else 4;total=size if scalar else 16 if word&(1<<30) else 8
   if (v['bytes'],v['total'])!=(size,total):errors.append({'word':hex(word),'error':'SIMD FP comparison width differs','reference':ins.op_str})
   if (v['rhs'] is None)!=('#0.0' in ins.op_str):errors.append({'word':hex(word),'error':'SIMD FP compare-zero differs','reference':ins.op_str})
+ elif kind=='InterleavedStructure':
+  v=op['InterleavedStructure'];name='ld2' if v['load'] else 'st2';arr=str(v['vector_bytes']//v['bytes'])+{1:'b',2:'h',4:'s',8:'d'}[v['bytes']]
+  reg=lambda r: 'sp' if r=='Sp' else 'x'+str(r['Gpr'])
+  operands='{v'+str(v['vector'])+'.'+arr+', v'+str((v['vector']+1)%32)+'.'+arr+'}, ['+reg(v['base'])+']'
+  wb=v['writeback']
+  if isinstance(wb,dict):operands+=', #'+str(wb['Immediate']) if 'Immediate' in wb else ', '+reg(wb['Register'])
+  if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'interleaved structure arrangement/register/writeback differs','reference':ins.mnemonic+' '+ins.op_str,'expected':name+' '+operands})
  elif kind=='Structure':
   v=op['Structure'];expected='ld1r' if v['replicate'] else 'ld1' if v['load'] else 'st1'
   if ins.mnemonic!=expected:errors.append({'word':hex(word),'error':'single structure family differs','reference':ins.mnemonic+' '+ins.op_str})

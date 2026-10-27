@@ -51,6 +51,7 @@ pub enum Op {
     VectorInteger(vector_integer::VectorInteger),
     VectorCompare(vector_compare::Compare),
     Structure(structures::Structure),
+    InterleavedStructure(structures::Interleaved),
     SimdShift(simd_shift::Shift),
     Crc32 {
         dst: Reg,

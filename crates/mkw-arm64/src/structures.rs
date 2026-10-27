@@ -1,4 +1,4 @@
-//! Single-register SIMD lane transfers and replicated loads.
+//! SIMD lane/replicated transfers and interleaved two-register structures.
 use super::{reg, Op, Reg};
 use serde::Serialize;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -18,7 +18,46 @@ pub struct Structure {
     pub replicate: u8,
     pub writeback: Writeback,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct Interleaved {
+    pub load: bool,
+    pub bytes: u8,
+    pub vector_bytes: u8,
+    pub vector: u8,
+    pub base: Reg,
+    pub writeback: Writeback,
+}
 pub fn decode(w: u32) -> Option<Result<Op, String>> {
+    if w & 0xbf000000 == 0x0c000000 {
+        let post = w & (1 << 23) != 0;
+        let load = w & (1 << 22) != 0;
+        let q = w & (1 << 30) != 0;
+        let rm = (w >> 16) & 31;
+        let size = ((w >> 10) & 3) as u8;
+        if w & (1 << 21) != 0 || (w >> 12) & 15 != 8 {
+            return Some(Err("unsupported multiple structure opcode".into()));
+        }
+        if (!post && rm != 0) || (size == 3 && !q) {
+            return Some(Err(
+                "reserved interleaved structure arrangement/register".into()
+            ));
+        }
+        let vector_bytes = if q { 16 } else { 8 };
+        return Some(Ok(Op::InterleavedStructure(Interleaved {
+            load,
+            bytes: 1 << size,
+            vector_bytes,
+            vector: (w & 31) as u8,
+            base: reg((w >> 5) & 31, true),
+            writeback: if !post {
+                Writeback::None
+            } else if rm == 31 {
+                Writeback::Immediate(vector_bytes * 2)
+            } else {
+                Writeback::Register(reg(rm, false))
+            },
+        })));
+    }
     if w & 0xbf000000 != 0x0d000000 {
         return None;
     }
@@ -92,5 +131,56 @@ mod tests {
             (v.base, v.vector, v.writeback),
             (Reg::Sp, 31, Writeback::Immediate(4))
         );
+    }
+}
+
+#[cfg(test)]
+mod interleaved_tests {
+    use super::*;
+    #[test]
+    fn two_structure_fields_and_reserved_forms() {
+        for q in 0..2 {
+            for size in 0..4 {
+                for load in 0..2 {
+                    for post in 0..2 {
+                        let w = 0x0c0083ff
+                            | (q << 30)
+                            | (size << 10)
+                            | (load << 22)
+                            | (post << 23)
+                            | ((if post != 0 { 31 } else { 0 }) << 16);
+                        if q == 0 && size == 3 {
+                            assert!(crate::decode(w, 0).is_err());
+                            continue;
+                        }
+                        let Op::InterleavedStructure(v) = crate::decode(w, 0).unwrap().op else {
+                            panic!()
+                        };
+                        assert_eq!(
+                            (v.bytes, v.vector_bytes, v.vector, v.base, v.load),
+                            (1 << size, 8 << q, 31, Reg::Sp, load != 0)
+                        );
+                        assert_eq!(
+                            v.writeback,
+                            if post != 0 {
+                                Writeback::Immediate(16 << q)
+                            } else {
+                                Writeback::None
+                            }
+                        );
+                    }
+                }
+            }
+        }
+        let Op::InterleavedStructure(v) = crate::decode(0x4cc18c3f, 0).unwrap().op else {
+            panic!()
+        };
+        assert_eq!(
+            (v.base, v.writeback),
+            (Reg::Gpr(1), Writeback::Register(Reg::Gpr(1)))
+        );
+        for w in [0x0c418020, 0x0c608020, 0x0c407020, 0x4c40c020, 0x0c408c20] {
+            assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
     }
 }

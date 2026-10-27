@@ -153,6 +153,10 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
                 out += &simd_shift::emit(op);
                 out += &next;
             }
+            Op::InterleavedStructure(op) => {
+                out += &structures::emit_interleaved(op);
+                out += &next;
+            }
             Op::Structure(op) => {
                 out += &structures::emit(op);
                 out += &next;
