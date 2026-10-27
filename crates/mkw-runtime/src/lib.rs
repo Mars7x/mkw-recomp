@@ -12,7 +12,9 @@ pub mod exclusive_entry;
 pub mod exclusive_native;
 pub mod floating;
 pub mod host_call;
+pub mod kernel_handles;
 mod linker;
+pub mod owned_events;
 #[cfg(target_os = "linux")]
 pub mod romfs_hle;
 #[cfg(target_os = "linux")]

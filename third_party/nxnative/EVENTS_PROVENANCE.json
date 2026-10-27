@@ -15,7 +15,7 @@
     "wait-any immediate manual-reset state observation"
   ],
   "adaptation": "crates/mkw-runtime/src/events.rs",
-  "adaptation_sha256": "a84f8754298b2cae740bca45762917f25b4bec4006a36b2474e3858cfcc1648b",
+  "adaptation_sha256": "a3a11ce01ead1ef4e7ac9f4c64fc51600d51f716bdbaa34eb3757d1da56ab86f",
   "notices": [
     "third_party/nxnative/LICENSE",
     "third_party/nxnative/d2r-mobile-LICENSE"
@@ -26,7 +26,8 @@
     "all poll input handles validate before selecting first ready index",
     "invalid/stale/foreign close is an error, unlike the upstream unconditional-success close path",
     "typed Rust errors, no guessed Horizon result mapping",
-    "no SVC registration, blocking waits, deadlines, cancellation, thread objects or Mach context code"
+    "no SVC registration, blocking waits, deadlines, cancellation, thread objects or Mach context code",
+    "event identities now use the same monotonic allocator as explicit typed kernel handle tables; reserved owner/waiter tag bits remain excluded"
   ],
   "status": "implemented and tested synthetic event primitive; no production SVC registration or target authorization"
 }

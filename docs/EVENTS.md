@@ -25,3 +25,7 @@ No production SVC handler is registered by this module. Initialization of actual
 ## Explicit event SVC reference bindings (October 27)
 
 [EVENT_SERVICES.md](EVENT_SERVICES.md) describes five opt-in reference-shaped event handlers with real owned state, typed W0/W1/W2 results and no default activation. Three O0/O2 fatal-UBSan native tests add budget, namespace, lifetime, error and concurrent-client evidence. These bindings are event-only; waits, clocks, cancellation, threads/process objects and actual retail target verification remain open. Compiler counts, prior tests/headers and original-execution gates remain unchanged.
+
+## Typed owned endpoint transfer (October 27)
+
+[KERNEL_HANDLES.md](KERNEL_HANDLES.md) describes explicit typed object tables and owned read/write endpoint wrappers. Their identity source is shared with this primitive below reserved owner/waiter tag bits. Host-only export/import copies real object references; final endpoint references close internal handles, preserving signal state and object quota across table boundaries. Explicit table shutdown drains entries before destructors while outstanding pins remain live. This is not an IPC packet/rights implementation or a new production SVC binding. Existing event semantics and test source remain unchanged; MIT provenance records the allocator refactor.

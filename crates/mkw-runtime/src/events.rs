@@ -8,12 +8,11 @@ use std::{
     collections::BTreeMap,
     sync::{
         atomic::{AtomicU32, Ordering},
-        Arc, Mutex, OnceLock,
+        Arc, Mutex,
     },
 };
-static IDS: OnceLock<Arc<AtomicU32>> = OnceLock::new();
-const FIRST: u32 = 0x1001;
-const END: u32 = 0x40000000;
+const FIRST: u32 = crate::kernel_handles::FIRST;
+const END: u32 = crate::kernel_handles::END;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Handle(u32);
 impl Handle {
@@ -60,10 +59,7 @@ pub struct Events {
 }
 impl Events {
     pub fn new(limit: usize) -> Result<Self, Error> {
-        Self::with_ids(
-            limit,
-            IDS.get_or_init(|| Arc::new(AtomicU32::new(FIRST))).clone(),
-        )
+        Self::with_ids(limit, crate::kernel_handles::shared_ids())
     }
     fn with_ids(limit: usize, ids: Arc<AtomicU32>) -> Result<Self, Error> {
         if limit == 0 || limit > 1024 {
