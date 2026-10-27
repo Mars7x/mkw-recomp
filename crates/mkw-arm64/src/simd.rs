@@ -14,6 +14,19 @@ pub enum ImmediateKind {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Simd {
+    Table {
+        dst: u8,
+        base: u8,
+        count: u8,
+        index: u8,
+        bytes: u8,
+        extension: bool,
+    },
+    ByteCount {
+        dst: u8,
+        src: u8,
+        bytes: u8,
+    },
     Immediate {
         dst: u8,
         value: u64,
@@ -106,6 +119,23 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let src = ((w >> 5) & 31) as u8;
     let q = w & (1 << 30) != 0;
     let vector_bytes = if q { 16 } else { 8 };
+    if w & 0xbfe08c00 == 0x0e000000 {
+        return Some(Ok(Op::Simd(Simd::Table {
+            dst,
+            base: src,
+            count: (((w >> 13) & 3) + 1) as u8,
+            index: ((w >> 16) & 31) as u8,
+            bytes: vector_bytes,
+            extension: w & (1 << 12) != 0,
+        })));
+    }
+    if w & 0xbffffc00 == 0x0e205800 {
+        return Some(Ok(Op::Simd(Simd::ByteCount {
+            dst,
+            src,
+            bytes: vector_bytes,
+        })));
+    }
     let permutation = match w & 0xbf20fc00 {
         0x0e001800 => Some((0, 0)),
         0x0e005800 => Some((0, 1)),
@@ -419,6 +449,50 @@ mod permutation_tests {
             Op::Simd(Simd::ExtractVector { .. })
         ));
         for w in [0x4e023c20, 0x4e223820] {
+            assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod table_count_tests {
+    use super::*;
+    #[test]
+    fn table_lengths_wrap_registers_and_byte_count_widths() {
+        for q in 0..2 {
+            for count in 1..5 {
+                for extension in [false, true] {
+                    let w =
+                        0x0e1f03ff | (q << 30) | ((count - 1) << 13) | (u32::from(extension) << 12);
+                    let Op::Simd(Simd::Table {
+                        dst,
+                        base,
+                        index,
+                        count: c,
+                        bytes,
+                        extension: e,
+                    }) = crate::decode(w, 0).unwrap().op
+                    else {
+                        panic!()
+                    };
+                    assert_eq!(
+                        (dst, base, index, c, bytes, e),
+                        (31, 31, 31, count as u8, 8 << q, extension)
+                    );
+                }
+            }
+            let Op::Simd(Simd::ByteCount { dst, src, bytes }) =
+                crate::decode(0x0e205bff | (q << 30), 0).unwrap().op
+            else {
+                panic!()
+            };
+            assert_eq!((dst, src, bytes), (31, 31, 8 << q));
+        }
+        assert!(matches!(
+            crate::decode(0x6e020020, 0).unwrap().op,
+            Op::Simd(Simd::ExtractVector { .. })
+        ));
+        for w in [0x4e220020, 0x4e028020, 0x4e605820, 0x5e205820] {
             assert!(crate::decode(w, 0).is_err(), "{w:x}");
         }
     }

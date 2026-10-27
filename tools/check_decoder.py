@@ -161,6 +161,13 @@ for scalar in range(2):
     for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
    for base in [0x0ea0d800,0x2ea0c800,0x0ea0c800,0x2ea0d800,0x0ea0e800]:
     for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rn<<5)|rd)
+for q in range(2):
+ for size in range(4):
+  for u in range(2):
+   for count in range(1,5):
+    for extension in range(2):
+     for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(0,30,31)]:words.add(0x0e000000|(q<<30)|(size<<22)|(u<<29)|((count-1)<<13)|(extension<<12)|(rm<<16)|(rn<<5)|rd)
+   for rd,rn in [(0,1),(0,0),(31,31)]:words.add(0x0e205800|(q<<30)|(size<<22)|(u<<29)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -226,8 +233,16 @@ for row in rows:
   size=1 if ins.mnemonic.endswith('b')else 2 if ins.mnemonic.endswith('h')else 4 if register.startswith('w')else 8
   if size!=op['Atomic']['bytes']:errors.append({'word':hex(word),'error':'atomic width differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='Simd':
-  expected={'fmov','mov','movi','mvni','orr','bic','dup','umov','smov','and','orn','eor','bsl','bit','bif','ext','zip1','zip2','uzp1','uzp2','trn1','trn2'}
+  expected={'fmov','mov','movi','mvni','orr','bic','dup','umov','smov','and','orn','eor','bsl','bit','bif','ext','zip1','zip2','uzp1','uzp2','trn1','trn2','tbl','tbx','cnt'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'SIMD family differs','reference':ins.mnemonic+' '+ins.op_str})
+  if isinstance(op['Simd'],dict) and 'Table' in op['Simd']:
+   v=op['Simd']['Table'];name='tbx' if v['extension'] else 'tbl';arr=str(v['bytes'])+'b'
+   table=', '.join('v'+str((v['base']+i)%32)+'.16b' for i in range(v['count']))
+   expected_operands='v'+str(v['dst'])+'.'+arr+', {'+table+'}, v'+str(v['index'])+'.'+arr
+   if (ins.mnemonic,ins.op_str)!=(name,expected_operands):errors.append({'word':hex(word),'error':'table arrangement/list/registers differ','reference':ins.mnemonic+' '+ins.op_str})
+  if isinstance(op['Simd'],dict) and 'ByteCount' in op['Simd']:
+   v=op['Simd']['ByteCount'];arr=str(v['bytes'])+'b';expected_operands='v'+str(v['dst'])+'.'+arr+', v'+str(v['src'])+'.'+arr
+   if (ins.mnemonic,ins.op_str)!=('cnt',expected_operands):errors.append({'word':hex(word),'error':'byte count arrangement/registers differ','reference':ins.op_str})
   if isinstance(op['Simd'],dict) and 'Permute' in op['Simd']:
    v=op['Simd']['Permute'];name=[['uzp1','uzp2'],['trn1','trn2'],['zip1','zip2']][v['kind']][v['part']]
    arrangement=str(v['vector_bytes']//v['bytes'])+{1:'b',2:'h',4:'s',8:'d'}[v['bytes']]

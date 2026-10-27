@@ -153,6 +153,13 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::Atomic(_) => features.push("lse_atomic"),
                             Op::Simd(v) => {
                                 features.push("simd_register_bits");
+                                if matches!(
+                                    v,
+                                    mkw_arm64::simd::Simd::Table { .. }
+                                        | mkw_arm64::simd::Simd::ByteCount { .. }
+                                ) {
+                                    features.push("simd_table_count");
+                                }
                                 if matches!(v, mkw_arm64::simd::Simd::Permute { .. }) {
                                     features.push("simd_permutation");
                                 }

@@ -19,6 +19,12 @@ fn lane(source: LaneSource, bytes: u8) -> String {
 }
 pub fn emit(op: Simd) -> String {
     match op {
+        Simd::Table {dst,base,count,index,bytes,extension}=>{
+            let mut out=format!("{{uint64_t table[{count}][2],index[2]={{c->vregs[{index}][0],c->vregs[{index}][1]}},old[2]={{c->vregs[{dst}][0],c->vregs[{dst}][1]}},output[2]={{0,0}};(void)old;\n");
+            for slot in 0..count {let reg=(base+slot)%32;out+=&format!("table[{slot}][0]=c->vregs[{reg}][0];table[{slot}][1]=c->vregs[{reg}][1];\n");}
+            out+=&format!("for(unsigned i=0;i<{bytes};i++){{unsigned at=(unsigned)((index[i/8]>>((i%8)*8))&UINT64_C(255));uint64_t value;if(at<{})value=(table[at/16][(at%16)/8]>>((at%8)*8))&UINT64_C(255);else value={};output[i/8]|=value<<((i%8)*8);}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",count*16,if extension {"(old[i/8]>>((i%8)*8))&UINT64_C(255)"}else{"UINT64_C(0)"});out
+        }
+        Simd::ByteCount {dst,src,bytes}=>format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{0,0}};for(unsigned i=0;i<{bytes};i++){{uint64_t value=(source[i/8]>>((i%8)*8))&UINT64_C(255),count=0;for(unsigned bit=0;bit<8;bit++)count+=(value>>bit)&UINT64_C(1);output[i/8]|=count<<((i%8)*8);}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n"),
         Simd::Immediate{dst,value,bytes,kind}=>{
             let value=if bytes<8{value&mask(bytes)}else{value};
             let expression=|half|match kind {ImmediateKind::Move=>format!("UINT64_C({value})"),ImmediateKind::Or=>format!("c->vregs[{dst}][{half}]|UINT64_C({value})"),ImmediateKind::Bic=>format!("c->vregs[{dst}][{half}]&~UINT64_C({value})")};
