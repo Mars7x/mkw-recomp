@@ -1,10 +1,10 @@
 # Runtime services
 
-Synthetic translated callers now invoke five explicit read-only filesystem APIs through checked native HLE. No original game service call has executed, and no unsupported service receives a fabricated success result.
+Synthetic translated callers now invoke five explicit read-only filesystem APIs and an opt-in five-operation event SVC reference profile through checked native boundaries. No original game service call has executed, and no unsupported service receives a fabricated success result.
 
 The private NPDM manifest records declared service permissions and kernel capability words. The import map records unresolved symbols and binding/type information. These are requirements evidence, not a call trace. Static SVC opcode locations are diagnostic observations; linear scanning can include data.
 
-The runtime implements owned mappings/BSS, permissions, scoped relocations, transactional transfers, a serialized plain/ordered/atomic memory bridge and a registered native-call dispatcher with iterative tail routing, explicit diagnostic data barriers and a bounded FP control/arithmetic profile for synthetic tests. Explicit guest software thread-register storage now exists, but actual TLS templates/allocation and guest thread scheduling do not. No real startup ABI is connected. The filesystem profile uses an explicitly preconfigured read-only mount, not an emulated MountRom call. Process entry, rtld startup, constructors, destructors, exception delivery, TLS, scheduling, events, IPC, clocks, other SDK services, saves, audio, input, graphics and networking remain unimplemented.
+The runtime implements owned mappings/BSS, permissions, scoped relocations, transactional transfers, a serialized plain/ordered/atomic memory bridge and a registered native-call dispatcher with iterative tail routing, explicit diagnostic data barriers and a bounded FP control/arithmetic profile for synthetic tests. Explicit guest software thread-register storage now exists, but actual TLS templates/allocation and guest thread scheduling do not. No real startup ABI is connected. The filesystem profile uses an explicitly preconfigured read-only mount, not an emulated MountRom call. Process entry, rtld startup, constructors, destructors, exception delivery, TLS, scheduling, full wait/event services, IPC, clocks, other SDK services, saves, audio, input, graphics and networking remain unimplemented.
 
 Load-time scopes and relocation readback now pass. Before bootstrap, implement the startup ABI and verify the actual PAC feature profile. Explicit authenticated-return lowering exists with a diagnostic backend only. Keep the original SDK execution path available where practical; introduce native implementations only after identifying actual requirements. Offline gameplay and same-device multiplayer retain priority over online services.
 
@@ -23,3 +23,7 @@ See [SVC.md](SVC.md): unchanged CPU-v10 layout, explicit typed SVC callback and 
 ## Owned event primitive (October 27)
 
 [EVENTS.md](EVENTS.md) describes paired manual-reset event state, endpoint rights, lifetime/quota management, monotonic handles and bounded polling. Five new tests add state/concurrency and O0/O2 fatal-UBSan native-boundary evidence. No production SVC mapping, numeric kernel result claim, blocking wait/clock/cancellation or scheduler is installed. Existing compiler counts and all previous tests/ABI contracts remain unchanged; original execution remains gated. Preserve the distinction between this nonempty poll helper and the kernel's valid zero-handle WaitSynchronization case.
+
+## Explicit event SVC reference bindings (October 27)
+
+[EVENT_SERVICES.md](EVENT_SERVICES.md) describes five opt-in reference-shaped event handlers with real owned state, typed W0/W1/W2 results and no default activation. Three O0/O2 fatal-UBSan native tests add budget, namespace, lifetime, error and concurrent-client evidence. These bindings are event-only; waits, clocks, cancellation, threads/process objects and actual retail target verification remain open. Compiler counts, prior tests/headers and original-execution gates remain unchanged.

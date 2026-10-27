@@ -4,6 +4,7 @@ pub mod abi;
 pub mod atomics;
 pub mod bridge;
 pub mod dispatch;
+pub mod event_services;
 pub mod events;
 pub mod exclusive;
 pub mod exclusive_calls;

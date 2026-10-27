@@ -1,0 +1,22 @@
+{
+  "repository": "https://github.com/Atmosphere-NX/Atmosphere",
+  "revision": "6b0c077b4c608a3a2ee712b8dc35fee87ceb62e8",
+  "inspected_file_identities": {
+    "libraries/libmesosphere/source/svc/kern_svc_event.cpp": {
+      "blob": "fc79be6d34a618d259afb4fafd958dc8a3b1b6ea",
+      "sha256": "6db3ecedb342b30e4dff92eee5d58e63ada6abfd7992ad158cbd20ec56056239"
+    },
+    "libraries/libmesosphere/source/svc/kern_svc_synchronization.cpp": {
+      "blob": "ae23f50bdf83f11cd80bb3f8ed528011c0ad8388",
+      "sha256": "be080749f567a66d5f15d0b89da6651636b9a7539f3a51bd21226cb09e3faa7e"
+    },
+    "libraries/libvapours/include/vapours/results/svc_results.hpp": {
+      "blob": "7a01b56990875616ff428f9046866f951abd7709",
+      "sha256": "c12650fcee37730f6039da87b3f412714db850fb33c1ae6efe59da9eb4d8fa4f"
+    }
+  },
+  "purpose": "semantic/result facts only, not implementation adoption",
+  "implementation_copied_or_linked": false,
+  "reference_source_license": "GPL-2.0; retained privately",
+  "actual_switch2_behavior_verified": false
+}

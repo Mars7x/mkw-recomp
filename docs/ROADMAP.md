@@ -26,3 +26,7 @@ See [SVC.md](SVC.md): unchanged CPU-v10 layout, explicit typed SVC callback and 
 ## Owned event primitive (October 27)
 
 [EVENTS.md](EVENTS.md) describes paired manual-reset event state, endpoint rights, lifetime/quota management, monotonic handles and bounded polling. Five new tests add state/concurrency and O0/O2 fatal-UBSan native-boundary evidence. No production SVC mapping, numeric kernel result claim, blocking wait/clock/cancellation or scheduler is installed. Existing compiler counts and all previous tests/ABI contracts remain unchanged; original execution remains gated. Preserve the distinction between this nonempty poll helper and the kernel's valid zero-handle WaitSynchronization case.
+
+## Explicit event SVC reference bindings (October 27)
+
+[EVENT_SERVICES.md](EVENT_SERVICES.md) describes five opt-in reference-shaped event handlers with real owned state, typed W0/W1/W2 results and no default activation. Three O0/O2 fatal-UBSan native tests add budget, namespace, lifetime, error and concurrent-client evidence. These bindings are event-only; waits, clocks, cancellation, threads/process objects and actual retail target verification remain open. Compiler counts, prior tests/headers and original-execution gates remain unchanged.

@@ -21,3 +21,7 @@ Two upstream behaviors are deliberately excluded: invalid CloseHandle returning 
 Real kernel binding remains separate: validate target result/register conventions and permissions, unify handles with thread/process/resource objects, establish pending-wait reference ownership, cancellation and actual timeout/scheduler contracts. A future WaitSynchronization binding must handle its zero-handle case separately: the pinned kernel reference accepts it, while this nonempty poll helper intentionally rejects it. Never translate that primitive limitation into an invented kernel error.
 
 No production SVC handler is registered by this module. Initialization of actual SDK thread/TLS objects and original execution remain behind identity/configuration gates. The bounded primitive advances runtime work without requiring 100% survey coverage.
+
+## Explicit event SVC reference bindings (October 27)
+
+[EVENT_SERVICES.md](EVENT_SERVICES.md) describes five opt-in reference-shaped event handlers with real owned state, typed W0/W1/W2 results and no default activation. Three O0/O2 fatal-UBSan native tests add budget, namespace, lifetime, error and concurrent-client evidence. These bindings are event-only; waits, clocks, cancellation, threads/process objects and actual retail target verification remain open. Compiler counts, prior tests/headers and original-execution gates remain unchanged.
