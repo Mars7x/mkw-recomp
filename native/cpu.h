@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #define MKW_CPU_ABI_VERSION 7u
+#define MKW_CONVERT_FIXED_SCALE UINT32_C(0x10000)
+#define MKW_CONVERT_SCALE_SHIFT 8u
 /* Internal transfer request: dispatcher routes c->pc without changing LR. */
 #define MKW_EXIT_TAIL 8
 #define MKW_ORDER_ACQUIRE_RCPC 1u
@@ -11,7 +13,9 @@
 typedef struct MkwCpu MkwCpu;
 /* Convert ops 0/1: signed/unsigned integer -> FP. 2..11: FP -> signed/unsigned
  * integer with rounding nearest-even,+inf,-inf,zero,ties-away. Integer width is
- * 32/64 bits; FP width is 4/8 bytes; outputs commit only on success. */
+ * 32/64 bits; FP width is 4/8 bytes; outputs commit only on success.
+ * Scaled base ops 0/1/8/9: FIXED_SCALE | (fractional_bits << SCALE_SHIFT) | base.
+ * fractional_bits must be 1..integer_width; noncanonical encodings refuse. */
 typedef int (*MkwConvert)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,uint64_t,uint64_t*,uint32_t*);
 /* Data barriers: DMB=0, DSB=1, followed by architectural option bits. */
 typedef int (*MkwBarrier)(void*,uint32_t,uint32_t);

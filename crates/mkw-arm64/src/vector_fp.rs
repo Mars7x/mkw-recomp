@@ -5,6 +5,7 @@ use serde::Serialize;
 pub enum VectorFpKind {
     Arithmetic(u8),
     Conversion(u8),
+    ScaledConversion { operation: u8, fractional_bits: u8 },
     PairwiseAdd,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -18,6 +19,45 @@ pub struct VectorFp {
     pub kind: VectorFpKind,
 }
 pub fn decode(w: u32) -> Option<Result<Op, String>> {
+    if w & (1 << 28) == 0 || w & (1 << 30) != 0 {
+        let fixed = match w & 0xaf80fc00 {
+            0x0f00e400 => Some(0),
+            0x2f00e400 => Some(1),
+            0x0f00fc00 => Some(8),
+            0x2f00fc00 => Some(9),
+            _ => None,
+        };
+        let imm = ((w >> 16) & 127) as u8;
+        if let Some(operation) = fixed.filter(|_| imm >= 8) {
+            if imm < 32 {
+                return Some(Err("unsupported half/subword scaled conversion".into()));
+            }
+            let bytes = if imm >= 64 { 8 } else { 4 };
+            let scalar = w & (1 << 28) != 0;
+            let q = w & (1 << 30) != 0;
+            if bytes == 8 && !scalar && !q {
+                return Some(Err("reserved single-D scaled conversion".into()));
+            }
+            return Some(Ok(Op::VectorFp(VectorFp {
+                bytes,
+                total: if scalar {
+                    bytes
+                } else if q {
+                    16
+                } else {
+                    8
+                },
+                dst: (w & 31) as u8,
+                lhs: ((w >> 5) & 31) as u8,
+                rhs: 0,
+                rhs_lane: None,
+                kind: VectorFpKind::ScaledConversion {
+                    operation,
+                    fractional_bits: bytes * 16 - imm,
+                },
+            })));
+        }
+    }
     let scalar_pairwise = w & 0xffbffc00 == 0x7e30d800;
     if scalar_pairwise || w & 0xbfa0fc00 == 0x2e20d400 {
         let bytes = if w & (1 << 22) != 0 { 8 } else { 4 };

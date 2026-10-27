@@ -112,12 +112,23 @@ pub fn run(root: &Path) -> Result<()> {
                         };
                         match instruction.op {
                             Op::FloatSelect { .. } => features.push("fp_conditional_select"),
-                            Op::Convert(_) => features.push("fp_integer_conversion"),
+                            Op::Convert(v) => {
+                                features.push("fp_integer_conversion");
+                                if v.fractional_bits != 0 {
+                                    features.push("fp_scaled_conversion");
+                                }
+                            }
                             Op::ConditionalFloat { .. } => features.push("conditional_fp_compare"),
                             Op::VectorCompare(_) => features.push("simd_fp_comparison"),
                             Op::VectorInteger(_) => features.push("simd_integer_lanes_reduction"),
                             Op::VectorFp(v) => {
                                 features.push("vector_fp");
+                                if matches!(
+                                    v.kind,
+                                    mkw_arm64::vector_fp::VectorFpKind::ScaledConversion { .. }
+                                ) {
+                                    features.push("fp_scaled_conversion");
+                                }
                                 if matches!(
                                     v.kind,
                                     mkw_arm64::vector_fp::VectorFpKind::Arithmetic(19..=25)

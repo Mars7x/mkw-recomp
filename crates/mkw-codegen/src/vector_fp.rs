@@ -4,9 +4,18 @@ pub fn emit(op: VectorFp) -> String {
     let lanes = op.total / op.bytes;
     let bits = op.bytes * 8;
     let (callback, operation) = match op.kind {
-        VectorFpKind::Arithmetic(n) => ("floating", n),
-        VectorFpKind::Conversion(n) => ("convert", n),
+        VectorFpKind::Arithmetic(n) => ("floating", u32::from(n)),
+        VectorFpKind::Conversion(n) => ("convert", u32::from(n)),
         VectorFpKind::PairwiseAdd => ("floating", 0),
+        VectorFpKind::ScaledConversion {
+            operation,
+            fractional_bits,
+        } => (
+            "convert",
+            u32::from(operation)
+                | mkw_arm64::floating::CONVERT_FIXED_SCALE
+                | (u32::from(fractional_bits) << mkw_arm64::floating::CONVERT_SCALE_SHIFT),
+        ),
     };
     let mut out=format!("{{if(!c->{callback}){{c->fault_status=3;return 3;}}uint64_t left[2]={{c->vregs[{}][0],c->vregs[{}][1]}},right[2]={{c->vregs[{}][0],c->vregs[{}][1]}},old[2]={{c->vregs[{}][0],c->vregs[{}][1]}},output[2]={{0,0}};uint32_t fpsr=c->fpsr;(void)right;(void)old;\n",op.lhs,op.lhs,op.rhs,op.rhs,op.dst,op.dst);
     out+=&format!("for(unsigned lane=0;lane<{lanes};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t result=0;\n");
@@ -31,7 +40,7 @@ pub fn emit(op: VectorFp) -> String {
             "(right[half]>>shift)".into()
         };
         match op.kind {
-        VectorFpKind::Conversion(_)=>out+=&format!("int status=c->convert({operation},{bits},{},c->fpcr,fpsr,a,&result,&fpsr);\n",op.bytes),
+        VectorFpKind::Conversion(_)|VectorFpKind::ScaledConversion{..}=>out+=&format!("int status=c->convert({operation},{bits},{},c->fpcr,fpsr,a,&result,&fpsr);\n",op.bytes),
         VectorFpKind::PairwiseAdd=>unreachable!(),
         VectorFpKind::Arithmetic(_)=>out+=&format!("uint64_t b={right_lane}&UINT64_C({mask}),acc=(old[half]>>shift)&UINT64_C({mask});int status=c->floating({operation},{},c->fpcr,fpsr,a,b,acc,&result,&fpsr);\n",op.bytes),
     }

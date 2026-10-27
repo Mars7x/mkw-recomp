@@ -186,6 +186,15 @@ for q in range(2):
  for size in range(2):
   for base in [0x0e218800,0x0ea18800,0x0e219800,0x0ea19800,0x2e218800,0x2e219800,0x2ea19800]:
    for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(q<<30)|(size<<22)|(rn<<5)|rd)
+for sf in range(2):
+ for ty in range(4):
+  for op in [0,1,2,3]:
+   for rounding in range(4):
+    for scale in range(64):words.add(0x1e000020|(sf<<31)|(ty<<22)|(op<<16)|(rounding<<19)|(scale<<10))
+for scalar in range(2):
+ for q in range(2):
+  for imm in range(128):
+   for base in [0x0f00e400,0x2f00e400,0x0f00fc00,0x2f00fc00]:words.add(base|(scalar<<28)|(q<<30)|(imm<<16)|(1<<5))
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -236,6 +245,8 @@ for row in rows:
   size=8 if ((word>>22)&1) else 4
   total=size if scalar else (16 if ((word>>30)&1) else 8)
   if (v['bytes'],v['total'])!=(size,total):errors.append({'word':hex(word),'error':'vector numeric arrangement differs','reference':ins.op_str})
+  if isinstance(v['kind'],dict) and 'ScaledConversion' in v['kind']:
+   if ins.operands[-1].imm!=v['kind']['ScaledConversion']['fractional_bits']:errors.append({'word':hex(word),'error':'SIMD fractional bits differ','reference':ins.op_str})
   if v['rhs_lane'] is not None:
    if ins.operands[-1].vector_index!=v['rhs_lane']:errors.append({'word':hex(word),'error':'indexed source lane differs','reference':ins.op_str})
    if (word>>16)&31 != v['rhs']:errors.append({'word':hex(word),'error':'indexed source register differs'})
@@ -246,6 +257,8 @@ for row in rows:
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'integer bit/carry family differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='Convert':
   if ins.mnemonic not in {'scvtf','ucvtf','fcvtns','fcvtnu','fcvtps','fcvtpu','fcvtms','fcvtmu','fcvtzs','fcvtzu','fcvtas','fcvtau'}:errors.append({'word':hex(word),'error':'conversion family differs','reference':ins.mnemonic+' '+ins.op_str})
+  v=op['Convert']
+  if v['fractional_bits'] and ins.operands[-1].imm!=v['fractional_bits']:errors.append({'word':hex(word),'error':'GPR fractional bits differ','reference':ins.op_str})
  elif kind in {'Floating','FloatSelect','SystemRegister','Barrier'}:
   expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd','fneg','fabs','fsqrt','fnmul','fmsub','fnmadd','fnmsub','fcvt','fmax','fmin','fmaxnm','fminnm','frintn','frintp','frintm','frintz','frinta','frintx','frinti'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'FP/system/barrier family differs','reference':ins.mnemonic+' '+ins.op_str})

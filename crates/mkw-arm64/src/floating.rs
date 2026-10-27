@@ -19,15 +19,50 @@ pub struct Floating {
     pub accumulate: u8,
     pub zero: bool,
 }
+pub const CONVERT_FIXED_SCALE: u32 = 0x10000;
+pub const CONVERT_SCALE_SHIFT: u32 = 8;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Conversion {
     pub operation: u8,
+    pub fractional_bits: u8,
     pub int_width: Width,
     pub bytes: u8,
     pub int_reg: Reg,
     pub vector: u8,
 }
 pub fn decode(w: u32) -> Option<Result<Op, String>> {
+    if w & 0x7f200000 == 0x1e000000 {
+        let opcode = (w >> 16) & 7;
+        let rounding = (w >> 19) & 3;
+        let operation = match (opcode, rounding) {
+            (2 | 3, 0) => (opcode - 2) as u8,
+            (0 | 1, 3) => 8 + opcode as u8,
+            _ => return None,
+        };
+        let bytes = match (w >> 22) & 3 {
+            0 => 4,
+            1 => 8,
+            _ => return Some(Err("unsupported scaled conversion FP type".into())),
+        };
+        let scale = ((w >> 10) & 63) as u8;
+        let width = if w >> 31 != 0 { Width::X64 } else { Width::W32 };
+        if width == Width::W32 && scale < 32 {
+            return Some(Err("reserved word fixed-point scale".into()));
+        }
+        return Some(Ok(Op::Convert(Conversion {
+            operation,
+            fractional_bits: 64 - scale,
+            int_width: width,
+            bytes,
+            int_reg: reg(if operation < 2 { (w >> 5) & 31 } else { w & 31 }, false),
+            vector: if operation < 2 {
+                (w & 31) as u8
+            } else {
+                ((w >> 5) & 31) as u8
+            },
+        })));
+    }
+
     if w & 0x7f20fc00 == 0x1e200000 {
         let opcode = (w >> 16) & 7;
         let rounding = (w >> 19) & 3;
@@ -44,6 +79,7 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
         };
         return Some(Ok(Op::Convert(Conversion {
             operation,
+            fractional_bits: 0,
             int_width: if w >> 31 != 0 { Width::X64 } else { Width::W32 },
             bytes,
             int_reg: reg(if operation < 2 { (w >> 5) & 31 } else { w & 31 }, false),
@@ -468,5 +504,56 @@ mod rounding_tests {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod scaled_tests {
+    use super::*;
+    #[test]
+    fn fixed_point_scales_and_neighbor_domains() {
+        for (bits, sf) in [(32, 0), (64, 1u32 << 31)] {
+            for fbits in 1..=bits {
+                for (base, operation) in [
+                    (0x1e020000, 0),
+                    (0x1e030000, 1),
+                    (0x1e180000, 8),
+                    (0x1e190000, 9),
+                ] {
+                    for ty in 0..2 {
+                        let w = base | sf | (ty << 22) | ((64 - fbits) << 10) | 0x3ff;
+                        let Op::Convert(v) = crate::decode(w, 0).unwrap().op else {
+                            panic!()
+                        };
+                        assert_eq!(
+                            (v.operation, v.fractional_bits, v.bytes),
+                            (operation, fbits as u8, 4 << ty)
+                        );
+                    }
+                }
+            }
+        }
+        for w in [0x1e180020, 0x1ee2c020, 0x1ea2c020] {
+            assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
+        assert!(matches!(
+            crate::decode(0x1e220020, 0).unwrap().op,
+            Op::Convert(Conversion {
+                fractional_bits: 0,
+                ..
+            })
+        ));
+        assert!(matches!(
+            crate::decode(0x1f30fc20, 0).unwrap().op,
+            Op::Floating(_)
+        ));
+        assert!(matches!(
+            crate::decode(0x4f00e420, 0).unwrap().op,
+            Op::Simd(_)
+        ));
+        for w in [0x4f30fc20, 0x6f30e420, 0x5f70fc20] {
+            assert!(matches!(crate::decode(w, 0).unwrap().op, Op::VectorFp(_)));
+        }
+        assert!(crate::decode(0x0f70fc20, 0).is_err());
     }
 }
