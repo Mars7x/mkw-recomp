@@ -276,3 +276,13 @@ Original signed comparisons, widened pair sums and i128 shift/clamp arithmetic f
 ## Polynomial/widening/difference provenance
 
 Original carryless multiplication follows [Arm's PMULL instruction facts](https://developer.arm.com/documentation/ddi0602/2026-06/SIMD-FP-Instructions/PMULL--PMULL2--Polynomial-multiply-long-); its shift/XOR implementation is checked by independent coefficient convolution and synthetic QEMU. Vector widening and unsigned-difference arrangements follow [Arm's armasm reference](https://documentation-service.arm.com/static/5f3fa899428f7a6b3328fd44). Independent exact S-to-D/NaN and byte-difference expectations supplement QEMU and private Capstone field checks. No reference instruction implementation was copied. Existing attributed floating callbacks are reused without ABI or profile changes; actual target access/feature configuration remains unverified.
+
+
+## Secure-hash instruction provenance
+
+Original SHA lane packing, round arithmetic and scheduling follow instruction facts in [Arm's A64 reference](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85). No reference implementation was copied. Independent bit-truth tables, widened sums, word expectations and synthetic QEMU supplement private Capstone field checks. Complete native-generated schedules and compression groups are checked against standard numerical examples from [NIST SHA1](https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/SHA1.pdf) and [NIST SHA256](https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/SHA256.pdf); additional SHA256 messages use the existing attributed RustCrypto dependency. Standard constants and digest values are numerical test data. Prior tests, third-party attribution, ABI v9 and execution/configuration gates remain unchanged.
+
+
+## Reciprocal-step provenance
+
+Original FRECPS lowering follows instruction and fused-step facts in [Arm's reference](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85). It reuses the existing attributed fused-subtract callback; no reference implementation was copied. The project's independent nine-limb exact oracle is adapted to 2−a×b at scale 2^-298 and cross-checked with known answers, a double-rounding adversary and synthetic QEMU. Original test files, ABI v9, FPCR refusal and pre-execution configuration gates remain unchanged.

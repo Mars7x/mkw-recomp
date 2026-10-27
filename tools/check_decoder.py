@@ -350,6 +350,11 @@ for rn in [0,1,31]:
  for rd in [0,1,31]:
   for q in range(2):
    for rm in [0,7,31]:
+    for base in [0x0e20fc00,0x0e60fc00]:words.add(base|(q<<30)|(rm<<16)|(rn<<5)|rd)
+    for base in [0x5e000000,0x5e001000,0x5e002000,0x5e003000,0x5e004000,0x5e005000,0x5e006000]:
+     for delta in [0,1<<30,1<<22]:words.add((base|(rm<<16)|(rn<<5)|rd)^delta)
+    for base in [0x5e280800,0x5e281800,0x5e282800]:
+     for delta in [0,1<<30,1<<22]:words.add((base|(rn<<5)|rd)^delta)
     for size in range(4):
      for base in [0x2e207000,0x2e207400]:words.add(base|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
     for size in range(4):words.add(0x0e20e000|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
@@ -399,6 +404,17 @@ for row in rows:
  elif kind=='UnsignedAbsDifference':
   v=op[kind];b=v['bytes'];letters={1:'b',2:'h',4:'s',8:'d'};reg=lambda r,b,t:'v'+str(r)+'.'+str(t//b)+letters[b];name='uabdl2'if v['upper']else'uabdl'if v['long']else'uabd';source_total=16 if v['upper']else 8 if v['long']else v['total'];operands=reg(v['dst'],b*2 if v['long']else b,v['total'])+', '+reg(v['lhs'],b,source_total)+', '+reg(v['rhs'],b,source_total)
   if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'unsigned absolute operands differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='ReciprocalStep':
+  v=op[kind];shape='.4s'if v['total']==16 else'.2s';operands=', '.join('v'+str(v[k])+shape for k in ['dst','lhs','rhs'])
+  if (ins.mnemonic,ins.op_str)!=('frecps',operands):errors.append({'word':hex(word),'error':'reciprocal step operands differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='SecureHash':
+  v=op[kind];names={'Sha1Choose':'sha1c','Sha1Parity':'sha1p','Sha1Majority':'sha1m','Sha1Rotate':'sha1h','Sha1Schedule0':'sha1su0','Sha1Schedule1':'sha1su1','Sha256Hash':'sha256h','Sha256Hash2':'sha256h2','Sha256Schedule0':'sha256su0','Sha256Schedule1':'sha256su1'};name=names[v['kind']];d=v['dst'];n=v['lhs'];m=v['rhs']
+  if name=='sha1h':operands=f's{d}, s{n}'
+  elif name in ['sha1c','sha1m','sha1p']:operands=f'q{d}, s{n}, v{m}.4s'
+  elif name in ['sha256h','sha256h2']:operands=f'q{d}, q{n}, v{m}.4s'
+  elif name in ['sha1su1','sha256su0']:operands=f'v{d}.4s, v{n}.4s'
+  else:operands=f'v{d}.4s, v{n}.4s, v{m}.4s'
+  if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'hash operands differ','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='PolynomialMultiply':
   v=op[kind];name='pmull2'if v['upper']else'pmull';shape='.2d'if v['upper']else'.1d';operands='v'+str(v['dst'])+'.1q, v'+str(v['lhs'])+shape+', v'+str(v['rhs'])+shape
   if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'polynomial operands differ','reference':ins.mnemonic+' '+ins.op_str})

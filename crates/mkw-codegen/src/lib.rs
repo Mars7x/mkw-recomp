@@ -120,6 +120,19 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
                 out += &vector_integer::emit_unsigned_abs(v);
                 out += &next;
             }
+            Op::ReciprocalStep {
+                dst,
+                lhs,
+                rhs,
+                total,
+            } => {
+                out += &vector_fp::emit_reciprocal_step(dst, lhs, rhs, total);
+                out += &next;
+            }
+            Op::SecureHash(v) => {
+                out += &vector_integer::emit_hash(v);
+                out += &next;
+            }
             Op::PolynomialMultiply(v) => {
                 out += &vector_integer::emit_polynomial(v);
                 out += &next;

@@ -563,3 +563,25 @@ pub fn emit_unsigned_abs(v: mkw_arm64::vector_integer::UnsignedAbsDifference) ->
     let mask = (1u64 << bits) - 1;
     format!("{{uint64_t a[2]={{c->vregs[{}][0],c->vregs[{}][1]}},b[2]={{c->vregs[{}][0],c->vregs[{}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{count};lane++){{unsigned input={start}+lane*{bits},dest=lane*{width};uint64_t left=(a[input/64]>>(input%64))&UINT64_C({mask}),right=(b[input/64]>>(input%64))&UINT64_C({mask});uint64_t result=left>=right?left-right:right-left;output[dest/64]|=result<<(dest%64);}}c->vregs[{}][0]=output[0];c->vregs[{}][1]=output[1];}}\n",v.lhs,v.lhs,v.rhs,v.rhs,v.dst,v.dst)
 }
+
+pub fn emit_hash(v: mkw_arm64::vector_integer::SecureHash) -> String {
+    use mkw_arm64::vector_integer::HashKind::*;
+    let mut s=format!("{{uint32_t d[4],n[4],m[4],output[4]={{0,0,0,0}};for(unsigned lane=0;lane<4;lane++){{d[lane]=(uint32_t)(c->vregs[{}][lane/2]>>((lane%2)*32));n[lane]=(uint32_t)(c->vregs[{}][lane/2]>>((lane%2)*32));m[lane]=(uint32_t)(c->vregs[{}][lane/2]>>((lane%2)*32));}}(void)d;(void)n;(void)m;",v.dst,v.lhs,v.rhs);
+    match v.kind {
+        Sha1Rotate=>s+="output[0]=(n[0]>>2)|(n[0]<<30);",
+        Sha1Schedule0=>s+="output[0]=d[0]^d[2]^m[0];output[1]=d[1]^d[3]^m[1];output[2]=d[2]^n[0]^m[2];output[3]=d[3]^n[1]^m[3];",
+        Sha1Schedule1=>s+="for(unsigned lane=0;lane<4;lane++){uint32_t value=d[lane]^(lane<3?n[lane+1]:output[0]);output[lane]=(value<<1)|(value>>31);}",
+        Sha1Choose|Sha1Parity|Sha1Majority=>{
+            let f=match v.kind{Sha1Choose=>"(b&third)^(~b&e)",Sha1Parity=>"b^third^e",Sha1Majority=>"(b&third)^(b&e)^(third&e)",_=>unreachable!()};
+            s+=&format!("uint32_t a=d[0],b=d[1],third=d[2],e=d[3],last=n[0];for(unsigned round=0;round<4;round++){{uint32_t temp=((a<<5)|(a>>27))+({f})+last+m[round];last=e;e=third;third=(b>>2)|(b<<30);b=a;a=temp;}}output[0]=a;output[1]=b;output[2]=third;output[3]=e;");
+        }
+        Sha256Schedule0=>s+="for(unsigned lane=0;lane<4;lane++){uint32_t value=lane<3?d[lane+1]:n[0];uint32_t sigma=((value>>7)|(value<<25))^((value>>18)|(value<<14))^(value>>3);output[lane]=d[lane]+sigma;}",
+        Sha256Schedule1=>s+="for(unsigned lane=0;lane<4;lane++){uint32_t value=lane<2?m[lane+2]:output[lane-2];uint32_t sigma=((value>>17)|(value<<15))^((value>>19)|(value<<13))^(value>>10);output[lane]=d[lane]+(lane<3?n[lane+1]:m[0])+sigma;}",
+        Sha256Hash|Sha256Hash2=>{
+            let(a,b)=if v.kind==Sha256Hash{("d","n")}else{("n","d")};
+            s+=&format!("uint32_t state[8]={{{a}[0],{a}[1],{a}[2],{a}[3],{b}[0],{b}[1],{b}[2],{b}[3]}};for(unsigned round=0;round<4;round++){{uint32_t a=state[0],b=state[1],c=state[2],e=state[4],f=state[5],g=state[6];uint32_t sigma1=((e>>6)|(e<<26))^((e>>11)|(e<<21))^((e>>25)|(e<<7)),sigma0=((a>>2)|(a<<30))^((a>>13)|(a<<19))^((a>>22)|(a<<10));uint32_t t1=state[7]+sigma1+((e&f)^(~e&g))+m[round],t2=sigma0+((a&b)^(a&c)^(b&c)),next_e=state[3]+t1;for(unsigned i=7;i>0;i--)state[i]=state[i-1];state[0]=t1+t2;state[4]=next_e;}}for(unsigned lane=0;lane<4;lane++)output[lane]=state[lane+{}];",if v.kind==Sha256Hash{0}else{4});
+        }
+    }
+    s+=&format!("c->vregs[{}][0]=(uint64_t)output[0]|((uint64_t)output[1]<<32);c->vregs[{}][1]=(uint64_t)output[2]|((uint64_t)output[3]<<32);}}\n",v.dst,v.dst);
+    s
+}

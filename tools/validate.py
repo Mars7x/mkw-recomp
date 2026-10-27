@@ -87,3 +87,7 @@ run('publication source snapshot guards', [sys.executable, str(ROOT / 'tools/tes
 run('public artifact guard', [sys.executable, str(ROOT/'tools/check_public_tree.py')])
 
 run('five-fix candidate ranking', [sys.executable, str(ROOT / 'tools/test_rank_five.py')])
+
+run('complete-set bundle ranking', [sys.executable, str(ROOT / 'tools/test_rank_bundles.py')])
+
+run('fixed half-conversion ranking policy', [sys.executable, str(ROOT / 'tools/test_rank_policy.py')])

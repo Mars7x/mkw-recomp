@@ -144,6 +144,22 @@ pub fn run(root: &Path) -> Result<()> {
                             } else {
                                 "unsigned_absolute_difference"
                             }),
+                            Op::ReciprocalStep { .. } => features.push("reciprocal_refinement"),
+                            Op::SecureHash(v) => {
+                                use mkw_arm64::vector_integer::HashKind::*;
+                                features.push(match v.kind {
+                                    Sha1Choose => "sha1_choose",
+                                    Sha1Parity => "sha1_parity",
+                                    Sha1Majority => "sha1_majority",
+                                    Sha1Rotate => "sha1_rotate",
+                                    Sha1Schedule0 => "sha1_schedule0",
+                                    Sha1Schedule1 => "sha1_schedule1",
+                                    Sha256Hash => "sha256_hash",
+                                    Sha256Hash2 => "sha256_hash2",
+                                    Sha256Schedule0 => "sha256_schedule0",
+                                    Sha256Schedule1 => "sha256_schedule1",
+                                });
+                            }
                             Op::PolynomialMultiply(_) => features.push("polynomial_multiply_64"),
                             Op::WidenSingleVector { .. } => {
                                 features.push("vector_single_to_double")

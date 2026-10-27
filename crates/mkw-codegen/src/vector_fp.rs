@@ -109,3 +109,7 @@ if(status){c->fault_status=status;return status;}
     out+=&format!("output[half]|=(uint64_t)result<<shift;}}c->vregs[{}][0]=output[0];c->vregs[{}][1]=output[1];c->fpsr=fpsr;}}\n",op.dst,op.dst);
     out
 }
+
+pub fn emit_reciprocal_step(dst: u8, lhs: u8, rhs: u8, total: u8) -> String {
+    format!("{{if(!c->floating||(c->fpcr&~UINT32_C(0x02c00000))){{c->fault_status=3;return 3;}}uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},output[2]={{0,0}};uint32_t fpsr=c->fpsr;for(unsigned lane=0;lane<{};lane++){{unsigned half=lane/2,shift=(lane%2)*32;uint32_t a=(uint32_t)(left[half]>>shift),b=(uint32_t)(right[half]>>shift),aa=a&UINT32_C(0x7fffffff),bb=b&UINT32_C(0x7fffffff);uint64_t result=UINT64_C(0x40000000);if(!((aa==UINT32_C(0x7f800000)&&!bb)||(!aa&&bb==UINT32_C(0x7f800000)))){{int status=c->floating(11,4,c->fpcr,fpsr,a,b,UINT64_C(0x40000000),&result,&fpsr);if(status){{c->fault_status=status;return status;}}}}output[half]|=(result&UINT64_C(0xffffffff))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];c->fpsr=fpsr;}}\n",total/4)
+}

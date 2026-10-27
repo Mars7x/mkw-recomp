@@ -147,3 +147,23 @@ The isolated implementation/check interval takes **4.82 wall minutes**. Strict m
 Rankings now enumerate all five-fix combinations in addition to complete larger observed sets. Two additional synthetic tests check shared validation and monotone family costs; previous tests remain unchanged. Complete SHA1 (five conditional gains) and SHA256 (four) lead the remaining generic forecasts, ahead of half-precision conversions. Their actual scoped costs still need investigation. Runtime/CFG dependencies increasingly limit the practical value of further survey work; these counts do not make original functions runnable.
 
 Commit `e3997c1` measured **+11**, all 239 Rust tests passing. Its scoped implementation-to-verified-push interval is **53.34 minutes / 12.37 extents per hour**, including a **15.98-minute** full gate. This interval overlaps prior publication and is not additive engineer-hours.
+
+
+## Measured complete SHA bundle and corrected policy ceiling
+
+Original lane packing, independent bit-truth arithmetic and shared complete-hash fixtures reduce the scoped SHA1 forecast to **10–23 engineering minutes**, SHA256 to **8–18**, and the combined package to **15–35**, plus the unchanged 15-minute gate. The combined nine-gain forecast gives **10.80–18.00 extents/hour**, ahead of either family alone. Ranking pairwise unions of complete feasible requirement sets exposes this combination without limiting large coherent sets to a fixed instruction count. Two new tests enforce complete accounting, shared validation and monotone costs; old tests are unchanged.
+
+Strict measurement confirms **+9**, reaching **214,514**, with no previous acceptance lost. All **9,342 rejects / 4,328,836 bytes** are inventoried with zero omissions. First-boundary failures stay 8,551 and diagnostic structural barriers 9,132. All ten observed hash operations have compiled representatives in their modules; 123 bounded objects remain unexecuted. Sample selection combines features, so PAC-object counts need not increase monotonically.
+
+An additional inspection finds the existing `floating::format_tests::format_conversion_directions_and_reserved_or_half_types` negatives exclude S↔H scalar conversion arrangements. The earlier two FCVT estimates were therefore infeasible under unchanged tests, not new arithmetic opportunities. Classification now excludes both full arrangements for every register pair; decoding/acceptance and all original tests remain unchanged. Together with the nine measured SHA gains, this corrects the remaining feasible ISA pool from **18 to 7**. Runtime/configuration/opaque/policy barriers rise to **789** through corrected classification, with no change to supported instructions.
+
+The seven opportunities are two SQDMLAL/SQDMLAL2 extents; one PACIB, one FRECPS, one SQRSHL; one SADALP+SRSHL combination and one RSHRN/RSHRN2+SRSHL combination. Generic cost defaults are conservative and need scoped review. Runtime/CFG/target contracts now make further survey-only gains substantially less useful. Accepted extents still have unverified configurations and potentially unbound callees/targets; they are not executable-game progress.
+
+
+## Shared SHA/refinement publication
+
+The SHA-only survey above is an intermediate measurement, not a separate published commit. The remaining FRECPS opportunity reuses the checked fused-subtract callback and an independently adapted exact 576-bit oracle. Its scoped 2–5-minute forecast combines with SHA's 15–35 minutes: **ten predicted gains / 17–40 engineering minutes plus one unchanged 15-minute gate (10.91–18.75/hour)**. Unions of up to three complete pure requirement sets now expose this combination; a third bundle test checks it. Existing tests and all acceptance rules are unchanged.
+
+Final strict measurement confirms **+10**, total **214,515**, with no prior acceptance lost. Nine additions contain SHA operations and one contains reciprocal refinement. Complete diagnostics scan **9,341 rejects / 4,327,996 bytes**, zero omissions. First-boundary failures remain 8,551, diagnostic structural barriers 9,132 and runtime/configuration/opaque/policy barriers 789. The feasible ISA pool falls to **six**: the preceding seven minus FRECPS. Every observed feature compiles in its module; representative selection now combines more features in **122 objects**, all unexecuted. The practical runtime/configuration/CFG ceiling remains unchanged.
+
+Commit `27964cb` measured **+6**, all 246 Rust tests passing, in a scoped **32.41-minute implementation-to-verified-push interval / 11.11 extents per hour**, including a **16.47-minute** complete gate. This interval overlaps earlier publication and is not additive engineer-hours.

@@ -52,6 +52,13 @@ pub enum Op {
     VectorInteger(vector_integer::VectorInteger),
     HalvingInteger(vector_integer::Halving),
     UnsignedAbsDifference(vector_integer::UnsignedAbsDifference),
+    ReciprocalStep {
+        dst: u8,
+        lhs: u8,
+        rhs: u8,
+        total: u8,
+    },
+    SecureHash(vector_integer::SecureHash),
     PolynomialMultiply(vector_integer::PolynomialMultiply),
     WidenSingleVector {
         dst: u8,
@@ -313,6 +320,16 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
     } else if let Some(result) = vector_integer::decode_unsigned_abs(word) {
+        result
+            .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if word & 0xbfe0fc00 == 0x0e20fc00 {
+        Op::ReciprocalStep {
+            dst: (word & 31) as u8,
+            lhs: ((word >> 5) & 31) as u8,
+            rhs: ((word >> 16) & 31) as u8,
+            total: if word & (1 << 30) != 0 { 16 } else { 8 },
+        }
+    } else if let Some(result) = vector_integer::decode_hash(word) {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
     } else if let Some(result) = vector_integer::decode_polynomial(word) {
@@ -981,6 +998,43 @@ mod vector_clz_tests {
                 ),
                 "{w:x}"
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod reciprocal_step_tests {
+    use super::*;
+    #[test]
+    fn reciprocal_step_single_precision_arrangements() {
+        for q in 0..2 {
+            for d in [0, 31] {
+                for n in [0, 31] {
+                    for m in [0, 31] {
+                        let Op::ReciprocalStep {
+                            dst,
+                            lhs,
+                            rhs,
+                            total,
+                        } = decode(0x0e20fc00 | (q << 30) | (m << 16) | (n << 5) | d, 0)
+                            .unwrap()
+                            .op
+                        else {
+                            panic!()
+                        };
+                        assert_eq!(
+                            (dst, lhs, rhs, total),
+                            (d as u8, n as u8, m as u8, if q != 0 { 16 } else { 8 })
+                        );
+                    }
+                }
+            }
+        }
+        for w in [0x0e60fc00, 0x4e60fc00, 0x5e20fc00, 0x0ea0fc00] {
+            assert!(!matches!(
+                decode(w, 0).map(|v| v.op),
+                Ok(Op::ReciprocalStep { .. })
+            ));
         }
     }
 }

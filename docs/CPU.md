@@ -320,3 +320,17 @@ Independent byte/i128 tests check 25,392 min/max, 2,208 long-pair and 14,656 sat
 S-to-D FCVTL/FCVTL2 snapshot the selected two S lanes, invoke existing format-conversion operation 14 for each, and commit vector/FPSR only after both succeed. The existing backend validates FPCR and ABI v9. Missing backend, unsupported profiles and stage-one/two callback faults refuse without partial destination/FPSR state. Other precisions stay outside this operation. Tests independently check finite exact widening and NaN payload/IOC/default-NaN rules.
 
 Independent native checks cover 352,800 polynomial, 99,024 widening and 271,104 unsigned-difference cases per optimization; 9,576 synthetic QEMU cases match O0/O2 with fatal UBSan. Every prior test and acceptance gate remains unchanged. These implementations establish no target SIMD access/feature configuration and permit no original execution.
+
+
+## Complete SHA1/SHA256 operations
+
+Separate typed records implement SHA1C/H/M/P/SU0/SU1 and SHA256H/H2/SU0/SU1 without altering legacy crypto enum contracts. Emitters snapshot complete sources and accumulators before original unsigned lane arithmetic. Four-round update ordering, scalar-E selection, high-state transport and cross-word schedule dependencies are explicit. SHA1H clears unused bits. All operations preserve GPRs, NZCV, FPCR and FPSR, consume the normal shared instruction budget, and require no callback or ABI change.
+
+Independent bit-truth functions, widened sums and word/round expectations check 27,864 native cases per optimization; 5,032 synthetic QEMU cases match O0/O2 with fatal UBSan. Complete native-generated schedules and compression groups produce six standard SHA1/SHA256 hash known answers per optimization, including two-block padding, plus nine further SHA256 messages matching independent RustCrypto. Aliases, V31, exact budgets and full failure-state preservation pass. Actual target crypto/SIMD access/feature configuration remains unverified; no original function executes.
+
+
+## Fused reciprocal refinement
+
+2S/4S FRECPS snapshots both vectors, uses existing checked fused-subtract operation 11 for one final S rounding of 2−a×b, and handles infinity-times-zero as positive 2 without invalid. The established NaN/sign/priority rules come from the same attributed backend used by other fused instructions. Backend presence and the original FPCR whitelist are checked even on constant-result paths. Output vectors/FPSR commit only after every lane succeeds; unused upper bits clear for 2S. No callback contract or ABI v9 change is required.
+
+An independent nine-limb fixed-point oracle at scale 2^-298 checks 204,288 native cases per optimization, including a naive double-rounding adversary. All 136,192 synthetic QEMU comparisons pass O0/O2 with fatal UBSan. Every supported mode, fresh/sticky flags, exceptional values, aliases and per-lane callback failure are covered. Target FP/access configuration and hardware equivalence remain unverified; no original execution occurs.

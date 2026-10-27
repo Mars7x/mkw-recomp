@@ -1572,3 +1572,88 @@ mod unsigned_absolute_tests {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum HashKind {
+    Sha1Choose,
+    Sha1Parity,
+    Sha1Majority,
+    Sha1Rotate,
+    Sha1Schedule0,
+    Sha1Schedule1,
+    Sha256Hash,
+    Sha256Hash2,
+    Sha256Schedule0,
+    Sha256Schedule1,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct SecureHash {
+    pub kind: HashKind,
+    pub dst: u8,
+    pub lhs: u8,
+    pub rhs: u8,
+}
+pub fn decode_hash(w: u32) -> Option<Result<Op, String>> {
+    use HashKind::*;
+    let (kind, ternary) = match w & 0xfffffc00 {
+        0x5e280800 => (Sha1Rotate, false),
+        0x5e281800 => (Sha1Schedule1, false),
+        0x5e282800 => (Sha256Schedule0, false),
+        _ => match w & 0xffe0fc00 {
+            0x5e000000 => (Sha1Choose, true),
+            0x5e001000 => (Sha1Parity, true),
+            0x5e002000 => (Sha1Majority, true),
+            0x5e003000 => (Sha1Schedule0, true),
+            0x5e004000 => (Sha256Hash, true),
+            0x5e005000 => (Sha256Hash2, true),
+            0x5e006000 => (Sha256Schedule1, true),
+            _ => return None,
+        },
+    };
+    Some(Ok(Op::SecureHash(SecureHash {
+        kind,
+        dst: (w & 31) as u8,
+        lhs: ((w >> 5) & 31) as u8,
+        rhs: if ternary { ((w >> 16) & 31) as u8 } else { 0 },
+    })))
+}
+#[cfg(test)]
+mod secure_hash_tests {
+    use super::*;
+    #[test]
+    fn secure_hash_exact_encodings_and_all_register_fields() {
+        use HashKind::*;
+        for (base, kind, ternary) in [
+            (0x5e000000, Sha1Choose, true),
+            (0x5e001000, Sha1Parity, true),
+            (0x5e002000, Sha1Majority, true),
+            (0x5e003000, Sha1Schedule0, true),
+            (0x5e004000, Sha256Hash, true),
+            (0x5e005000, Sha256Hash2, true),
+            (0x5e006000, Sha256Schedule1, true),
+            (0x5e280800, Sha1Rotate, false),
+            (0x5e281800, Sha1Schedule1, false),
+            (0x5e282800, Sha256Schedule0, false),
+        ] {
+            for d in 0..32 {
+                for n in 0..32 {
+                    for m in if ternary { vec![0, 7, 31] } else { vec![0] } {
+                        let Op::SecureHash(v) = crate::decode(base | (m << 16) | (n << 5) | d, 0)
+                            .unwrap()
+                            .op
+                        else {
+                            panic!()
+                        };
+                        assert_eq!(
+                            (v.kind, v.dst, v.lhs, v.rhs),
+                            (kind, d as u8, n as u8, m as u8)
+                        );
+                    }
+                }
+            }
+            for delta in [1 << 31, 1 << 30, 1 << 22, 1 << 23] {
+                assert!(decode_hash(base ^ delta).is_none());
+            }
+        }
+    }
+}

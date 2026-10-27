@@ -9,7 +9,7 @@
 | Function discovery | Partially implemented | 223,856 validated CIE/FDE extents plus candidates; indirect resolution incomplete |
 | Synthetic native translation | Implemented and tested | Host x86-64 executable ran; limited instruction subset |
 | Guest memory/relocation foundation | Partially implemented | Synthetic Rust/native memory and dispatcher tests pass; 309,844 relocations apply/read back; serialized diagnostic ordering |
-| Actual game CPU translation | Partially implemented | 214,505 subset-liftable indexed extents with possible unbound tails; 122 object samples; no complete module |
+| Actual game CPU translation | Partially implemented | 214,515 subset-liftable indexed extents with possible unbound tails; 122 object samples; no complete module |
 | Actual runtime bootstrap | Not started | No guest instruction execution |
 | Vulkan/shaders/game frame | Not started | Container observations only |
 | SDL3 input/audio, VFS/saves | Not started | No runtime implementations |
@@ -146,3 +146,9 @@ Scoped signed pairwise min/max, long pair sums and 4S saturating immediate shift
 
 
 64-bit polynomial multiply, S-to-D vector widening and unsigned absolute differences add six strict survey acceptances. Independent native/QEMU checks pass; widening preserves destination/FPSR on callback failure. CPU ABI v9, the FPCR whitelist and every previous test/acceptance rule remain unchanged. The remaining 18 purely ISA opportunities are small relative to runtime/configuration/CFG dependencies. No original function has executed.
+
+
+Complete SHA1/SHA256 operations add nine strict survey acceptances. Independent native/QEMU instruction tests, native-generated schedules, complete standard hashes and independent SHA256 comparisons pass. CPU ABI v9 and all previous tests/acceptance rules remain unchanged. Preserved S/H conversion negatives are now correctly excluded from feasible rankings for entire arrangements. Only seven feasible pure ISA opportunities remain; runtime/configuration/CFG dependencies increasingly determine useful progress. No original execution or target crypto-feature validation is claimed.
+
+
+The same publication additionally includes 2S/4S FRECPS, yielding **ten total gains** over the preceding polynomial/widening/difference package. Independent exact and QEMU checks pass, including atomic callback failure and exceptional inputs. Only six feasible pure ISA opportunities remain. Representative selection combines features into 122 objects; none execute. Every previous correctness gate, acceptance rule and test remains unchanged.
