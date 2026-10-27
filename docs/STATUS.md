@@ -1,12 +1,13 @@
 # Status — October 27, 2026
 
-Coverage-ranked remaining integer/PAC transport and a static runtime-contract inventory and complete blocker analysis are implemented and tested; automatic source-only publication and periodic continuations remain active. **No game-derived function has executed. Mario Kart World has not booted, rendered or become playable.**
+A checked exclusive-memory reservation foundation and coverage-ranked runtime dependencies and complete blocker analysis are implemented and tested; automatic source-only publication and periodic continuations remain active. **No game-derived function has executed. Mario Kart World has not booted, rendered or become playable.**
 
 ## Latest implementation
 
-- Added **PACIB register/SP transport, scoped 4S SQRSHL, 4S/2D SRSHL, 4S SADALP, RSHRN/RSHRN2 and register/indexed SQDMLAL/SQDMLAL2**. **Measured gain: +6**, exactly predicted, reaching **214,521** accepted extents with no prior acceptance lost. Every existing correctness test, refusal rule, CFG boundary and CPU ABI v9 contract remains unchanged.
-- Independent byte/i128 expectations check **156,672 rounded-register, 23,296 rounded-narrow, 1,024 pair-accumulate and 344,064 saturating-long native cases per optimization**. All **345,984 synthetic integer QEMU cases** pass O0/O2 with fatal UBSan. Tests cover all low count bytes/legal immediates, separate product/accumulator saturation, fresh/sticky QC, aliases, V31 and exact shared budgets.
-- PACIB routes key B/sign with explicit GPR/zero destination and GPR/SP modifier through the existing backend. **564 transport and 564 checked-backend cases per optimization**, plus missing-backend/context and fault probes, pass. **640 QEMU sign/strip round trips** compare shared canonical addresses; signed pointer bits are not compared across different profiles. The game PAC/VA/TBI configuration remains unverified.
+- Added a standalone **exclusive-memory authority** with owned reservations, registered per-context identities, explicit granule/quota configuration, clear/release operations and checked conditional stores. Every overlapping successful write invalidates affected reservations, including unchanged-byte writes. Complete cross-region permission checks prevent partial writes; owner identities cannot cross authorities, revive after release or wrap silently.
+- **Seven new unit tests and 576 synthetic QEMU sequences pass in debug and release builds.** Tests cover all primitive widths (1/2/4/8/16 bytes), granule boundaries, multiple owners, explicit clearing, wrong address/width, permissions, cross-region atomicity, quotas and identity exhaustion. QEMU compares 1/2/4/8-byte load/status/memory results across successful, cleared and changed-value-interference sequences, for plain and acquire/release encodings.
+- **Strict survey gain: +0; baseline remains 214,521.** This implements the next runtime dependency without enabling LL/SC decoding or changing CPU ABI v9, native callbacks or default acceptance. Native integration, target granule/access/fault semantics, physical aliasing, MMIO and weak-memory/scheduler behavior still require an explicitly versioned contract and real target configuration. No original function executes.
+- Remaining arithmetic/PAC commit **`93f7bcf`: +6**, total 214,521; all 265 Rust tests passed. The scoped verified push interval is **41.99 minutes / 8.57 extents per hour**, including a **17.13-minute** full gate. Overlapping intervals are not additive engineer-hours.
 - SHA/refinement commit **`00e3acb`: +10**, total 214,515; all 256 Rust tests passed. The scoped verified push interval is **39.04 minutes / 15.37 extents per hour**, including a **16.63-minute** full gate. Overlapping intervals are not additive engineer-hours.
 - Previous polynomial/widening/difference package: **+6**, exactly predicted, total 214,505. It passed all 246 Rust tests and retained every previous test and acceptance rule. The verified scoped push interval is 32.41 minutes / 11.11 extents per hour, including the 16.47-minute full gate. Overlapping intervals are not additive engineer-hours.
 - Previous signed pairwise/widening/saturating package: **+11**, exactly predicted, total 214,499. It passed all 239 Rust tests and retained all pre-existing tests and acceptance rules. The verified push interval is 53.34 minutes / 12.37 extents per hour, including a 15.98-minute full gate. Overlapping scoped intervals are not additive engineer-hours.
@@ -29,6 +30,8 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 
 ## Validation
 
+- **Seven exclusive-memory unit tests and 576 synthetic QEMU sequences** pass in debug and release. Values/status/memory match the serialized diagnostic model for plain and acquire/release encodings; this does not validate hardware weak-memory ordering, physical aliasing or actual target granule/trap behavior. Existing LL/SC instruction refusals and ABI v9 tests remain unchanged. The release memory/monitor suite is an additional mandatory gate.
+
 - **345,984 remaining-integer QEMU fixtures** and independent **156,672 / 23,296 / 1,024 / 344,064 native cases per optimization** pass O0/O2 with fatal UBSan. Separate product/accumulator clamps, every register count byte/narrowing immediate, QC, aliases and exact budgets are checked.
 - **640 PACIB sign/strip round trips** match QEMU on shared canonical addresses. Independent operand/budget/failure probes and the existing independently QARMA-checked backend validate transport. Target signature/profile equivalence remains unverified.
 - Three additional runtime-contract inventory checks and two remaining-set ranking checks pass. All 58 pre-existing crate test files remain byte-identical.
@@ -49,7 +52,7 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 - **1,280 XPACI fixtures** match QEMU on shared canonical pointer cases; **111,264 native cases per optimization** check the explicit no-TBI strip profile, all register/zero destinations, budgets and full state preservation. Additional probes check callback operands, faults and missing backend/context. A separate test asserts the expected QEMU top-tag profile difference. The two earlier PAC native integration tests still pass unchanged.
 - **18,720 halving fixtures** match QEMU at O0/O2; independent byte/i128 expectations check **28,080 native cases per optimization**, including odd negative results, extrema, aliases, distinct lanes and unchanged flags. Pre-existing files under crate test directories remain byte-identical to the preceding snapshot.
 - **928 prefetch fixtures** match QEMU at O0/O2; **8,352 native cases per optimization** check register/control/fault preservation, exact shared budgets, PC rebasing and zero memory callbacks. Existing SP-prefetch and reserved-form refusal tests remain unchanged.
-- **265 Rust tests pass**, including extended memory capacity, multiple structures and stale-ABI refusal checks and earlier scaled conversion/rounding/integer SIMD/FP/memory semantics, plus all prior native thread-register, bit/carry, conversion, FP, SIMD, LSE, PAC and control-flow regressions.
+- **273 Rust tests pass**, including extended memory capacity, multiple structures and stale-ABI refusal checks and earlier scaled conversion/rounding/integer SIMD/FP/memory semantics, plus all prior native thread-register, bit/carry, conversion, FP, SIMD, LSE, PAC and control-flow regressions.
 - **6,656 AES fixtures** match QEMU at O0/O2; independent polynomial/byte expectations check 13,312 native cases per optimization. Two complete AES-128 standard encryption/decryption known answers also pass per optimization.
 - **31,200 ordinary SIMD MUL fixtures** match QEMU at O0/O2; independent u128 byte-array expectations check 46,800 native cases per optimization across register/indexed forms and aliases.
 - **16 YIELD fixtures** match QEMU at O0/O2; native shared-budget/state tests check exact accounting, rebased PC, zero memory callbacks and unchanged register/control state.
@@ -102,7 +105,7 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 
 ## Files changed this session
 
-Scoped remaining integer/PAC transport IR/decoders/emitters with independent native/QEMU/budget/failure tests; per-operation feature sampling and Capstone checks; complete-set union ranking; static runtime-contract inventory and synthetic tests; CPU/compatibility/research/coverage/status documentation. All 58 pre-existing crate test files stay byte-identical. CPU ABI v9 and every existing correctness/acceptance gate remain unchanged. Original inputs remain unchanged and binary-derived outputs stay private.
+Exclusive-memory Rust backend primitive, seven unit tests and synthetic QEMU sequence tests; an additive release semantic gate; CPU/compatibility/research/coverage/status documentation. All 60 pre-existing crate test files stay byte-identical. Decoder, codegen and native CPU header remain byte-identical to the preceding published source. CPU ABI v9 and every existing correctness/acceptance gate remain unchanged. Original inputs remain unchanged and all binary-derived outputs stay private.
 
 ## Measured commit gains
 
@@ -124,10 +127,11 @@ Scoped remaining integer/PAC transport IR/decoders/emitters with independent nat
 | `e3997c1` | 214,499 | +11 |
 | `27964cb` | 214,505 | +6 |
 | `00e3acb` | 214,515 | +10 |
-| Current remaining-set package | 214,521 | +6 |
+| `93f7bcf` | 214,521 | +6 |
+| Current exclusive-memory foundation | 214,521 | +0 |
 
 Future commits will report measured strict gain against the preceding commit and compare it with the blocker-set prediction. Earlier stages did not record comparable end-to-end effort timings; new validation receipts record gate durations.
 
 ## Next concrete dependencies
 
-The current bounded diagnostics have no feasible pure ISA requirement sets left; do not return to first-error frequency as a gain estimate. Use the new private runtime-contract inventory. The next concrete work is an explicit per-context exclusive-monitor contract with overlapping-write invalidation, ownership, failure and memory-permission semantics; physical-counter access follows only with a real configured frequency/time contract. Design any native interface extension with explicit versioning and preserve ABI v9 compatibility/tests. Keep unsupported service mappings, target configuration and original bootstrap gated. No successful service/monitor placeholders, fabricated clocks or relaxed CFG policies are permitted.
+The bounded diagnostics have no feasible pure ISA sets left. The exclusive-memory primitive now implements reservation ownership and invalidation for explicitly configured serialized normal memory. Next define and test its versioned native binding, including all ordinary/ordered/atomic write paths, context lifetime and clearing, status/fault transport and current ABI v9 compatibility. Keep LL/SC instruction acceptance disabled until that real contract is integrated. Physical-counter access needs a real configured frequency/time contract; service mappings and original bootstrap remain gated. Never supply successful service/monitor placeholders, fabricated clocks or relaxed CFG policies.

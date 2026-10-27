@@ -155,3 +155,6 @@ The same publication additionally includes 2S/4S FRECPS, yielding **ten total ga
 
 
 The remaining scoped arithmetic/PAC package adds six strict acceptances, with independent native/QEMU/failure/budget checks and unchanged prior tests/ABI v9. The current complete diagnostic now has zero feasible pure ISA/nonstructural requirement sets; this does not establish complete ISA or module support. Runtime inventory exposes 167 contract-only extents, including conditional exclusive-monitor/counter opportunities, while retaining other barriers. Runtime/profile effort remains unpriced and original execution stays gated. No real monitor/service placeholder or invented clock is used to inflate acceptance.
+
+
+The exclusive-memory backend primitive implements real checked conditional-store success/failure and per-owner/granule invalidation in serialized owned normal memory. Seven unit tests and 576 QEMU sequences pass in debug/release. It is not yet bound to native LL/SC instructions: default survey acceptance stays 214,521, CPU ABI v9 and all old tests/refusals remain unchanged. Target granule/trap, physical-alias/MMIO, scheduler and weak-memory behavior remain unverified. Original bootstrap stays gated.

@@ -180,3 +180,12 @@ The new static runtime-contract inventory retains all other barriers and exposes
 Accepted extents still overlap large requirements for checked memory (165,966), call routing (161,644), PAC (127,110), ordered memory (22,543), floating helpers (11,014), LSE atomics (8,314), barriers (1,749) and thread-register configuration (674). These are static extent requirements, not execution frequencies or configured/runnable-function counts. Further survey-only ISA work now has no measured independent whole-extent return. The next concrete dependencies are a real versioned exclusive-monitor contract and configured counter access, followed by target service contracts and CFG/target resolution.
 
 Commit `00e3acb` measured **+10**, all 256 Rust tests passing, with a **39.04-minute scoped implementation-to-verified-push interval / 15.37 extents per hour**, including a **16.63-minute** complete gate. Overlapping intervals are not additive engineer-hours.
+
+
+## Exclusive-memory foundation: runtime work without inflated survey gains
+
+The next measured dependency now has a standalone Rust implementation: owned, checked normal memory with per-context exclusive reservations, configured granule invalidation and real success/failure conditional stores. Seven unit tests and 576 synthetic QEMU sequences pass in debug and release. Plain/acquire-release cases compare values, status and memory; hardware weak-memory ordering, real target granules/traps and physical aliasing remain unverified.
+
+**Strict gain is zero: 214,521 accepted extents remain the baseline.** Decoder/codegen/native-header sources are unchanged, and no LL/SC instruction is newly accepted. The 64 conditional monitor opportunities therefore remain predictions pending an actual versioned native binding and target profile. This distinction prevents a backend primitive from being reported as executable guest support. Existing correctness/acceptance gates remain intact; a release semantic check is additive.
+
+Commit `93f7bcf` measured **+6**, all 265 Rust tests passing, with a **41.99-minute scoped implementation-to-verified-push interval / 8.57 extents per hour**, including a **17.13-minute** full gate. Those overlapping intervals are not additive engineer-hours. Static ISA-only return has reached zero under the current complete diagnostic; concrete runtime contracts now drive useful progress.
