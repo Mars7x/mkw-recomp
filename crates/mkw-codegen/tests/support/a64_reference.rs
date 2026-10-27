@@ -123,3 +123,105 @@ fn build_elf(cases: &[u32], atomic: bool) -> Vec<u8> {
     }
     bytes
 }
+
+pub struct FloatingCase {
+    pub word: u32,
+    pub left: u64,
+    pub right: u64,
+    pub fpcr: u32,
+    pub accumulate: u64,
+    pub nzcv: u32,
+    pub fpsr: u32,
+}
+pub fn floating_elf(cases: &[FloatingCase]) -> Vec<u8> {
+    const BASE: u64 = 0x400000;
+    const TEXT: usize = 4096;
+    let mut code = Vec::new();
+    immediate(&mut code, 28, 0);
+    let mut loads = Vec::new();
+    for (i, case) in cases.iter().enumerate() {
+        for reg in 0..4 {
+            loads.push((code.len(), i * 80 + reg * 16, 0x9c000000 | reg as u32));
+            code.push(0);
+        }
+        loads.push((code.len(), i * 80 + 64, 0x5800001b));
+        code.push(0);
+        code.push(0xd51b441b); // MSR FPCR
+        loads.push((code.len(), i * 80 + 72, 0x5800001b));
+        code.push(0);
+        code.push(0xd51b443b); // MSR FPSR
+        immediate(&mut code, 27, u64::from(case.nzcv));
+        code.push(0xd51b421b);
+        code.push(case.word);
+        code.push(0x3d800380); // Q0 result
+        code.push(0xd53b443b);
+        code.push(0xf9000b9b); // FPSR -> output+16
+        code.push(0xd53b421b);
+        code.push(0xf9000f9b); // NZCV -> output+24
+        code.push(0x9100839c);
+    }
+    let write_at = code.len();
+    immediate(&mut code, 0, 1);
+    immediate(&mut code, 1, 0);
+    immediate(&mut code, 2, cases.len() as u64 * 32);
+    immediate(&mut code, 8, 64);
+    code.push(0xd4000001);
+    immediate(&mut code, 0, 0);
+    immediate(&mut code, 8, 93);
+    code.push(0xd4000001);
+    let pool = TEXT + code.len() * 4;
+    let output = (pool + cases.len() * 80 + 15) & !15;
+    let va = BASE + output as u64;
+    let mut pointer = Vec::new();
+    immediate(&mut pointer, 28, va);
+    code[..4].copy_from_slice(&pointer);
+    pointer.clear();
+    immediate(&mut pointer, 1, va);
+    code[write_at + 4..write_at + 8].copy_from_slice(&pointer);
+    for (at, offset, op) in loads {
+        let delta = (pool + offset) as i64 - (TEXT + at * 4) as i64;
+        assert!(delta.abs() < 1024 * 1024);
+        code[at] = op | (((delta / 4) as u32 & 0x7ffff) << 5);
+    }
+    let mut bytes = vec![0u8; output + cases.len() * 32];
+    bytes[..7].copy_from_slice(b"\x7fELF\x02\x01\x01");
+    put16(&mut bytes, 16, 2);
+    put16(&mut bytes, 18, 183);
+    put32(&mut bytes, 20, 1);
+    put64(&mut bytes, 24, BASE + TEXT as u64);
+    put64(&mut bytes, 32, 64);
+    put16(&mut bytes, 52, 64);
+    put16(&mut bytes, 54, 56);
+    put16(&mut bytes, 56, 1);
+    put32(&mut bytes, 64, 1);
+    put32(&mut bytes, 68, 7);
+    put64(&mut bytes, 80, BASE);
+    put64(&mut bytes, 88, BASE);
+    let len = bytes.len() as u64;
+    put64(&mut bytes, 96, len);
+    put64(&mut bytes, 104, len);
+    put64(&mut bytes, 112, 4096);
+    for (i, w) in code.into_iter().enumerate() {
+        put32(&mut bytes, TEXT + i * 4, w);
+    }
+    for (i, c) in cases.iter().enumerate() {
+        for (j, value) in [
+            INITIAL_V[0][0],
+            INITIAL_V[0][1],
+            c.left,
+            INITIAL_V[1][1],
+            c.right,
+            INITIAL_V[2][1],
+            c.accumulate,
+            INITIAL_V[3][1],
+            u64::from(c.fpcr),
+            u64::from(c.fpsr),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            put64(&mut bytes, pool + i * 80 + j * 8, value);
+        }
+    }
+    bytes
+}

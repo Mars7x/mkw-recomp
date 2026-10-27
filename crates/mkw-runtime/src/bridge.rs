@@ -1,7 +1,7 @@
 //! Serialized diagnostic memory backend. All callbacks share one lock, including
 //! ordinary accesses. Stronger than RCpc; no claim of weak-memory equivalence.
 use crate::{
-    abi::{AtomicCallback, Cpu, MemoryCallback, OrderedCallback},
+    abi::{AtomicCallback, BarrierCallback, Cpu, MemoryCallback, OrderedCallback},
     GuestAddr, Memory,
 };
 use std::{
@@ -26,6 +26,7 @@ pub struct MemoryBridge {
     pub(crate) last_fault: Mutex<Option<String>>,
     pub(crate) atomic_counts: [AtomicU64; 4],
     counts: [AtomicU64; 4],
+    barrier_counts: [[AtomicU64; 16]; 2],
     _pin: PhantomPinned,
 }
 impl MemoryBridge {
@@ -34,6 +35,7 @@ impl MemoryBridge {
             memory: Mutex::new(memory),
             last_fault: Mutex::new(None),
             atomic_counts: std::array::from_fn(|_| AtomicU64::new(0)),
+            barrier_counts: std::array::from_fn(|_| std::array::from_fn(|_| AtomicU64::new(0))),
             counts: std::array::from_fn(|_| AtomicU64::new(0)),
             _pin: PhantomPinned,
         })
@@ -93,14 +95,16 @@ impl MemoryBridge {
         result
     }
     pub fn attach<'a>(self: Pin<&'a Self>, cpu: &'a mut Cpu) -> Attachment<'a> {
-        let previous = (
-            cpu.memory,
-            cpu.ordered_memory,
-            cpu.memory_context,
-            cpu.atomic_memory,
-        );
+        let previous = Previous {
+            memory: cpu.memory,
+            ordered: cpu.ordered_memory,
+            context: cpu.memory_context,
+            atomic: cpu.atomic_memory,
+            barrier: cpu.barrier,
+        };
         cpu.memory = Some(memory_callback);
         cpu.atomic_memory = Some(crate::atomics::callback);
+        cpu.barrier = Some(barrier_callback);
         cpu.ordered_memory = Some(ordered_callback);
         cpu.memory_context = self.get_ref() as *const Self as *mut c_void;
         Attachment {
@@ -110,15 +114,17 @@ impl MemoryBridge {
         }
     }
 }
+struct Previous {
+    memory: Option<MemoryCallback>,
+    ordered: Option<OrderedCallback>,
+    context: *mut c_void,
+    atomic: Option<AtomicCallback>,
+    barrier: Option<BarrierCallback>,
+}
 pub struct Attachment<'a> {
     cpu: &'a mut Cpu,
     _bridge: Pin<&'a MemoryBridge>,
-    previous: (
-        Option<MemoryCallback>,
-        Option<OrderedCallback>,
-        *mut c_void,
-        Option<AtomicCallback>,
-    ),
+    previous: Previous,
 }
 impl Attachment<'_> {
     pub fn cpu_mut(&mut self) -> &mut Cpu {
@@ -127,10 +133,11 @@ impl Attachment<'_> {
 }
 impl Drop for Attachment<'_> {
     fn drop(&mut self) {
-        self.cpu.memory = self.previous.0;
-        self.cpu.ordered_memory = self.previous.1;
-        self.cpu.memory_context = self.previous.2;
-        self.cpu.atomic_memory = self.previous.3;
+        self.cpu.memory = self.previous.memory;
+        self.cpu.ordered_memory = self.previous.ordered;
+        self.cpu.memory_context = self.previous.context;
+        self.cpu.atomic_memory = self.previous.atomic;
+        self.cpu.barrier = self.previous.barrier;
     }
 }
 /// # Safety
@@ -204,6 +211,45 @@ unsafe fn dispatch(
     })) {
         Ok(Ok(())) => 0,
         Ok(Err(_)) => 5,
+        Err(_) => 7,
+    }
+}
+
+impl MemoryBridge {
+    pub fn barrier_counts(&self) -> [[u64; 16]; 2] {
+        std::array::from_fn(|k| {
+            std::array::from_fn(|option| self.barrier_counts[k][option].load(Ordering::Relaxed))
+        })
+    }
+    /// DMB/DSB for synchronous owned normal memory. Domain/access distinctions
+    /// remain explicit but are strengthened to the shared serialized profile.
+    pub fn barrier_access(&self, kind: u32, option: u32) -> Result<(), String> {
+        if kind > 1 || option > 15 || option & 3 == 0 {
+            return Err("unsupported data barrier kind/option".into());
+        }
+        let guard = self
+            .memory
+            .lock()
+            .map_err(|_| "memory backend lock poisoned")?;
+        std::sync::atomic::fence(Ordering::SeqCst);
+        self.barrier_counts[kind as usize][option as usize].fetch_add(1, Ordering::Relaxed);
+        drop(guard);
+        Ok(())
+    }
+}
+/// # Safety
+/// context is a live pinned MemoryBridge installed by an active Attachment.
+unsafe extern "C" fn barrier_callback(context: *mut c_void, kind: u32, option: u32) -> i32 {
+    if context.is_null() || context as usize % std::mem::align_of::<MemoryBridge>() != 0 {
+        return 7;
+    }
+    // SAFETY: the attachment preserves the bridge's context and lifetime.
+    let bridge = unsafe { &*context.cast::<MemoryBridge>() };
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        bridge.barrier_access(kind, option)
+    })) {
+        Ok(Ok(())) => 0,
+        Ok(Err(_)) => 3,
         Err(_) => 7,
     }
 }

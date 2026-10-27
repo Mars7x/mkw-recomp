@@ -67,6 +67,12 @@ pub fn run(root: &Path) -> Result<()> {
                     row["subset_instructions"] = json!(ir.len());
                     row["requires_atomic_memory_backend"] =
                         json!(ir.iter().any(|i| matches!(i.op, mkw_arm64::Op::Atomic(_))));
+                    row["requires_floating_backend"] = json!(ir
+                        .iter()
+                        .any(|i| matches!(i.op, mkw_arm64::Op::Floating(_))));
+                    row["requires_barrier_backend"] = json!(ir
+                        .iter()
+                        .any(|i| matches!(i.op, mkw_arm64::Op::Barrier { .. })));
                     row["requires_pac_backend"] = json!(pac);
                     row["requires_call_backend"] = json!(ir.iter().any(|i| matches!(
                         i.op,
@@ -89,6 +95,10 @@ pub fn run(root: &Path) -> Result<()> {
                             Op,
                         };
                         match instruction.op {
+                            Op::FloatSelect { .. } => features.push("fp_conditional_select"),
+                            Op::Floating(_) => features.push("scalar_fp"),
+                            Op::SystemRegister { .. } => features.push("fp_nzcv_register"),
+                            Op::Barrier { .. } => features.push("data_barrier"),
                             Op::Atomic(_) => features.push("lse_atomic"),
                             Op::Simd(_) => features.push("simd_register_bits"),
                             Op::Multiply { .. } | Op::Divide { .. } => {

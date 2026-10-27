@@ -3,6 +3,7 @@ mod arithmetic;
 mod atomics;
 mod bitops;
 mod condition;
+mod floating;
 mod integer;
 mod memory;
 mod simd;
@@ -36,7 +37,11 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("integer.rs"),
     include_str!("simd.rs"),
     include_str!("atomics.rs"),
+    include_str!("floating.rs"),
     include_str!("../../../native/cpu.h"),
+    include_str!("../../../native/fp.c"),
+    include_str!("../../../native/softfloat/platform.h"),
+    include_str!("../../../third_party/softfloat/PROVENANCE.json"),
 ];
 pub const HEADER: &str = include_str!("../../../native/cpu.h");
 pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
@@ -78,6 +83,25 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
         let next = format!("goto L_{:x};\n", i.pc + 4);
         match i.op {
             Op::Nop => out += &next,
+            Op::FloatSelect {
+                bytes,
+                dst,
+                lhs,
+                rhs,
+                condition,
+            } => {
+                let mask = if bytes == 8 {
+                    u64::MAX
+                } else {
+                    (1u64 << (bytes * 8)) - 1
+                };
+                out+=&format!("{{uint64_t value=({})?c->vregs[{lhs}][0]:c->vregs[{rhs}][0];c->vregs[{dst}][0]=value&UINT64_C({mask});c->vregs[{dst}][1]=0;}}\n",condition::expression(condition)?);
+                out += &next;
+            }
+            op @ (Op::Floating(_) | Op::SystemRegister { .. } | Op::Barrier { .. }) => {
+                out += &floating::emit(op);
+                out += &next;
+            }
             Op::Atomic(op) => {
                 out += &atomics::emit(op);
                 out += &next;

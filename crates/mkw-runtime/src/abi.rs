@@ -1,7 +1,7 @@
-//! ABI v4 mirrors native/cpu.h; integration tests compare its size and offsets
+//! ABI v5 mirrors native/cpu.h; integration tests compare its size and offsets
 //! against the C compiler before invoking generated native functions.
 use std::ffi::c_void;
-pub const CPU_ABI_VERSION: u32 = 4;
+pub const CPU_ABI_VERSION: u32 = 5;
 /// Internal dispatcher request, never a completed guest return.
 pub const EXIT_TAIL: i32 = 8;
 pub type Call = unsafe extern "C" fn(*mut c_void, *mut Cpu, u64, *mut u64) -> i32;
@@ -10,6 +10,9 @@ pub type MemoryCallback = unsafe extern "C" fn(*mut c_void, i32, u64, *mut u64, 
 pub type OrderedCallback = unsafe extern "C" fn(*mut c_void, u32, i32, u64, *mut u64, u32) -> i32;
 pub type AtomicCallback =
     unsafe extern "C" fn(*mut c_void, u32, u32, u64, u64, u64, *mut u64, u32) -> i32;
+pub type BarrierCallback = unsafe extern "C" fn(*mut c_void, u32, u32) -> i32;
+pub type FloatingCallback =
+    unsafe extern "C" fn(u32, u32, u32, u32, u64, u64, u64, *mut u64, *mut u32) -> i32;
 #[repr(C)]
 #[derive(Default)]
 pub struct Cpu {
@@ -32,4 +35,8 @@ pub struct Cpu {
     pub ordered_memory: Option<OrderedCallback>,
     pub vregs: [[u64; 2]; 32],
     pub atomic_memory: Option<AtomicCallback>,
+    pub barrier: Option<BarrierCallback>,
+    pub fpcr: u32,
+    pub fpsr: u32,
+    pub floating: Option<FloatingCallback>,
 }

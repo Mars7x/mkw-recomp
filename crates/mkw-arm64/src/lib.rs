@@ -2,6 +2,7 @@
 //! PAC operations carry explicit semantics; a configured backend is required at execution.
 pub mod atomics;
 pub mod bitops;
+pub mod floating;
 pub mod integer;
 pub mod memory;
 pub mod simd;
@@ -13,6 +14,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("integer.rs"),
     include_str!("simd.rs"),
     include_str!("atomics.rs"),
+    include_str!("floating.rs"),
 ];
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Width {
@@ -35,6 +37,23 @@ pub enum MemoryOrder {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Op {
     Nop,
+    Floating(floating::Floating),
+    FloatSelect {
+        bytes: u8,
+        dst: u8,
+        lhs: u8,
+        rhs: u8,
+        condition: u8,
+    },
+    SystemRegister {
+        read: bool,
+        register: floating::SystemReg,
+        value: Reg,
+    },
+    Barrier {
+        kind: u8,
+        option: u8,
+    },
     Atomic(atomics::Atomic),
     Simd(simd::Simd),
     Multiply {
@@ -225,7 +244,9 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
     };
     let rd = word & 31;
     let rn = (word >> 5) & 31;
-    let op = if let Some(op) = atomics::decode(word) {
+    let op = if let Some(result) = floating::decode(word) {
+        result.map_err(|error| format!("{error} at {pc:#x}"))?
+    } else if let Some(op) = atomics::decode(word) {
         op
     } else if let Some(result) = simd::decode(word) {
         result.map_err(|error| format!("{error} at {pc:#x}"))?

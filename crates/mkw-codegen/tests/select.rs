@@ -89,3 +89,54 @@ fn all_conditional_select_variants_preserve_flags() {
         );
     }
 }
+
+#[test]
+fn all_fp_select_conditions_copy_raw_bits_and_preserve_flags() {
+    let mut code = HEADER.to_string();
+    let mut main=String::from("int main(void){MkwCpu c;const unsigned masks[16]={0xf0f0,0x0f0f,0xcccc,0x3333,0xff00,0x00ff,0xaaaa,0x5555,0x0c0c,0xf3f3,0xaa55,0x55aa,0x0a05,0xf5fa,0xffff,0xffff};\n");
+    for (ftype, mask) in [(0, 0xffffffffu64), (1, u64::MAX), (3, 0xffff)] {
+        for cond in 0..16u32 {
+            let word = 0x1e200c00 | (ftype << 22) | (cond << 12) | (2 << 16) | (1 << 5);
+            let name = format!("select_fp_{ftype}_{cond}");
+            let bytes: Vec<_> = [word, 0xd65f03c0]
+                .iter()
+                .flat_map(|w| w.to_le_bytes())
+                .collect();
+            code += &emit(&lift(&bytes, 0, 0).unwrap(), 0)
+                .unwrap()
+                .replace(HEADER, "")
+                .replace("mkw_guest", &name);
+            main+=&format!("for(unsigned f=0;f<16;f++){{c=(MkwCpu){{0}};c.vregs[1][0]=UINT64_C(0xfff0123456789abc);c.vregs[2][0]=UINT64_C(0x7ff8fedcba987654);c.vregs[0][1]=UINT64_MAX;c.fpsr=0x0800009f;c.n=f>>3;c.z=(f>>2)&1;c.c=(f>>1)&1;c.v=f&1;uint64_t expected=((masks[{cond}]&(1u<<f))?c.vregs[1][0]:c.vregs[2][0])&UINT64_C({mask});if({name}(&c,10)||c.vregs[0][0]!=expected||c.vregs[0][1]||c.n!=(f>>3)||c.z!=((f>>2)&1)||c.c!=((f>>1)&1)||c.v!=(f&1)||c.fpsr!=0x0800009f)return 1;}}\n");
+        }
+    }
+    main += "return 0;}\n";
+    let folder =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../private/testing/fp-select");
+    std::fs::create_dir_all(&folder).unwrap();
+    let src = folder.join("test.c");
+    let exe = folder.join("test");
+    std::fs::write(&src, code + &main).unwrap();
+    for opt in ["-O0", "-O2"] {
+        let build = std::process::Command::new("cc")
+            .args([
+                "-std=c11",
+                opt,
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-fsanitize=undefined",
+                "-fno-sanitize-recover=undefined",
+            ])
+            .arg(&src)
+            .arg("-o")
+            .arg(&exe)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "{}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        assert!(std::process::Command::new(&exe).status().unwrap().success());
+    }
+}

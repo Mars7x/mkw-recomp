@@ -69,6 +69,26 @@ for size in range(4):
     for rn in [0,31]:words.add(0x38200000|(size<<30)|((order&1)<<23)|((order>>1)<<22)|(operation<<12)|(rs<<16)|(rn<<5)|rt)
   for rs,rt in [(0,1),(31,31),(1,31),(31,1)]:
    for rn in [0,31]:words.add(0x08a07c00|(size<<30)|((order&1)<<22)|((order>>1)<<15)|(rs<<16)|(rn<<5)|rt)
+for kind in [0xd503309f,0xd50330bf]:
+ for option in range(16):words.add(kind|(option<<8))
+for register in [0xd53b4400,0xd53b4420,0xd53b4200,0xd51b4400,0xd51b4420,0xd51b4200]:
+ for rt in range(32):words.add(register|rt)
+for ftype in range(4):
+ for operation in range(16):
+  for rn in [0,1,31]:
+   for rm in [0,2,31]:words.add(0x1e200800|(ftype<<22)|(operation<<12)|(rm<<16)|(rn<<5))
+ for signaling in range(2):
+  for zero in range(2):
+   for rn in [0,1,31]:
+    for rm in [0,2,31]:words.add(0x1e202000|(ftype<<22)|(signaling<<4)|(zero<<3)|(rm<<16)|(rn<<5))
+for ftype in range(4):
+ for rn in [0,1,31]:
+  for rm in [0,2,31]:
+   for ra in [0,3,31]:words.add(0x1f000000|(ftype<<22)|(rm<<16)|(ra<<10)|(rn<<5))
+for ftype in range(4):
+ for condition in range(16):
+  for rn in [0,1,31]:
+   for rm in [0,2,31]:words.add(0x1e200c00|(ftype<<22)|(condition<<12)|(rm<<16)|(rn<<5))
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -81,7 +101,10 @@ for row in rows:
  word=row['word'];decoded=list(decoder.disasm(word.to_bytes(4,'little'),0x1000));op=row['instruction']['op'];kind=next(iter(op))if isinstance(op,dict)else op;counts[kind]+=1
  if len(decoded)!=1:errors.append({'word':hex(word),'error':'accepted encoding not decoded by Capstone'});continue
  ins=decoded[0]
- if kind=='OrderedMemory':
+ if kind in {'Floating','FloatSelect','SystemRegister','Barrier'}:
+  expected={'FloatSelect':{'fcsel'},'Floating':{'fadd','fsub','fmul','fdiv','fcmp','fcmpe','fmadd'},'SystemRegister':{'mrs','msr'},'Barrier':{'dmb','dsb'}}[kind]
+  if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'FP/system/barrier family differs','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='OrderedMemory':
   if ins.mnemonic not in {'ldapr','ldaprb','ldaprh'}:errors.append({'word':hex(word),'error':'ordered-memory family differs','reference':ins.mnemonic})
  elif kind=='Atomic':
   if not ins.mnemonic.startswith(('ldadd','ldclr','ldeor','ldset','ldsmax','ldsmin','ldumax','ldumin','swp','cas','stadd','stclr','steor','stset','stsmax','stsmin','stumax','stumin')):errors.append({'word':hex(word),'error':'atomic family differs','reference':ins.mnemonic+' '+ins.op_str})

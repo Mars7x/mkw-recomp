@@ -1,0 +1,25 @@
+use super::{r, write};
+use mkw_arm64::{floating::SystemReg, Op, Width};
+pub fn emit(op: Op) -> String {
+    match op {
+        Op::Floating(op)=>{
+            let accumulate=if op.operation==6{format!("c->vregs[{}][0]",op.accumulate)}else{"UINT64_C(0)".into()};
+            let right=if op.zero{"UINT64_C(0)".into()}else{format!("c->vregs[{}][0]",op.rhs)};
+            let mut out=format!("{{uint64_t result=0;uint32_t fpsr=c->fpsr;if(!c->floating){{c->fault_status=3;return 3;}}int status=c->floating({},{},c->fpcr,c->fpsr,c->vregs[{}][0],{right},{accumulate},&result,&fpsr);if(status){{c->fault_status=status;return status;}}c->fpsr=fpsr;\n",op.operation,op.bytes,op.lhs);
+            if matches!(op.operation,4|5){out+="c->n=(uint32_t)((result>>3)&1);c->z=(uint32_t)((result>>2)&1);c->c=(uint32_t)((result>>1)&1);c->v=(uint32_t)(result&1);\n";}
+            else {out+=&format!("c->vregs[{}][0]=result;c->vregs[{}][1]=0;\n",op.dst,op.dst);}
+            out+="}\n";out
+        }
+        Op::SystemRegister{read,register,value}=>{
+            if read {let expression=match register{SystemReg::Fpcr=>"c->fpcr",SystemReg::Fpsr=>"c->fpsr",SystemReg::Nzcv=>"((uint64_t)c->n<<31)|((uint64_t)c->z<<30)|((uint64_t)c->c<<29)|((uint64_t)c->v<<28)"};write(value,Width::X64,expression)}else{
+                let src=r(value);match register{
+                    SystemReg::Fpcr=>format!("{{uint64_t value={src};if(value&~UINT64_C(0x07c89f00)){{c->fault_status=3;return 3;}}c->fpcr=(uint32_t)value;}}\n"),
+                    SystemReg::Fpsr=>format!("c->fpsr=(uint32_t)({src}&UINT64_C(0x0800009f));\n"),
+                    SystemReg::Nzcv=>format!("{{uint64_t value={src};c->n=(uint32_t)((value>>31)&1);c->z=(uint32_t)((value>>30)&1);c->c=(uint32_t)((value>>29)&1);c->v=(uint32_t)((value>>28)&1);}}\n"),
+                }
+            }
+        }
+        Op::Barrier{kind,option}=>format!("if(!c->barrier){{c->fault_status=3;return 3;}}{{int status=c->barrier(c->memory_context,{kind},{option});if(status){{c->fault_status=status;return status;}}}}\n"),
+        _=>unreachable!(),
+    }
+}

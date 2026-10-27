@@ -4,6 +4,7 @@ pub mod abi;
 pub mod atomics;
 pub mod bridge;
 pub mod dispatch;
+pub mod floating;
 mod linker;
 pub use linker::LinkScopes;
 use mkw_formats::{Nso, Result};
