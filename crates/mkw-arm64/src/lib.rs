@@ -52,6 +52,11 @@ pub enum Op {
         flags: bool,
     },
     Floating(floating::Floating),
+    ConditionalFloat {
+        operation: floating::Floating,
+        condition: u8,
+        nzcv: u8,
+    },
     Convert(floating::Conversion),
     FloatSelect {
         bytes: u8,

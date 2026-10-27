@@ -85,6 +85,22 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
         let next = format!("goto L_{:x};\n", i.pc + 4);
         match i.op {
             Op::Nop => out += &next,
+            Op::ConditionalFloat {
+                operation,
+                condition,
+                nzcv,
+            } => {
+                out += &format!("if({}){{\n", condition::expression(condition)?);
+                out += &floating::emit(Op::Floating(operation));
+                out += &format!(
+                    "}}else{{c->n={};c->z={};c->c={};c->v={};}}\n",
+                    nzcv >> 3,
+                    (nzcv >> 2) & 1,
+                    (nzcv >> 1) & 1,
+                    nzcv & 1
+                );
+                out += &next;
+            }
             Op::FloatSelect {
                 bytes,
                 dst,

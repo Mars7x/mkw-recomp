@@ -9,7 +9,7 @@
 | Function discovery | Partially implemented | 223,856 validated CIE/FDE extents plus candidates; indirect resolution incomplete |
 | Synthetic native translation | Implemented and tested | Host x86-64 executable ran; limited instruction subset |
 | Guest memory/relocation foundation | Partially implemented | Synthetic Rust/native memory and dispatcher tests pass; 309,844 relocations apply/read back; serialized diagnostic ordering |
-| Actual game CPU translation | Partially implemented | 208,307 subset-liftable indexed extents with possible unbound tails; 44 object samples; no complete module |
+| Actual game CPU translation | Partially implemented | 209,011 subset-liftable indexed extents with possible unbound tails; 46 object samples; no complete module |
 | Actual runtime bootstrap | Not started | No guest instruction execution |
 | Vulkan/shaders/game frame | Not started | Container observations only |
 | SDL3 input/audio, VFS/saves | Not started | No runtime implementations |

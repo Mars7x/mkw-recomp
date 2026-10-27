@@ -135,6 +135,26 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
             zero: false,
         })));
     }
+    if w & 0xff200c00 == 0x1e200400 {
+        let bytes = match (w >> 22) & 3 {
+            0 => 4,
+            1 => 8,
+            _ => return Some(Err("unsupported conditional FP compare type".into())),
+        };
+        return Some(Ok(Op::ConditionalFloat {
+            condition: ((w >> 12) & 15) as u8,
+            nzcv: (w & 15) as u8,
+            operation: Floating {
+                bytes,
+                operation: 4 + u8::from(w & (1 << 4) != 0),
+                dst: 0,
+                lhs: ((w >> 5) & 31) as u8,
+                rhs: ((w >> 16) & 31) as u8,
+                accumulate: 0,
+                zero: false,
+            },
+        }));
+    }
     let compare = w & 0xff20fc07 == 0x1e202000;
     let binary = w & 0xff200c00 == 0x1e200800;
     if !compare && !binary {
@@ -157,6 +177,7 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
             1 => 3,
             2 => 0,
             3 => 1,
+            8 => 10,
             _ => return None,
         };
         (operation, false)
@@ -272,5 +293,36 @@ mod thread_tests {
             }
         ));
         assert!(crate::decode(system(false, 3, 0), 0).is_err());
+    }
+}
+
+#[cfg(test)]
+mod conditional_fp_tests {
+    use super::*;
+    #[test]
+    fn conditional_fp_fields_and_unsupported_widths() {
+        assert!(matches!(
+            crate::decode(0x1e22043f, 0).unwrap().op,
+            Op::ConditionalFloat {
+                condition: 0,
+                nzcv: 15,
+                operation: Floating {
+                    operation: 5,
+                    bytes: 4,
+                    ..
+                }
+            }
+        ));
+        assert!(matches!(
+            crate::decode(0x1e628820, 0).unwrap().op,
+            Op::Floating(Floating {
+                operation: 10,
+                bytes: 8,
+                ..
+            })
+        ));
+        for word in [0x1ee20420, 0x1ea20420, 0x1ee28820] {
+            assert!(crate::decode(word, 0).is_err(), "{word:08x}");
+        }
     }
 }

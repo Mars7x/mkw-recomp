@@ -10,7 +10,12 @@ unsigned mkw_fp_abi_version(void){return MKW_CPU_ABI_VERSION;}
  * Supported FPCR: rounding and default-NaN; traps/flush/alternative/merge refuse. */
 int mkw_fp(uint32_t operation,uint32_t bytes,uint32_t fpcr,uint32_t fpsr,
            uint64_t left,uint64_t right,uint64_t accumulate,uint64_t *result,uint32_t *status){
-    if((bytes!=4&&bytes!=8)||operation>9||(fpcr&~UINT32_C(0x02c00000)))return 3;
+    if((bytes!=4&&bytes!=8)||operation>10||(fpcr&~UINT32_C(0x02c00000)))return 3;
+    if(operation==10){
+        uint64_t product=0;uint32_t flags=fpsr;int rc=mkw_fp(2,bytes,fpcr,fpsr,left,right,0,&product,&flags);
+        if(rc){return rc;}
+        *result=product^(bytes==4?UINT64_C(0x80000000):UINT64_C(0x8000000000000000));*status=flags;return 0;
+    }
     if(bytes==4){left=(uint32_t)left;right=(uint32_t)right;accumulate=(uint32_t)accumulate;}
     MkwFpEnvironment saved=mkw_fp_begin(fpcr);
     uint64_t value=0;

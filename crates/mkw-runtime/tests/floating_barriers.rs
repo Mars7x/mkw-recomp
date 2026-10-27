@@ -11,7 +11,7 @@ mod fp_native;
 mod reference;
 use fp_native::*;
 fn fp_word(bytes: u8, operation: u32, zero: bool) -> u32 {
-    if operation >= 7 {
+    if (7..=9).contains(&operation) {
         return (match operation {
             7 => 0x1e214000,
             8 => 0x1e20c000,
@@ -28,6 +28,7 @@ fn fp_word(bytes: u8, operation: u32, zero: bool) -> u32 {
         4 => 0x1e202000,
         5 => 0x1e202010,
         6 => 0x1f000c00,
+        10 => 0x1e208800,
         _ => unreachable!(),
     };
     base | (if bytes == 8 { 1 << 22 } else { 0 }) | (if zero { 8 } else { 2 << 16 }) | (1 << 5)
@@ -245,7 +246,7 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
         }
         for rounding in 0..4 {
             for dn in 0..2 {
-                for operation in 0..10 {
+                for operation in 0..11 {
                     for (i, &(left, right)) in pairs.iter().enumerate() {
                         cases.push(reference::FloatingCase {
                             word: fp_word(bytes, operation, false),
@@ -316,6 +317,54 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
                     nzcv: flags << 28,
                     fpcr: 0,
                     fpsr: 0x0800009f,
+                });
+            }
+        }
+    }
+    for bytes in [4, 8] {
+        for signaling in 0..2 {
+            for condition in 0..16 {
+                for flags in 0..16 {
+                    for left in [
+                        if bytes == 4 {
+                            0x3f800000
+                        } else {
+                            0x3ff0000000000000
+                        },
+                        if bytes == 4 {
+                            0x7f812345
+                        } else {
+                            0x7ff0123456789abc
+                        },
+                    ] {
+                        cases.push(reference::FloatingCase {
+                            word: 0x1e220420
+                                | (if bytes == 8 { 1 << 22 } else { 0 })
+                                | (signaling << 4)
+                                | (condition << 12)
+                                | condition,
+                            left,
+                            right: 0,
+                            accumulate: 0,
+                            nzcv: flags << 28,
+                            fpcr: 0,
+                            fpsr: 0x08000080,
+                        });
+                    }
+                }
+            }
+            for nzcv in 0..16 {
+                cases.push(reference::FloatingCase {
+                    word: 0x1e220420
+                        | (if bytes == 8 { 1 << 22 } else { 0 })
+                        | (signaling << 4)
+                        | nzcv,
+                    left: 0x7ff0123456789abc,
+                    right: 0,
+                    accumulate: 0,
+                    nzcv: 0,
+                    fpcr: 1 << 24,
+                    fpsr: 0x08000080,
                 });
             }
         }
@@ -403,7 +452,7 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
         .output()
         .unwrap();
     let version = String::from_utf8(version.stdout).unwrap();
-    let receipt = serde_json::json!({"reference":version.lines().next(),"synthetic_cases":cases.len(),"operations":["fadd","fsub","fmul","fdiv","fcmp","fcmpe","fmadd","fcsel","fneg","fabs","fsqrt"],"widths":[32,64],"raw_select_widths":[16,32,64],"rounding_modes":4,"default_nan_modes":2,"flush_modes_supported":false,"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false});
+    let receipt = serde_json::json!({"reference":version.lines().next(),"synthetic_cases":cases.len(),"operations":["fadd","fsub","fmul","fdiv","fcmp","fcmpe","fmadd","fcsel","fneg","fabs","fsqrt","fnmul","fccmp","fccmpe"],"widths":[32,64],"raw_select_widths":[16,32,64],"rounding_modes":4,"default_nan_modes":2,"flush_modes_supported":false,"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false});
     std::fs::write(
         path.join("receipt.json"),
         serde_json::to_vec_pretty(&receipt).unwrap(),
@@ -517,5 +566,138 @@ fn data_barriers_preserve_tags_refuse_missing_backends_and_publish() {
             .access(MemoryOrder::Plain, false, GuestAddr(0x1000), &mut data, 8)
             .unwrap();
         assert_eq!(data[0], 42);
+    }
+}
+
+#[test]
+fn conditional_compare_skips_false_path_and_fnmul_preserves_nan_sign_rules() {
+    let path = folder("conditional-fp-known");
+    let mut code = String::new();
+    for bytes in [4, 8] {
+        for signaling in 0..2 {
+            for cond in 0..16 {
+                let word = 0x1e220420
+                    | (if bytes == 8 { 1 << 22 } else { 0 })
+                    | (signaling << 4)
+                    | (cond << 12)
+                    | cond;
+                code += &generate(
+                    &[word, 0xd65f03c0],
+                    &format!("cc_{bytes}_{signaling}_{cond}"),
+                );
+            }
+        }
+        code += &generate(
+            &[fp_word(bytes, 10, false), 0xd65f03c0],
+            &format!("nm_{bytes}"),
+        );
+    }
+    let masks = [
+        0xf0f0u16, 0x0f0f, 0xcccc, 0x3333, 0xff00, 0x00ff, 0xaaaa, 0x5555, 0x0c0c, 0xf3f3, 0xaa55,
+        0x55aa, 0x0a05, 0xf5fa, 0xffff, 0xffff,
+    ];
+    for opt in ["-O0", "-O2"] {
+        let library = build(&code, &path, opt);
+        let fp_lib = backend(&path, opt);
+        let fp = unsafe { FloatingBackend::load(&fp_lib) }.unwrap();
+        for bytes in [4, 8] {
+            for signaling in 0..2 {
+                for (cond, mask) in masks.iter().enumerate() {
+                    let native = unsafe {
+                        library
+                            .get::<Entry>(format!("cc_{bytes}_{signaling}_{cond}\0").as_bytes())
+                            .unwrap()
+                    };
+                    for flags in 0..16u32 {
+                        let holds = *mask & (1 << flags) != 0;
+                        let initial = Cpu {
+                            n: flags >> 3,
+                            z: (flags >> 2) & 1,
+                            c: (flags >> 1) & 1,
+                            v: flags & 1,
+                            fpcr: 1 << 24,
+                            fpsr: 0x08000080,
+                            ..Cpu::default()
+                        };
+                        let mut cpu = initial;
+                        cpu.vregs[0] = [123, 456];
+                        assert_eq!(unsafe { native(&mut cpu, 10) }, if holds { 3 } else { 0 });
+                        let actual = (cpu.n << 3) | (cpu.z << 2) | (cpu.c << 1) | cpu.v;
+                        assert_eq!(actual, if holds { flags } else { cond as u32 });
+                        assert_eq!(cpu.fpsr, 0x08000080);
+                        for snan in [false, true] {
+                            let mut cpu = Cpu {
+                                n: flags >> 3,
+                                z: (flags >> 2) & 1,
+                                c: (flags >> 1) & 1,
+                                v: flags & 1,
+                                fpsr: 0x08000080,
+                                ..Cpu::default()
+                            };
+                            cpu.vregs[0] = [123, 456];
+                            cpu.vregs[1][0] = if bytes == 4 {
+                                if snan {
+                                    0x7f812345
+                                } else {
+                                    0x7fc12345
+                                }
+                            } else if snan {
+                                0x7ff0123456789abc
+                            } else {
+                                0x7ff8123456789abc
+                            };
+                            let mut attached = fp.attach(&mut cpu);
+                            assert_eq!(unsafe { native(attached.cpu_mut(), 10) }, 0);
+                            let cpu = attached.cpu_mut();
+                            assert_eq!(
+                                (cpu.n << 3) | (cpu.z << 2) | (cpu.c << 1) | cpu.v,
+                                if holds { 3 } else { cond as u32 }
+                            );
+                            assert_eq!(
+                                cpu.fpsr,
+                                0x08000080 | u32::from(holds && (snan || signaling != 0))
+                            );
+                            assert_eq!(cpu.vregs[0], [123, 456]);
+                        }
+                    }
+                }
+            }
+            let native = unsafe {
+                library
+                    .get::<Entry>(format!("nm_{bytes}\0").as_bytes())
+                    .unwrap()
+            };
+            for dn in [0, 1u32 << 25] {
+                let mut cpu = Cpu {
+                    fpcr: dn,
+                    ..Cpu::default()
+                };
+                cpu.vregs[1][0] = if bytes == 4 {
+                    0x7fc12345
+                } else {
+                    0x7ff8123456789abc
+                };
+                cpu.vregs[2][0] = if bytes == 4 {
+                    0x3f800000
+                } else {
+                    0x3ff0000000000000
+                };
+                let expected = if bytes == 4 {
+                    if dn != 0 {
+                        0xffc00000
+                    } else {
+                        0xffc12345
+                    }
+                } else if dn != 0 {
+                    0xfff8000000000000
+                } else {
+                    0xfff8123456789abc
+                };
+                let mut attached = fp.attach(&mut cpu);
+                assert_eq!(unsafe { native(attached.cpu_mut(), 10) }, 0);
+                assert_eq!(attached.cpu_mut().vregs[0], [expected, 0]);
+                assert_eq!(attached.cpu_mut().fpsr, 0);
+            }
+        }
     }
 }
