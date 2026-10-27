@@ -1,0 +1,22 @@
+{
+  "repository": "https://github.com/Atmosphere-NX/Atmosphere",
+  "revision": "6b0c077b4c608a3a2ee712b8dc35fee87ceb62e8",
+  "purpose": "semantic bit-field reference only; no implementation adoption",
+  "sources": {
+    "libraries/libmesosphere/include/mesosphere/kern_k_capabilities.hpp": {
+      "blob": "2c74b835cd0acc1ea383e61590a125561f90ce8d",
+      "sha256": "db9b2b0b0711446700bd36456fe4098449ded9d1262ab0206f2c28b017576cd2"
+    },
+    "libraries/libmesosphere/source/kern_k_capabilities.cpp": {
+      "blob": "ba035926230c23a956046d799ea9df5883aa214c",
+      "sha256": "8090121a6f2e64ae7fa139aa5a634cd52f9ed99da888ff361d953e5bb03e91e5"
+    },
+    "stratosphere/loader/source/ldr_capabilities.cpp": {
+      "blob": "b3bc25e652c7b7a328e91a0e087d6ce529d1e416",
+      "sha256": "c6f79c6be320fdbfc7a3e737f2650afdc64d2f0f2b1a31acafa3c2936d80ac25"
+    }
+  },
+  "reference_source_license": "GPL-2.0; retained privately",
+  "implementation_copied_or_linked": false,
+  "actual_switch2_behavior_verified": false
+}

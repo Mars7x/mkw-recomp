@@ -34,7 +34,8 @@ def run(label, command, *, cwd=ROOT, required=True):
 run('format', ['cargo', 'fmt', '--all', '--', '--check'])
 run('lint', ['cargo', 'clippy', '--workspace', '--all-targets', '--offline', '--locked', '--', '-D', 'warnings'])
 run('unit and native semantic tests', ['cargo', 'test', '--workspace', '--offline', '--locked'])
-run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks', '--test', 'thread_runner', '--test', 'services', '--test', 'events', '--test', 'event_services', '--test', 'event_poll'])
+run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks', '--test', 'thread_runner', '--test', 'services', '--test', 'events', '--test', 'event_services', '--test', 'event_poll', '--test', 'service_permissions'])
+run('kernel capability facts release tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-formats', '--test', 'capabilities'])
 run('native synthetic demo', ['cargo', 'run', '--release', '--offline', '--locked', '--', 'aot-demo'])
 binary = ROOT / 'target/release/mkw-recomp'
 header = run('native ELF header', ['readelf', '-h', str(ROOT / 'private/builds/synthetic/aot-demo')])
@@ -44,6 +45,11 @@ if 'Advanced Micro Devices X86-64' not in header.stdout:
 if args.game:
     game = args.game.resolve()
     run('exact supplied ExeFS identity', [str(binary), 'verify', str(game)])
+    run('declared supplied runtime metadata consistency', [str(binary), 'runtime-metadata-check', str(game)])
+    facts = json.loads((ROOT / 'private/analysis/runtime-metadata-facts.json').read_text())
+    if (facts['signature_verified'] or facts['target_configuration_verified']
+            or facts['game_code_executed'] or facts['services_activated']):
+        raise SystemExit('Runtime metadata inspection crossed authorization/execution boundaries')
     run('synthetic native HLE read of supplied RomFS', [str(binary), 'romfs-hle-check', str(game)])
     manifest = json.loads((ROOT / 'private/analysis/exefs-manifest.json').read_text())
     # Change only a test copy of manifest metadata, never any game input.

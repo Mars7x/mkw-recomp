@@ -105,6 +105,19 @@ impl Services {
         }
         Ok(Self { handlers })
     }
+    /// Return a view containing only already registered handlers whose numbers
+    /// are explicitly allowed. This can remove capabilities, never add them.
+    /// The caller must separately authenticate/authorize any target policy.
+    pub fn restricted_to(&self, allowed: &std::collections::BTreeSet<u16>) -> Self {
+        Self {
+            handlers: self
+                .handlers
+                .iter()
+                .filter(|(number, _)| allowed.contains(number))
+                .map(|(&number, handler)| (number, handler.clone()))
+                .collect(),
+        }
+    }
     pub(crate) fn invoke(
         &self,
         context: &Context,

@@ -1,4 +1,5 @@
 //! Read-only, bounded binary parsing. Guest addresses are module-relative, never host pointers.
+pub mod capabilities;
 pub mod unwind;
 use serde::Serialize;
 use sha2::{Digest, Sha256};

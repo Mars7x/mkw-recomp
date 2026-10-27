@@ -4,11 +4,12 @@ mod exclusive_survey;
 mod pipeline;
 #[cfg(target_os = "linux")]
 mod romfs_probe;
+mod runtime_metadata;
 mod survey;
 use mkw_formats::{Npdm, Nso};
 use std::{error::Error, path::Path};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-const USAGE:&str="usage: mkw-recomp {analyze|verify|link-check|cpu-survey|cpu-survey-exclusive-v10|cpu-survey-exclusive-v2|cpu-survey-services-v3|romfs-hle-check|cpu-blockers} GAME_ROOT | inspect FILE | aot-demo | generate-slice GAME_ROOT MODULE ENTRY LENGTH";
+const USAGE:&str="usage: mkw-recomp {analyze|verify|link-check|cpu-survey|cpu-survey-exclusive-v10|cpu-survey-exclusive-v2|cpu-survey-services-v3|romfs-hle-check|runtime-metadata-check|cpu-blockers} GAME_ROOT | inspect FILE | aot-demo | generate-slice GAME_ROOT MODULE ENTRY LENGTH";
 fn main() {
     if let Err(e) = run() {
         eprintln!("error: {e}");
@@ -47,6 +48,7 @@ fn run() -> Result<()> {
         "cpu-survey-exclusive-v10" => exclusive_survey::run(Path::new(argument(2)?))?,
         "cpu-survey-services-v3" => exclusive_survey::run_v3(Path::new(argument(2)?))?,
         "cpu-survey-exclusive-v2" => exclusive_survey::run_v2(Path::new(argument(2)?))?,
+        "runtime-metadata-check" => runtime_metadata::run(Path::new(argument(2)?))?,
         "cpu-blockers" => blockers::run(Path::new(argument(2)?))?,
         "link-check" => pipeline::link_check(Path::new(argument(2)?))?,
         "generate-slice" => {
