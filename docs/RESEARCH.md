@@ -203,3 +203,11 @@ The multiple-structure encoding table was independently constructed and cross-ch
 ## Widening multiply provenance
 
 The widening register/indexed masks and shared H/L/M lane fields were constructed independently and checked using private Capstone. Native code uses unsigned modulo arithmetic; the independent oracle uses i128 products and accumulator arithmetic followed by byte truncation. Tests include signed/unsigned boundaries, both source halves, destination aliases, V31, indexed lanes and preserved status fields. All implementation and synthetic ELF code is original; no new upstream sources or game code were copied. QEMU remains a software oracle and original execution stays gated.
+
+## Saturating arithmetic and narrowing provenance
+
+SQADD/UQADD/SQSUB/UQSUB and SQXTN/UQXTN/SQXTUN encodings were independently constructed and cross-checked with private Capstone before publication. Native emitters use unsigned overflow predicates and encoded thresholds; independent test oracles use i128 arithmetic and clamps. Matrices exercise 64-bit extrema, signed-to-unsigned negative clamps, all scalar/vector widths, upper retention, V31/source aliases, initial QC states and preserved controls/flags. Synthetic QEMU fixtures execute no game-derived instructions. No new upstream sources or copied implementations were added.
+
+## Register shift provenance
+
+SSHL/USHL masks and scalar/vector width constraints were independently constructed and privately cross-checked. Native code uses bounded unsigned shifts and sign-fill masks; the independent oracle copies individual source bits based on signed low-byte counts. Every count byte is represented, with nonzero unrelated upper count bits, extrema and aliases. No upstream or game code was copied; software-only and target-configuration limits remain.

@@ -49,3 +49,15 @@ All multiple-structure LD1/ST1 lists of one through four registers and interleav
 SMULL/UMULL, SMLAL/UMLAL and SMLSL/UMLSL support B/H/S vector inputs, low/upper source halves and H/S indexed-element forms. All forms produce a complete 128-bit widened destination. Upper forms select the upper half of ordinary sources; indexed right operands retain their independent full-vector lane selection. Complete snapshots preserve source/destination aliases and V31. Unsigned modulo arithmetic implements products and accumulator wrap without signed overflow; no callbacks or ABI changes are needed and NZCV/FPCR/FPSR remain unchanged.
 
 Independent i128 product/add/subtract expectations check 280,800 native cases per optimization, including extrema, upper halves, aliases, accumulator wrap and indexed lanes. A separate 187,200-case synthetic QEMU matrix matches O0/O2 with fatal UBSan. Scalar and reserved width encodings retain their prior ownership or reject. Software comparisons do not establish original hardware behavior or remove target/access/bootstrap gates.
+
+## Saturating arithmetic and narrowing
+
+SQADD/UQADD and SQSUB/UQSUB support B/H/S/D scalar forms and legal vector arrangements. Inputs are snapshotted before destination updates; unsigned carry/borrow and sign-bit overflow tests avoid host signed overflow, including 64-bit lanes. Saturation sets sticky FPSR.QC and other state is preserved. Independent i128 clamping checks 212,256 native cases per optimization; 141,504 synthetic QEMU cases match O0/O2 with fatal UBSan.
+
+SQXTN/UQXTN/SQXTUN support H/S/D inputs narrowed to B/H/S, scalar results and vector low/upper destination halves. Upper vector forms retain the low half; low/scalar forms clear unused bits. Signed 64-bit inputs are compared with unsigned encoded thresholds, avoiding implementation-defined signed conversions. Independent i128 clamp/truncate checks cover 21,600 native cases per optimization; 10,800 synthetic QEMU cases match O0/O2 with fatal UBSan. Reserved widths and neighboring scalar FP encodings remain separately checked. These operations require no callbacks or ABI change; access/configuration gates and software-oracle limitations still apply.
+
+## Register-count SIMD shifts
+
+SSHL/USHL support legal B/H/S/D vectors and D scalar forms. Each lane uses only the signed low byte of its count: positive counts shift left, negative counts shift right, and counts at/beyond element width produce zero or arithmetic sign fill. Complete snapshots preserve aliases/V31; unused destination bits clear. Explicit bounds prevent C shifts by the element width or larger; unsigned sign fill avoids host signed-right-shift dependencies. FPSR.QC and all other flags/controls are unchanged.
+
+An independent bit-copy oracle checks 688,128 native cases per optimization; 458,752 synthetic QEMU cases match O0/O2 with fatal UBSan. Matrices cover every count byte, irrelevant upper count bits, all arrangements, extrema, aliases and preserved state. No callbacks or ABI changes are required; software-reference and actual target/access/bootstrap limitations remain.

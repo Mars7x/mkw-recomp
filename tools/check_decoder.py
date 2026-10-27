@@ -259,6 +259,21 @@ for scalar in range(2):
     for base in [0x0f00a000,0x0f002000,0x0f006000]:
      for index in range(8):
       for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,15)]:words.add(base|(scalar<<28)|(q<<30)|(u<<29)|(size<<22)|((index>>2)<<11)|(((index>>1)&1)<<21)|((index&1)<<20)|(rm<<16)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for size in range(4):
+   for base in [0x0e200c00,0x2e200c00,0x0e202c00,0x2e202c00]:
+    for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(1,2,1)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for size in range(4):
+   for base in [0x0e214800,0x2e214800,0x2e212800]:
+    for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for size in range(4):
+   for base in [0x0e204400,0x2e204400]:
+    for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(1,2,1)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -291,7 +306,18 @@ for row in rows:
   elif ins.mnemonic==name and ins.operands[-1].imm!=v['amount']:errors.append({'word':hex(word),'error':'SIMD shift amount differs','reference':ins.op_str})
  elif kind=='VectorInteger':
   variant,v=next(iter(op['VectorInteger'].items()));letters={1:'b',2:'h',4:'s',8:'d'}
-  if variant=='WidenMultiply':
+  if variant=='RegisterShift':
+   name='sshl' if v['signed'] else 'ushl';scalar=bool(word&(1<<28));reg=lambda n:letters[v['bytes']]+str(n) if scalar else 'v'+str(n)+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
+   operands=', '.join(reg(v[k]) for k in ['dst','lhs','rhs'])
+  elif variant=='SaturatingNarrow':
+   name={'Signed':'sqxtn','Unsigned':'uqxtn','SignedUnsigned':'sqxtun'}[v['kind']]+('2' if v['upper'] else '')
+   b=v['bytes']
+   operands=letters[b]+str(v['dst'])+', '+letters[b*2]+str(v['src']) if v['scalar'] else 'v'+str(v['dst'])+'.'+str((16 if v['upper'] else 8)//b)+letters[b]+', v'+str(v['src'])+'.'+str(8//b)+letters[b*2]
+  elif variant=='Saturating':
+   name=('sq' if v['signed'] else 'uq')+('sub' if v['subtract'] else 'add');scalar=bool(word&(1<<28))
+   reg=lambda n:letters[v['bytes']]+str(n) if scalar else 'v'+str(n)+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
+   operands=', '.join(reg(v[k]) for k in ['dst','lhs','rhs'])
+  elif variant=='WidenMultiply':
    name=('s' if v['signed'] else 'u')+{'Product':'mull','Add':'mlal','Subtract':'mlsl'}[v['accumulate']]+('2' if v['upper'] else '')
    b=v['bytes'];reg=lambda n:'v'+str(n)+'.'+str((16 if v['upper'] else 8)//b)+letters[b]
    operands='v'+str(v['dst'])+'.'+str(8//b)+letters[b*2]+', '+reg(v['lhs'])+', '

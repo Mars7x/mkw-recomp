@@ -593,7 +593,19 @@ mod transform_tests {
             crate::decode(0x4e205820, 0).unwrap().op,
             Op::Simd(Simd::ByteCount { .. })
         ));
-        for w in [0x5e200820, 0x4e200c20, 0x6ea05820] {
+        assert!(matches!(
+            crate::decode(0x4e200c20, 0).unwrap().op,
+            Op::VectorInteger(crate::vector_integer::VectorInteger::Saturating {
+                bytes: 1,
+                total: 16,
+                dst: 0,
+                lhs: 1,
+                rhs: 0,
+                signed: true,
+                subtract: false
+            })
+        ));
+        for w in [0x5e200820, 0x6ea05820] {
             assert!(crate::decode(w, 0).is_err(), "{w:x}");
         }
     }

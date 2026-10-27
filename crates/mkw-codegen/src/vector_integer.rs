@@ -1,4 +1,4 @@
-use mkw_arm64::vector_integer::{Accumulate, Kind, Reduction, VectorInteger};
+use mkw_arm64::vector_integer::{Accumulate, Kind, NarrowKind, Reduction, VectorInteger};
 fn mask(bytes: u8) -> u64 {
     if bytes == 8 {
         u64::MAX
@@ -8,6 +8,104 @@ fn mask(bytes: u8) -> u64 {
 }
 pub fn emit(op: VectorInteger) -> String {
     match op {
+        VectorInteger::RegisterShift {
+            bytes,
+            total,
+            dst,
+            lhs,
+            rhs,
+            signed,
+        } => {
+            let bits = bytes * 8;
+            let mask = mask(bytes);
+            let sign = 1u64 << (bits - 1);
+            let negative = if signed {
+                format!("(a&UINT64_C({sign}))!=0")
+            } else {
+                "0".into()
+            };
+            format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t a=(left[half]>>shift)&UINT64_C({mask}),b=(right[half]>>shift)&UINT64_C(255),value;int amount=(int)b;if(amount>=128)amount-=256;if(amount>=0){{value=amount>={bits}?0:(a<<amount)&UINT64_C({mask});}}else{{unsigned count=(unsigned)(-amount);if(count>={bits})value={negative}?UINT64_C({mask}):0;else{{value=a>>count;if({negative})value|=UINT64_C({mask})^(UINT64_C({mask})>>count);}}}}output[half]|=value<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes)
+        }
+
+        VectorInteger::SaturatingNarrow {
+            bytes,
+            dst,
+            src,
+            scalar,
+            upper,
+            kind,
+        } => {
+            let bits = bytes * 8;
+            let inbits = bits * 2;
+            let input_mask = mask(bytes * 2);
+            let output_mask = mask(bytes);
+            let sign = 1u64 << (inbits - 1);
+            let signed_input = kind != NarrowKind::Unsigned;
+            let signed_output = kind == NarrowKind::Signed;
+            let max = if signed_output {
+                (1u64 << (bits - 1)) - 1
+            } else {
+                output_mask
+            };
+            let min = 1u64 << (bits - 1);
+            let threshold = input_mask - min + 1;
+            let negative = if signed_input {
+                format!("(a&UINT64_C({sign}))!=0")
+            } else {
+                "0".into()
+            };
+            let handle_negative = if signed_output {
+                format!("if(a<UINT64_C({threshold})){{value=UINT64_C({min});fpsr|=UINT32_C(134217728);}}else value=a&UINT64_C({output_mask});")
+            } else {
+                "value=0;fpsr|=UINT32_C(134217728);".into()
+            };
+            let low = if upper {
+                format!("c->vregs[{dst}][0]")
+            } else {
+                "0".into()
+            };
+            let start = if upper { 64 } else { 0 };
+            let lanes = if scalar { 1 } else { 8 / bytes };
+            format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{{low},0}};uint32_t fpsr=c->fpsr;for(unsigned lane=0;lane<{lanes};lane++){{unsigned offset=lane*{inbits},out={start}+lane*{bits};uint64_t a=(source[offset/64]>>(offset%64))&UINT64_C({input_mask}),value;if({negative}){{{handle_negative}}}else if(a>UINT64_C({max})){{value=UINT64_C({max});fpsr|=UINT32_C(134217728);}}else value=a;output[out/64]|=value<<(out%64);}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];c->fpsr=fpsr;}}\n")
+        }
+
+        VectorInteger::Saturating {
+            bytes,
+            total,
+            dst,
+            lhs,
+            rhs,
+            signed,
+            subtract,
+        } => {
+            let bits = bytes * 8;
+            let mask = mask(bytes);
+            let sign = 1u64 << (bits - 1);
+            let result = if subtract { "a-b" } else { "a+b" };
+            let overflow = if signed {
+                if subtract {
+                    format!("((a^b)&(a^value)&UINT64_C({sign}))!=0")
+                } else {
+                    format!("(~(a^b)&(a^value)&UINT64_C({sign}))!=0")
+                }
+            } else if subtract {
+                "a<b".into()
+            } else {
+                "value<a".into()
+            };
+            let clip = if signed {
+                format!(
+                    "(a&UINT64_C({sign}))?UINT64_C({sign}):UINT64_C({})",
+                    sign - 1
+                )
+            } else if subtract {
+                "UINT64_C(0)".into()
+            } else {
+                format!("UINT64_C({mask})")
+            };
+            format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},output[2]={{0,0}};uint32_t fpsr=c->fpsr;for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t a=(left[half]>>shift)&UINT64_C({mask}),b=(right[half]>>shift)&UINT64_C({mask}),value=({result})&UINT64_C({mask});if({overflow}){{value={clip};fpsr|=UINT32_C(134217728);}}output[half]|=value<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];c->fpsr=fpsr;}}\n",total/bytes)
+        }
+
         VectorInteger::WidenMultiply {
             bytes,
             dst,

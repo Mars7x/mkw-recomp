@@ -129,6 +129,24 @@ pub fn run(root: &Path) -> Result<()> {
                                 features.push("simd_integer_lanes_reduction");
                                 if matches!(
                                     v,
+                                    mkw_arm64::vector_integer::VectorInteger::RegisterShift { .. }
+                                ) {
+                                    features.push("simd_register_shift");
+                                }
+                                if matches!(
+                                    v,
+                                    mkw_arm64::vector_integer::VectorInteger::SaturatingNarrow { .. }
+                                ) {
+                                    features.push("simd_saturating_narrow");
+                                }
+                                if matches!(
+                                    v,
+                                    mkw_arm64::vector_integer::VectorInteger::Saturating { .. }
+                                ) {
+                                    features.push("simd_saturating_add_subtract");
+                                }
+                                if matches!(
+                                    v,
                                     mkw_arm64::vector_integer::VectorInteger::WidenMultiply { .. }
                                 ) {
                                     features.push("simd_widening_multiply");

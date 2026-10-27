@@ -36,7 +36,38 @@ pub enum Accumulate {
     Subtract,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum NarrowKind {
+    Signed,
+    Unsigned,
+    SignedUnsigned,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum VectorInteger {
+    RegisterShift {
+        bytes: u8,
+        total: u8,
+        dst: u8,
+        lhs: u8,
+        rhs: u8,
+        signed: bool,
+    },
+    SaturatingNarrow {
+        bytes: u8,
+        dst: u8,
+        src: u8,
+        scalar: bool,
+        upper: bool,
+        kind: NarrowKind,
+    },
+    Saturating {
+        bytes: u8,
+        total: u8,
+        dst: u8,
+        lhs: u8,
+        rhs: u8,
+        signed: bool,
+        subtract: bool,
+    },
     WidenMultiply {
         bytes: u8,
         dst: u8,
@@ -82,6 +113,79 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let bytes = 1 << size;
     let dst = (w & 31) as u8;
     let lhs = ((w >> 5) & 31) as u8;
+    let register_shift = match w & 0xaf20fc00 {
+        0x0e204400 => Some(true),
+        0x2e204400 => Some(false),
+        _ => None,
+    };
+    if let Some(signed) = register_shift {
+        let scalar = w & (1 << 28) != 0;
+        if (scalar && size != 3) || (!scalar && !q && size == 3) {
+            return Some(Err("reserved register shift arrangement".into()));
+        }
+        return Some(Ok(Op::VectorInteger(VectorInteger::RegisterShift {
+            bytes,
+            total: if scalar {
+                bytes
+            } else if q {
+                16
+            } else {
+                8
+            },
+            dst,
+            lhs,
+            rhs: ((w >> 16) & 31) as u8,
+            signed,
+        })));
+    }
+    let narrow = match w & 0xaf3ffc00 {
+        0x0e214800 => Some(NarrowKind::Signed),
+        0x2e214800 => Some(NarrowKind::Unsigned),
+        0x2e212800 => Some(NarrowKind::SignedUnsigned),
+        _ => None,
+    };
+    if let Some(kind) = narrow {
+        if size == 3 {
+            return Some(Err("reserved saturating narrowing width".into()));
+        }
+        let scalar = w & (1 << 28) != 0;
+        return Some(Ok(Op::VectorInteger(VectorInteger::SaturatingNarrow {
+            bytes,
+            dst,
+            src: lhs,
+            scalar,
+            upper: q && !scalar,
+            kind,
+        })));
+    }
+    let saturating = match w & 0xaf20fc00 {
+        0x0e200c00 => Some((true, false)),
+        0x2e200c00 => Some((false, false)),
+        0x0e202c00 => Some((true, true)),
+        0x2e202c00 => Some((false, true)),
+        _ => None,
+    };
+    if let Some((signed, subtract)) = saturating {
+        let scalar = w & (1 << 28) != 0;
+        if !scalar && !q && size == 3 {
+            return Some(Err("reserved saturating arithmetic arrangement".into()));
+        }
+        return Some(Ok(Op::VectorInteger(VectorInteger::Saturating {
+            bytes,
+            total: if scalar {
+                bytes
+            } else if q {
+                16
+            } else {
+                8
+            },
+            dst,
+            lhs,
+            rhs: ((w >> 16) & 31) as u8,
+            signed,
+            subtract,
+        })));
+    }
     let regular = match w & 0x9f20fc00 {
         0x0e20c000 => Some(Accumulate::Product),
         0x0e208000 => Some(Accumulate::Add),
@@ -467,5 +571,138 @@ mod widening_tests {
             }
         }
         assert!(decode(0x5e22c020).is_none());
+    }
+}
+
+#[cfg(test)]
+mod saturating_tests {
+    use super::*;
+    #[test]
+    fn saturating_domains_and_widths() {
+        for base in [0x0e200c00, 0x2e200c00, 0x0e202c00, 0x2e202c00] {
+            for scalar in 0..2 {
+                for q in 0..2 {
+                    for size in 0..4 {
+                        let w = base | (scalar << 28) | (q << 30) | (size << 22) | 0x20020;
+                        let result = decode(w);
+                        if scalar != 0 && q == 0 {
+                            assert!(result.is_none());
+                            continue;
+                        }
+                        if scalar == 0 && q == 0 && size == 3 {
+                            assert!(result.unwrap().is_err());
+                            continue;
+                        }
+                        let Op::VectorInteger(VectorInteger::Saturating {
+                            bytes,
+                            total,
+                            signed,
+                            subtract,
+                            ..
+                        }) = result.unwrap().unwrap()
+                        else {
+                            panic!()
+                        };
+                        assert_eq!(bytes, 1 << size);
+                        assert_eq!(
+                            total,
+                            if scalar != 0 {
+                                bytes
+                            } else if q != 0 {
+                                16
+                            } else {
+                                8
+                            }
+                        );
+                        assert_eq!(signed, base & (1 << 29) == 0);
+                        assert_eq!(subtract, base & (1 << 13) != 0);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod saturating_narrow_tests {
+    use super::*;
+    #[test]
+    fn saturating_narrow_domains_and_widths() {
+        for base in [0x0e214800, 0x2e214800, 0x2e212800] {
+            for scalar in 0..2 {
+                for q in 0..2 {
+                    for size in 0..4 {
+                        let w = base | (scalar << 28) | (q << 30) | (size << 22) | 0x20;
+                        let result = decode(w);
+                        if scalar != 0 && q == 0 {
+                            assert!(result.is_none());
+                            continue;
+                        }
+                        if size == 3 {
+                            assert!(result.unwrap().is_err());
+                            continue;
+                        }
+                        let Op::VectorInteger(VectorInteger::SaturatingNarrow {
+                            bytes,
+                            scalar: single,
+                            upper,
+                            ..
+                        }) = result.unwrap().unwrap()
+                        else {
+                            panic!()
+                        };
+                        assert_eq!(
+                            (bytes, single, upper),
+                            (1 << size, scalar != 0, scalar == 0 && q != 0)
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod register_shift_tests {
+    use super::*;
+    #[test]
+    fn register_shift_domains_and_widths() {
+        for base in [0x0e204400, 0x2e204400] {
+            for scalar in 0..2 {
+                for q in 0..2 {
+                    for size in 0..4 {
+                        let result =
+                            decode(base | (scalar << 28) | (q << 30) | (size << 22) | 0x20020);
+                        if scalar != 0 && q == 0 {
+                            assert!(result.is_none());
+                            continue;
+                        }
+                        if (scalar != 0 && size != 3) || (scalar == 0 && q == 0 && size == 3) {
+                            assert!(result.unwrap().is_err());
+                            continue;
+                        }
+                        let Op::VectorInteger(VectorInteger::RegisterShift {
+                            bytes, total, ..
+                        }) = result.unwrap().unwrap()
+                        else {
+                            panic!()
+                        };
+                        assert_eq!(
+                            (bytes, total),
+                            (
+                                1 << size,
+                                if scalar != 0 {
+                                    8
+                                } else if q != 0 {
+                                    16
+                                } else {
+                                    8
+                                }
+                            )
+                        );
+                    }
+                }
+            }
+        }
     }
 }
