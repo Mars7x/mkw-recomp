@@ -25,6 +25,22 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     if w & (1 << 28) != 0 && w & (1 << 30) == 0 {
         return None;
     }
+    if w & 0xaf3ffc00 == 0x2e213800 {
+        let size = ((w >> 22) & 3) as u8;
+        if size == 3 || w & (1 << 28) != 0 {
+            return Some(Err("reserved SHLL arrangement".into()));
+        }
+        let bytes = 1 << size;
+        return Some(Ok(Op::SimdShift(Shift {
+            bytes,
+            total: 16,
+            dst: (w & 31) as u8,
+            src: ((w >> 5) & 31) as u8,
+            amount: bytes * 8,
+            upper: w & (1 << 30) != 0,
+            kind: Kind::UnsignedWiden,
+        })));
+    }
     use Kind::*;
     let kind = match w & 0xaf80fc00 {
         0x0f005400 => Left,
@@ -102,5 +118,40 @@ mod tests {
             crate::decode(0x1f095420, 0).unwrap().op,
             Op::Floating(_)
         ));
+    }
+}
+
+#[cfg(test)]
+mod shll_tests {
+    use super::*;
+    #[test]
+    fn full_width_widening_and_reserved_fields() {
+        for q in 0..2 {
+            for size in 0..4 {
+                let w = 0x2e213800 | (q << 30) | (size << 22) | (31 << 5) | 31;
+                if size == 3 {
+                    assert!(crate::decode(w, 0).is_err());
+                    continue;
+                }
+                let Op::SimdShift(v) = crate::decode(w, 0).unwrap().op else {
+                    panic!()
+                };
+                assert_eq!(
+                    (v.bytes, v.total, v.amount, v.upper, v.dst, v.src, v.kind),
+                    (
+                        1 << size,
+                        16,
+                        8 << size,
+                        q != 0,
+                        31,
+                        31,
+                        Kind::UnsignedWiden
+                    )
+                );
+                assert!(crate::decode(w | (1 << 28) | (1 << 30), 0).is_err());
+            }
+        }
+        assert!(decode(0x2e203820).is_none());
+        assert!(decode(0x2e213c20).is_none());
     }
 }

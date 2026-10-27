@@ -173,13 +173,13 @@ for q in range(2):
 for scalar in range(2):
  for q in range(2):
   for size in range(4):
-   for base in [0x0e208400,0x2e208400,0x2e208c00,0x0e208c00,0x0e203c00,0x0e203400,0x2e203c00,0x2e203400]:
+   for base in [0x0e206400,0x0e206c00,0x2e206400,0x2e206c00,0x0e208400,0x2e208400,0x2e208c00,0x0e208c00,0x0e203c00,0x0e203400,0x2e203c00,0x2e203400]:
     for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(1,2,1)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
    for base in [0x0e209800,0x2e208800,0x0e208800,0x2e209800,0x0e20a800]:
     for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rn<<5)|rd)
 for q in range(2):
  for size in range(4):
-  for base in [0x0e303800,0x2e303800,0x0e31b800]:
+  for base in [0x0e303800,0x2e303800,0x0e31b800,0x0e30a800,0x0e31a800,0x2e30a800,0x2e31a800]:
    for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(q<<30)|(size<<22)|(rn<<5)|rd)
 for ty in range(4):
  for base in [0x1e244000,0x1e24c000,0x1e254000,0x1e25c000,0x1e264000,0x1e274000,0x1e27c000]:
@@ -210,6 +210,10 @@ for scalar in range(2):
   for imm in range(128):
    for base in [0x0f005400,0x2f005400,0x0f000400,0x2f000400,0x2f004400,0x0f00a400,0x2f00a400]:
     for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(scalar<<28)|(q<<30)|(imm<<16)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for size in range(4):
+   for rd,rn in [(0,1),(0,0),(31,31)]:words.add(0x2e213800|(scalar<<28)|(q<<30)|(size<<22)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -225,7 +229,7 @@ for row in rows:
  if kind=='SimdShift':
   v=op['SimdShift'];k=v['kind'];widen=k in ['SignedWiden','UnsignedWiden'];scalar=bool(word&(1<<28));letters={1:'b',2:'h',4:'s',8:'d'}
   if widen:
-   name=('sshll' if k=='SignedWiden' else 'ushll')+('2' if v['upper'] else '')
+   name=('shll' if v['amount']==v['bytes']*8 else 'sshll' if k=='SignedWiden' else 'ushll')+('2' if v['upper'] else '')
    dest='v'+str(v['dst'])+'.'+str(16//(v['bytes']*2))+letters[v['bytes']*2]
    source='v'+str(v['src'])+'.'+str((16 if v['upper'] else 8)//v['bytes'])+letters[v['bytes']]
   else:
@@ -239,11 +243,11 @@ for row in rows:
  elif kind=='VectorInteger':
   variant,v=next(iter(op['VectorInteger'].items()));letters={1:'b',2:'h',4:'s',8:'d'}
   if variant=='Lanes':
-   name={'Add':'add','Subtract':'sub','Equal':'cmeq','Test':'cmtst','SignedGe':'cmge','SignedGt':'cmgt','UnsignedGe':'cmhs','UnsignedGt':'cmhi','SignedLe':'cmle','SignedLt':'cmlt'}[v['kind']]
+   name={'Add':'add','Subtract':'sub','SignedMax':'smax','SignedMin':'smin','UnsignedMax':'umax','UnsignedMin':'umin','Equal':'cmeq','Test':'cmtst','SignedGe':'cmge','SignedGt':'cmgt','UnsignedGe':'cmhs','UnsignedGt':'cmhi','SignedLe':'cmle','SignedLt':'cmlt'}[v['kind']]
    scalar=bool(word&(1<<28));register=lambda n: letters[v['bytes']]+str(n) if scalar else 'v'+str(n)+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
    operands=register(v['dst'])+', '+register(v['lhs'])+', '+(register(v['rhs']) if v['rhs'] is not None else '#0')
   else:
-   name={'Sum':'addv','SignedLong':'saddlv','UnsignedLong':'uaddlv'}[v['kind']];output=v['bytes'] if v['kind']=='Sum' else v['bytes']*2
+   name={'Sum':'addv','SignedLong':'saddlv','UnsignedLong':'uaddlv','SignedMax':'smaxv','SignedMin':'sminv','UnsignedMax':'umaxv','UnsignedMin':'uminv'}[v['kind']];output=v['bytes']*2 if v['kind'] in {'SignedLong','UnsignedLong'} else v['bytes']
    operands=letters[output]+str(v['dst'])+', v'+str(v['src'])+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
   if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'integer SIMD kind/arrangement/operands differ','reference':ins.mnemonic+' '+ins.op_str,'expected':name+' '+operands})
  elif kind=='VectorCompare':

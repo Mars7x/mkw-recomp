@@ -49,8 +49,29 @@ fn words(include31: bool) -> Vec<u32> {
             }
         }
     }
+    for q in 0..2 {
+        for size in 0..3 {
+            for base in [0x0e206400, 0x0e206c00, 0x2e206400, 0x2e206c00] {
+                for (rd, rn, rm) in [
+                    (0, 1, 2),
+                    (0, 0, 2),
+                    (0, 1, 0),
+                    (0, 0, 0),
+                    (31, 31, 31),
+                    (31, 1, 31),
+                ] {
+                    if !include31 && (rd == 31 || rn == 31 || rm == 31) {
+                        continue;
+                    }
+                    words.insert(base | (q << 30) | (size << 22) | (rm << 16) | (rn << 5) | rd);
+                }
+            }
+        }
+    }
     for (q, size) in [(0, 0), (0, 1), (1, 0), (1, 1), (1, 2)] {
-        for base in [0x0e303800, 0x2e303800, 0x0e31b800] {
+        for base in [
+            0x0e303800, 0x2e303800, 0x0e31b800, 0x0e30a800, 0x0e31a800, 0x2e30a800, 0x2e31a800,
+        ] {
             for (rd, rn) in [(0, 1), (0, 0), (31, 31), (31, 1)] {
                 if !include31 && rd == 31 {
                     continue;
@@ -117,6 +138,10 @@ fn oracle(op: VectorInteger, input: &[[u64; 2]; 32]) -> (usize, [u64; 2]) {
                 .map(|(&a, b)| match kind {
                     Kind::Add => ((a as i128 + b as i128) as u128) & mask(bits),
                     Kind::Subtract => ((a as i128 - b as i128) as u128) & mask(bits),
+                    Kind::UnsignedMax => a.max(b),
+                    Kind::UnsignedMin => a.min(b),
+                    Kind::SignedMax => (signed(a, bits).max(signed(b, bits)) as u128) & mask(bits),
+                    Kind::SignedMin => (signed(a, bits).min(signed(b, bits)) as u128) & mask(bits),
                     _ => {
                         let yes = match kind {
                             Kind::Equal => a == b,
@@ -148,12 +173,25 @@ fn oracle(op: VectorInteger, input: &[[u64; 2]; 32]) -> (usize, [u64; 2]) {
         } => {
             let bits = u32::from(bytes) * 8;
             let values = elements(input[usize::from(src)], bytes, total);
-            let output_bytes = if kind == Reduction::Sum {
+            let output_bytes = if !matches!(kind, Reduction::SignedLong | Reduction::UnsignedLong) {
                 bytes
             } else {
                 bytes * 2
             };
-            let value = if kind == Reduction::SignedLong {
+            let value = if matches!(kind, Reduction::SignedMax | Reduction::SignedMin) {
+                let v = values.into_iter().map(|v| signed(v, bits));
+                (if kind == Reduction::SignedMax {
+                    v.max().unwrap()
+                } else {
+                    v.min().unwrap()
+                }) as u128
+            } else if matches!(kind, Reduction::UnsignedMax | Reduction::UnsignedMin) {
+                if kind == Reduction::UnsignedMax {
+                    values.into_iter().max().unwrap()
+                } else {
+                    values.into_iter().min().unwrap()
+                }
+            } else if kind == Reduction::SignedLong {
                 values.into_iter().map(|v| signed(v, bits)).sum::<i128>() as u128
             } else {
                 values.into_iter().sum::<u128>()
@@ -347,7 +385,7 @@ fn integer_vector_results_match_synthetic_qemu() {
                 cpu.vregs[0][0],
                 cpu.vregs[0][1],
                 u64::from(cpu.fpsr),
-                0xb0000000,
+                u64::from((cpu.n << 31) | (cpu.z << 30) | (cpu.c << 29) | (cpu.v << 28)),
             ]
             .into_iter()
             .flat_map(u64::to_le_bytes)
@@ -359,6 +397,7 @@ fn integer_vector_results_match_synthetic_qemu() {
                 c.word
             );
             assert_eq!(cpu.vregs[1..], before[1..]);
+            assert_eq!(cpu.fpcr, c.fpcr);
         }
     }
     std::fs::write(path.join("receipt.json"),serde_json::to_vec_pretty(&serde_json::json!({"synthetic_cases":cases.len(),"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false})).unwrap()).unwrap();

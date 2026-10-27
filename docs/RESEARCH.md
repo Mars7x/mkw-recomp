@@ -181,3 +181,6 @@ Independent authored Capstone probes established the legal reversal and immediat
 
 
 Pairwise min/max reuses the independently authored adjacent-pair routing and existing min/max NaN/zero rules. An author-created 288-pair synthetic QEMU experiment compared FABD with FSUB followed by FABS across S/D scalar/vector controls and special values before implementation; the expanded 52,640-case SIMD numeric matrix also passes. The adapter performs checked subtraction then raw sign clearing, preserving operation order. No external implementation or additional upstream source was copied. Software-oracle lineage and target-profile limitations remain unchanged.
+
+
+Independently constructed min/max and SHLL encoding probes were compared with the private Capstone installation before implementation. Six ordinary-scalar-domain min/max probe neighbors decode as FCCMP/FCSEL and retain their existing decoder ownership. Typed min/max selection/reduction and full-width widening reuse original snapshot/packing code, with independent i128/u128/byte-array expectations and synthetic QEMU fixtures. No additional upstream source or external implementation was copied.

@@ -28,6 +28,10 @@ pub fn emit(op: VectorInteger) -> String {
             let expression = match kind {
                 Kind::Add => "a+b".into(),
                 Kind::Subtract => "a-b".into(),
+                Kind::UnsignedMax => "a>b?a:b".into(),
+                Kind::UnsignedMin => "a<b?a:b".into(),
+                Kind::SignedMax => format!("(a^UINT64_C({sign}))>(b^UINT64_C({sign}))?a:b"),
+                Kind::SignedMin => format!("(a^UINT64_C({sign}))<(b^UINT64_C({sign}))?a:b"),
                 _ => {
                     let predicate = match kind {
                         Kind::Equal => "a==b".into(),
@@ -54,6 +58,25 @@ pub fn emit(op: VectorInteger) -> String {
         } => {
             let bits = bytes * 8;
             let input_mask = mask(bytes);
+            if matches!(
+                kind,
+                Reduction::SignedMax
+                    | Reduction::SignedMin
+                    | Reduction::UnsignedMax
+                    | Reduction::UnsignedMin
+            ) {
+                let bias = if matches!(kind, Reduction::SignedMax | Reduction::SignedMin) {
+                    1u64 << (bits - 1)
+                } else {
+                    0
+                };
+                let compare = if matches!(kind, Reduction::SignedMax | Reduction::UnsignedMax) {
+                    ">"
+                } else {
+                    "<"
+                };
+                return format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},selected=source[0]&UINT64_C({input_mask});for(unsigned lane=1;lane<{};lane++){{unsigned offset=lane*{bits};uint64_t value=(source[offset/64]>>(offset%64))&UINT64_C({input_mask});if((value^UINT64_C({bias})){compare}(selected^UINT64_C({bias})))selected=value;}}c->vregs[{dst}][0]=selected;c->vregs[{dst}][1]=0;}}\n",total/bytes);
+            }
             let output_mask = mask(if kind == Reduction::Sum {
                 bytes
             } else {

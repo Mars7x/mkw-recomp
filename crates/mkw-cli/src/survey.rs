@@ -120,7 +120,29 @@ pub fn run(root: &Path) -> Result<()> {
                             }
                             Op::ConditionalFloat { .. } => features.push("conditional_fp_compare"),
                             Op::VectorCompare(_) => features.push("simd_fp_comparison"),
-                            Op::VectorInteger(_) => features.push("simd_integer_lanes_reduction"),
+                            Op::VectorInteger(v) => {
+                                features.push("simd_integer_lanes_reduction");
+                                use mkw_arm64::vector_integer::{Kind, Reduction, VectorInteger};
+                                match v {
+                                    VectorInteger::Lanes {
+                                        kind:
+                                            Kind::SignedMax
+                                            | Kind::SignedMin
+                                            | Kind::UnsignedMax
+                                            | Kind::UnsignedMin,
+                                        ..
+                                    } => features.push("simd_integer_minmax"),
+                                    VectorInteger::Reduce {
+                                        kind:
+                                            Reduction::SignedMax
+                                            | Reduction::SignedMin
+                                            | Reduction::UnsignedMax
+                                            | Reduction::UnsignedMin,
+                                        ..
+                                    } => features.push("simd_integer_minmax_reduction"),
+                                    _ => {}
+                                }
+                            }
                             Op::VectorFp(v) => {
                                 features.push("vector_fp");
                                 if matches!(

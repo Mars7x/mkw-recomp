@@ -86,3 +86,6 @@ Raw-transform IR distinguishes byte reversal, element-block reversal and complem
 
 
 Pairwise FP min/max shares the adjacent-pair emitter and checked numerical helpers. FABD uses a checked subtraction followed by sign clearing, with deferred vector/FPSR commit and helper operation 26. ABI v7 layout is unchanged; older helpers reject the new operation conservatively. Original execution still requires target configuration/bootstrap gates.
+
+
+Integer SIMD SMAX/SMIN/UMAX/UMIN support B/H/S vector arrangements; SMAXV/SMINV/UMAXV/UMINV reduce legal vectors to one zero-extended scalar element. Source snapshots preserve overlap and V31; unsigned comparisons with sign-bit bias implement signed ordering without host signed overflow. Reserved D/scalar arrangements reject and ordinary FCCMP/FCSEL neighbors retain their decoder ownership. SHLL/SHLL2 additionally widen B/H/S elements and shift by their original width, using the existing defined unsigned widening emitter. These operations need no callbacks or ABI v7 changes and preserve GPR/NZCV/FPCR/FPSR. Actual access-trap/configuration gates remain unverified.

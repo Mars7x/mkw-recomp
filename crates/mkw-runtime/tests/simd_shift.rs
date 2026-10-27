@@ -56,6 +56,16 @@ fn words(include31: bool) -> Vec<u32> {
             }
         }
     }
+    for q in 0..2 {
+        for size in 0..3 {
+            for (dst, src) in [(0, 1), (0, 0), (31, 31), (31, 1)] {
+                if !include31 && dst == 31 {
+                    continue;
+                }
+                out.insert(0x2e213800 | (q << 30) | (size << 22) | (src << 5) | dst);
+            }
+        }
+    }
     out.into_iter().collect()
 }
 fn codes(words: &[u32]) -> String {
@@ -291,7 +301,7 @@ fn immediate_shift_and_widening_results_match_qemu() {
                 cpu.vregs[0][0],
                 cpu.vregs[0][1],
                 u64::from(cpu.fpsr),
-                0xb0000000,
+                u64::from((cpu.n << 31) | (cpu.z << 30) | (cpu.c << 29) | (cpu.v << 28)),
             ]
             .into_iter()
             .flat_map(u64::to_le_bytes)
@@ -303,6 +313,7 @@ fn immediate_shift_and_widening_results_match_qemu() {
                 c.word
             );
             assert_eq!(cpu.vregs[1..], before[1..]);
+            assert_eq!(cpu.fpcr, c.fpcr);
         }
     }
     std::fs::write(path.join("receipt.json"),serde_json::to_vec_pretty(&serde_json::json!({"synthetic_cases":cases.len(),"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false})).unwrap()).unwrap();
