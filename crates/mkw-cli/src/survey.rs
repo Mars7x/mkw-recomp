@@ -133,6 +133,15 @@ pub fn run(root: &Path) -> Result<()> {
                                 ..
                             } => features.push("register_pointer_strip"),
                             Op::VectorLeadingZeros { .. } => features.push("vector_leading_zeros"),
+                            Op::PairwiseMinMax(v) => features.push(if v.minimum {
+                                "signed_pairwise_min"
+                            } else {
+                                "signed_pairwise_max"
+                            }),
+                            Op::PairwiseLongSum(_) => features.push("signed_long_pair_sum"),
+                            Op::SaturatingShiftImmediate(_) => {
+                                features.push("signed_saturating_immediate")
+                            }
                             Op::MultiplyAccumulate(_) => {
                                 features.push("integer_multiply_accumulate")
                             }

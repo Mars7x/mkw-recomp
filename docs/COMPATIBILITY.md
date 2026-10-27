@@ -9,7 +9,7 @@
 | Function discovery | Partially implemented | 223,856 validated CIE/FDE extents plus candidates; indirect resolution incomplete |
 | Synthetic native translation | Implemented and tested | Host x86-64 executable ran; limited instruction subset |
 | Guest memory/relocation foundation | Partially implemented | Synthetic Rust/native memory and dispatcher tests pass; 309,844 relocations apply/read back; serialized diagnostic ordering |
-| Actual game CPU translation | Partially implemented | 213,503 subset-liftable indexed extents with possible unbound tails; 72 object samples; no complete module |
+| Actual game CPU translation | Partially implemented | 214,499 subset-liftable indexed extents with possible unbound tails; 121 object samples; no complete module |
 | Actual runtime bootstrap | Not started | No guest instruction execution |
 | Vulkan/shaders/game frame | Not started | Container observations only |
 | SDL3 input/audio, VFS/saves | Not started | No runtime implementations |
@@ -140,3 +140,6 @@ Independent real-valued midpoint expectations cover 1,040,912 native cases per o
 FRSQRTE/FRSQRTS support exact 2S/4S encodings. Original integer midpoint/boundary search computes estimates, including NaNs, negative inputs, signed zeros and infinities. Refinement preserves one final S rounding through existing callbacks: exact S-to-D conversion, D fused subtraction toward zero, exact halving, odd-bit jamming when inexact, then D-to-S conversion in the original mode. Nonzero finite refinement magnitudes lie between 2^-47 and 2^255, keeping the intermediate D-normal. Exact-zero signs and exceptional inputs have explicit handling.
 
 CPU ABI v9 and all callback operations remain unchanged. The original FPCR whitelist still refuses traps/flush/alternative profiles; output vectors/FPSR commit only after every lane/callback succeeds. An independent 576-bit fixed-point oracle checks refinement, including an adversary where naive D-to-S double rounding fails. Independent midpoint expectations check 1,040,784 native estimate cases per optimization; exact refinement checks 102,144. All 102,144 synthetic QEMU cases match O0/O2 with fatal UBSan. Stage-by-stage failures, aliases and missing/unsupported profiles also pass. These are software/synthetic results; target FP configuration and hardware behavior remain unverified.
+
+
+Scoped signed pairwise min/max, long pair sums and 4S saturating immediate shifts add eleven strict survey acceptances. Independent native/QEMU checks cover signed extrema, all legal immediate amounts, sticky QC, aliases and upper clearing. CPU ABI v9, all existing tests and strict acceptance remain unchanged. The remaining 24 pure ISA opportunities are small relative to CFG/runtime/configuration blockers; higher acceptance does not establish runnable functions or a target access profile.

@@ -470,3 +470,74 @@ pub fn emit_mla(op: mkw_arm64::vector_integer::MultiplyAccumulate) -> String {
     };
     format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},old[2]={{c->vregs[{dst}][0],c->vregs[{dst}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t a=(left[half]>>shift)&UINT64_C({mask}),b={right}&UINT64_C({mask}),prior=(old[half]>>shift)&UINT64_C({mask});output[half]|=((prior+a*b)&UINT64_C({mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes)
 }
+
+pub fn emit_pairwise_minmax(op: mkw_arm64::vector_integer::PairwiseMinMax) -> String {
+    let mkw_arm64::vector_integer::PairwiseMinMax {
+        bytes,
+        total,
+        dst,
+        lhs,
+        rhs,
+        signed,
+        minimum,
+    } = op;
+    let bits = bytes * 8;
+    let mask = mask(bytes);
+    let sign = 1u64 << (bits - 1);
+    let pairs = total / bytes / 2;
+    let compare = if signed {
+        format!("int64_t a=(int64_t)(ua^UINT64_C({sign}))-(int64_t)UINT64_C({sign}),b=(int64_t)(ub^UINT64_C({sign}))-(int64_t)UINT64_C({sign});")
+    } else {
+        "uint64_t a=ua,b=ub;".into()
+    };
+    format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{const uint64_t *source=lane<{pairs}?left:right;unsigned pair=(lane%{pairs})*{bits}*2,offset=lane*{bits};uint64_t ua=(source[pair/64]>>(pair%64))&UINT64_C({mask}),ub=(source[(pair+{bits})/64]>>((pair+{bits})%64))&UINT64_C({mask});{compare}uint64_t value=a{}b?ua:ub;output[offset/64]|=value<<(offset%64);}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes,if minimum{"<"}else{">"})
+}
+pub fn emit_pairwise_long_sum(op: mkw_arm64::vector_integer::PairwiseLongSum) -> String {
+    let mkw_arm64::vector_integer::PairwiseLongSum {
+        bytes,
+        total,
+        dst,
+        src,
+        signed,
+    } = op;
+    let bits = bytes * 8;
+    let input_mask = mask(bytes);
+    let output_mask = mask(bytes * 2);
+    let sign = 1u64 << (bits - 1);
+    let convert = if signed {
+        format!("int64_t a=(int64_t)(ua^UINT64_C({sign}))-(int64_t)UINT64_C({sign}),b=(int64_t)(ub^UINT64_C({sign}))-(int64_t)UINT64_C({sign});")
+    } else {
+        "int64_t a=(int64_t)ua,b=(int64_t)ub;".into()
+    };
+    format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits}*2,half=offset/64,shift=offset%64;uint64_t ua=(source[half]>>shift)&UINT64_C({input_mask}),ub=(source[half]>>(shift+{bits}))&UINT64_C({input_mask});{convert}output[half]|=((uint64_t)(a+b)&UINT64_C({output_mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes/2)
+}
+pub fn emit_saturating_immediate(
+    op: mkw_arm64::vector_integer::SaturatingShiftImmediate,
+) -> String {
+    let mkw_arm64::vector_integer::SaturatingShiftImmediate {
+        bytes,
+        total,
+        dst,
+        src,
+        signed,
+        amount,
+    } = op;
+    let bits = bytes * 8;
+    let mask = mask(bytes);
+    let sign = 1u64 << (bits - 1);
+    let input = if signed {
+        format!("(__int128)(raw^UINT64_C({sign}))-(__int128)UINT64_C({sign})")
+    } else {
+        "(__int128)raw".into()
+    };
+    let minimum = if signed {
+        format!("-(((__int128)1)<<{})", bits - 1)
+    } else {
+        "0".into()
+    };
+    let maximum = format!(
+        "(((__int128)1)<<{})-1",
+        if signed { bits - 1 } else { bits }
+    );
+    format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{0,0}};uint32_t saturated=0;for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t raw=(source[half]>>shift)&UINT64_C({mask});__int128 value=({input})*(((__int128)1)<<{amount}),low={minimum},high={maximum};if(value<low){{value=low;saturated=1;}}if(value>high){{value=high;saturated=1;}}output[half]|=((uint64_t)value&UINT64_C({mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];if(saturated)c->fpsr|=UINT32_C(0x08000000);}}\n",total/bytes)
+}

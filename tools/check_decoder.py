@@ -346,6 +346,13 @@ for q in range(2):
    for rd in [0,1,31]:
     words.add(0x2ea1d800|(q<<30)|(size<<22)|(rn<<5)|rd)
     for rm in [0,2,31]:words.add(0x0ea0fc00|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+for rn in [0,1,31]:
+ for rd in [0,1,31]:
+  for base in [0x0ea0a400,0x0ea0ac00]:
+   for rm in [0,2,31]:words.add(base|(rm<<16)|(rn<<5)|rd)
+  for q in range(2):
+   for size in range(4):words.add(0x0e202800|(q<<30)|(size<<22)|(rn<<5)|rd)
+  for imm in range(128):words.add(0x4f007400|(imm<<16)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -386,6 +393,13 @@ for row in rows:
  elif kind=='VectorLeadingZeros':
   v=op['VectorLeadingZeros'];operands='v'+str(v['dst'])+'.2s, v'+str(v['src'])+'.2s'
   if (ins.mnemonic,ins.op_str)!=('clz',operands)or(v['bytes'],v['total'])!=(4,8):errors.append({'word':hex(word),'error':'2S CLZ kind/operands differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind in {'PairwiseMinMax','PairwiseLongSum','SaturatingShiftImmediate'}:
+  v=op[kind];letters={1:'b',2:'h',4:'s',8:'d'};reg=lambda n,b,t:'v'+str(n)+'.'+str(t//b)+letters[b];b=v['bytes'];total=v['total']
+  if kind=='PairwiseMinMax':
+   name=('s'if v['signed']else'u')+('minp'if v['minimum']else'maxp');operands=', '.join(reg(v[k],b,total)for k in ['dst','lhs','rhs'])
+  elif kind=='PairwiseLongSum':name='saddlp'if v['signed']else'uaddlp';operands=reg(v['dst'],b*2,total)+', '+reg(v['src'],b,total)
+  else:name='sqshl'if v['signed']else'uqshl';operands=reg(v['dst'],b,total)+', '+reg(v['src'],b,total)
+  if ins.mnemonic!=name or(kind!='SaturatingShiftImmediate'and ins.op_str!=operands)or(kind=='SaturatingShiftImmediate'and(not ins.op_str.startswith(operands+', ')or ins.operands[-1].imm!=v['amount'])):errors.append({'word':hex(word),'error':'scoped integer operation differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='MultiplyAccumulate':
   v=op['MultiplyAccumulate'];b=v['bytes'];letters={1:'b',2:'h',4:'s'};reg=lambda n:'v'+str(n)+'.'+str(v['total']//b)+letters[b]
   operands=reg(v['dst'])+', '+reg(v['lhs'])+', '+(reg(v['rhs']) if v['rhs_lane'] is None else 'v'+str(v['rhs'])+'.'+letters[b]+'['+str(v['rhs_lane'])+']')

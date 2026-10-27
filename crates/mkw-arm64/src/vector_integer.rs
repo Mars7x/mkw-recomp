@@ -107,6 +107,33 @@ pub struct MultiplyAccumulate {
     pub rhs_lane: Option<u8>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct PairwiseMinMax {
+    pub bytes: u8,
+    pub total: u8,
+    pub dst: u8,
+    pub lhs: u8,
+    pub rhs: u8,
+    pub signed: bool,
+    pub minimum: bool,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct PairwiseLongSum {
+    pub bytes: u8,
+    pub total: u8,
+    pub dst: u8,
+    pub src: u8,
+    pub signed: bool,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct SaturatingShiftImmediate {
+    pub bytes: u8,
+    pub total: u8,
+    pub dst: u8,
+    pub src: u8,
+    pub signed: bool,
+    pub amount: u8,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum VectorInteger {
     MultiplyLow {
         bytes: u8,
@@ -1281,4 +1308,124 @@ pub fn decode_mla(w: u32) -> Option<Result<Op, String>> {
         })));
     }
     None
+}
+
+pub fn decode_pairwise(w: u32) -> Option<Result<Op, String>> {
+    let minimum = match w & 0xffe0fc00 {
+        0x0ea0a400 => Some(false),
+        0x0ea0ac00 => Some(true),
+        _ => None,
+    };
+    if let Some(minimum) = minimum {
+        return Some(Ok(Op::PairwiseMinMax(PairwiseMinMax {
+            bytes: 4,
+            total: 8,
+            dst: (w & 31) as u8,
+            lhs: ((w >> 5) & 31) as u8,
+            rhs: ((w >> 16) & 31) as u8,
+            signed: true,
+            minimum,
+        })));
+    }
+    if w & 0xbf3ffc00 == 0x0e202800 {
+        let size = ((w >> 22) & 3) as u8;
+        if size == 3 {
+            return Some(Err("reserved long pair-sum width".into()));
+        }
+        return Some(Ok(Op::PairwiseLongSum(PairwiseLongSum {
+            bytes: 1 << size,
+            total: if w & (1 << 30) != 0 { 16 } else { 8 },
+            dst: (w & 31) as u8,
+            src: ((w >> 5) & 31) as u8,
+            signed: true,
+        })));
+    }
+    None
+}
+pub fn decode_saturating_immediate(w: u32) -> Option<Result<Op, String>> {
+    let imm = ((w >> 16) & 127) as u8;
+    if w & 0xff80fc00 == 0x4f007400 && (32..64).contains(&imm) {
+        return Some(Ok(Op::SaturatingShiftImmediate(SaturatingShiftImmediate {
+            bytes: 4,
+            total: 16,
+            dst: (w & 31) as u8,
+            src: ((w >> 5) & 31) as u8,
+            signed: true,
+            amount: imm - 32,
+        })));
+    }
+    None
+}
+#[cfg(test)]
+mod integer_gap_tests {
+    use super::*;
+    #[test]
+    fn signed_pairwise_and_long_sum_fields() {
+        for minimum in [false, true] {
+            let Op::PairwiseMinMax(v) = crate::decode(
+                (if minimum { 0x0ea0ac00 } else { 0x0ea0a400 }) | (31 << 16) | (31 << 5) | 31,
+                0,
+            )
+            .unwrap()
+            .op
+            else {
+                panic!()
+            };
+            assert_eq!(
+                (v.bytes, v.total, v.dst, v.lhs, v.rhs, v.signed, v.minimum),
+                (4, 8, 31, 31, 31, true, minimum)
+            );
+        }
+        for q in 0..2 {
+            for size in 0..3 {
+                let Op::PairwiseLongSum(v) =
+                    crate::decode(0x0e202800 | (q << 30) | (size << 22) | (31 << 5) | 31, 0)
+                        .unwrap()
+                        .op
+                else {
+                    panic!()
+                };
+                assert_eq!(
+                    (v.bytes, v.total, v.dst, v.src, v.signed),
+                    (1 << size, 8 << q, 31, 31, true)
+                );
+            }
+        }
+        for w in [0x0ee02820, 0x4ee02820] {
+            assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
+    }
+    #[test]
+    fn immediate_signed_four_s_saturation_amounts() {
+        for amount in 0..32 {
+            let Op::SaturatingShiftImmediate(v) =
+                crate::decode(0x4f007400 | ((32 + amount) << 16) | (31 << 5) | 31, 0)
+                    .unwrap()
+                    .op
+            else {
+                panic!()
+            };
+            assert_eq!(
+                (v.bytes, v.total, v.dst, v.src, v.signed, v.amount),
+                (4, 16, 31, 31, true, amount as u8)
+            );
+        }
+        for w in [0x4f007420, 0x0f207420, 0x5f207420, 0x6f207420, 0x4f407420] {
+            assert!(
+                !matches!(
+                    crate::decode(w, 0),
+                    Ok(crate::Instruction {
+                        op: Op::SaturatingShiftImmediate(SaturatingShiftImmediate {
+                            bytes: 4,
+                            total: 16,
+                            signed: true,
+                            ..
+                        }),
+                        ..
+                    })
+                ),
+                "{w:x}"
+            );
+        }
+    }
 }

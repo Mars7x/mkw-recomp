@@ -51,6 +51,9 @@ pub enum Op {
     VectorFp(vector_fp::VectorFp),
     VectorInteger(vector_integer::VectorInteger),
     HalvingInteger(vector_integer::Halving),
+    PairwiseMinMax(vector_integer::PairwiseMinMax),
+    PairwiseLongSum(vector_integer::PairwiseLongSum),
+    SaturatingShiftImmediate(vector_integer::SaturatingShiftImmediate),
     VectorLeadingZeros {
         bytes: u8,
         total: u8,
@@ -300,6 +303,12 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
     let rd = word & 31;
     let rn = (word >> 5) & 31;
     let op = if let Some(result) = structures::decode(word) {
+        result
+            .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if let Some(result) = vector_integer::decode_pairwise(word) {
+        result
+            .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if let Some(result) = vector_integer::decode_saturating_immediate(word) {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
     } else if let Some(result) = simd_shift::decode(word) {

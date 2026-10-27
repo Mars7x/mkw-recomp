@@ -266,3 +266,8 @@ The 2S CLZ form covers every remaining observed leading-zero blocker. Its C bit 
 ## Reciprocal square-root provenance
 
 The original estimate/refinement lowering follows the instruction facts in [Arm's reference](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85). The generated integer boundary search differs from the independent test's real midpoint construction. Refinement uses the round-to-odd concept discussed by [Boldo and Melquiond](https://guillaume.melquiond.fr/doc/05-imacs17_1-article.pdf); the full instruction's bounds, signs, flags and failure behavior are additionally checked by an original 576-bit exact oracle and QEMU. No implementation or proof script was copied. Existing attributed SoftFloat callbacks and CPU ABI v9 are unchanged, and no hardware/game profile is established by these tests.
+
+
+## Signed pairwise/widening/saturating provenance
+
+Original signed comparisons, widened pair sums and i128 shift/clamp arithmetic follow instruction facts in [Arm's A64 guide](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab) and [armasm reference](https://documentation-service.arm.com/static/5f3fa899428f7a6b3328fd44). Independent byte/i128 expectations and synthetic QEMU check semantics; private Capstone checks operand fields and reserved neighbors. No instruction implementation was copied. Existing decoder entry-point exclusions are preserved through separate typed operations. CPU ABI v9 and target-access gates remain unchanged.
