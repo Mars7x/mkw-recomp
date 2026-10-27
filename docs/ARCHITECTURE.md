@@ -129,3 +129,7 @@ See [UPSTREAM_REUSE.md](UPSTREAM_REUSE.md) and upstream-reuse-audit.json for pin
 ## Explicit service-table-v3 transport (October 27)
 
 See [SVC.md](SVC.md): unchanged CPU-v10 layout, explicit typed SVC callback and X0–X7 W/X reply packets, checked atomic memory outputs, completion-time local-monitor clearing, terminal thread-exit propagation and scoped worker attachment. No Horizon service is enabled implicitly. Eight tests add to all prior checks; old headers and 68 existing test/support files remain unchanged. The strict survey remains 214,521 (+0); v1/v2 remain 214,585 and v3 conditionally compiles 214,664 including 79 new SVC wrappers. No original function executes. Dynamic lifecycle/handles/waits, real target/TLS/PAC configuration and original startup remain open.
+
+## Owned event primitive (October 27)
+
+[EVENTS.md](EVENTS.md) describes paired manual-reset event state, endpoint rights, lifetime/quota management, monotonic handles and bounded polling. Five new tests add state/concurrency and O0/O2 fatal-UBSan native-boundary evidence. No production SVC mapping, numeric kernel result claim, blocking wait/clock/cancellation or scheduler is installed. Existing compiler counts and all previous tests/ABI contracts remain unchanged; original execution remains gated. Preserve the distinction between this nonempty poll helper and the kernel's valid zero-handle WaitSynchronization case.

@@ -1,0 +1,32 @@
+{
+  "repository": "https://github.com/seedds/nxnative",
+  "revision": "c8ab8166f68296dc712a4ec13b892535d9d790c6",
+  "license": "MIT",
+  "source_files": {
+    "dm/host/hle_thread.c": "89dc9c47e4aa21352e633f0bf8748ec276f512808b630455d128494ae05c7bcb"
+  },
+  "adapted_semantics": [
+    "event_t signaled state and two endpoint references",
+    "CreateEvent read/write ends",
+    "SignalEvent write-end capability",
+    "ClearEvent either-end capability",
+    "ResetSignal read-end and already-clear error",
+    "event endpoint close lifetime",
+    "wait-any immediate manual-reset state observation"
+  ],
+  "adaptation": "crates/mkw-runtime/src/events.rs",
+  "adaptation_sha256": "a84f8754298b2cae740bca45762917f25b4bec4006a36b2474e3858cfcc1648b",
+  "notices": [
+    "third_party/nxnative/LICENSE",
+    "third_party/nxnative/d2r-mobile-LICENSE"
+  ],
+  "differences": [
+    "independent owned Rust maps and monotonic process-wide non-reused identities",
+    "configurable bounded object quota; atomic pair allocation; no native handle pointer casts",
+    "all poll input handles validate before selecting first ready index",
+    "invalid/stale/foreign close is an error, unlike the upstream unconditional-success close path",
+    "typed Rust errors, no guessed Horizon result mapping",
+    "no SVC registration, blocking waits, deadlines, cancellation, thread objects or Mach context code"
+  ],
+  "status": "implemented and tested synthetic event primitive; no production SVC registration or target authorization"
+}
