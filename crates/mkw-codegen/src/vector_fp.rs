@@ -1,11 +1,16 @@
 use mkw_arm64::vector_fp::{VectorFp, VectorFpKind};
 pub fn emit(op: VectorFp) -> String {
+    if let VectorFpKind::ReduceMinMax(operation) = op.kind {
+        return format!("{{if(!c->floating){{c->fault_status=3;return 3;}}uint64_t source[2]={{c->vregs[{}][0],c->vregs[{}][1]}},pairs[2]={{0,0}},result=0;uint32_t fpsr=c->fpsr;for(unsigned pair=0;pair<2;pair++){{int status=c->floating({operation},4,c->fpcr,fpsr,source[pair]&UINT64_C(4294967295),source[pair]>>32,0,&pairs[pair],&fpsr);if(status){{c->fault_status=status;return status;}}}}int status=c->floating({operation},4,c->fpcr,fpsr,pairs[0],pairs[1],0,&result,&fpsr);if(status){{c->fault_status=status;return status;}}c->vregs[{}][0]=result&UINT64_C(4294967295);c->vregs[{}][1]=0;c->fpsr=fpsr;}}\n",op.lhs,op.lhs,op.dst,op.dst);
+    }
+
     let mask = if op.bytes == 8 { u64::MAX } else { 0xffffffff };
     let lanes = op.total / op.bytes;
     let bits = op.bytes * 8;
     let (callback, operation) = match op.kind {
         VectorFpKind::Arithmetic(n) => ("floating", u32::from(n)),
         VectorFpKind::Conversion(n) => ("convert", u32::from(n)),
+        VectorFpKind::ReduceMinMax(_) => unreachable!(),
         VectorFpKind::PairwiseAdd => ("floating", 0),
         VectorFpKind::PairwiseMinMax(n) => ("floating", u32::from(n)),
         VectorFpKind::ScaledConversion {
@@ -45,7 +50,7 @@ pub fn emit(op: VectorFp) -> String {
         };
         match op.kind {
         VectorFpKind::Conversion(_)|VectorFpKind::ScaledConversion{..}=>out+=&format!("int status=c->convert({operation},{bits},{},c->fpcr,fpsr,a,&result,&fpsr);\n",op.bytes),
-        VectorFpKind::PairwiseAdd|VectorFpKind::PairwiseMinMax(_)=>unreachable!(),
+        VectorFpKind::PairwiseAdd|VectorFpKind::PairwiseMinMax(_)|VectorFpKind::ReduceMinMax(_)=>unreachable!(),
         VectorFpKind::Arithmetic(_)=>out+=&format!("uint64_t b={right_lane}&UINT64_C({mask}),acc=(old[half]>>shift)&UINT64_C({mask});int status=c->floating({operation},{},c->fpcr,fpsr,a,b,acc,&result,&fpsr);\n",op.bytes),
     }
     }

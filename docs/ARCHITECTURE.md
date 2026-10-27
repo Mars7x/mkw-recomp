@@ -89,3 +89,9 @@ Pairwise FP min/max shares the adjacent-pair emitter and checked numerical helpe
 
 
 Integer SIMD SMAX/SMIN/UMAX/UMIN support B/H/S vector arrangements; SMAXV/SMINV/UMAXV/UMINV reduce legal vectors to one zero-extended scalar element. Source snapshots preserve overlap and V31; unsigned comparisons with sign-bit bias implement signed ordering without host signed overflow. Reserved D/scalar arrangements reject and ordinary FCCMP/FCSEL neighbors retain their decoder ownership. SHLL/SHLL2 additionally widen B/H/S elements and shift by their original width, using the existing defined unsigned widening emitter. These operations need no callbacks or ABI v7 changes and preserve GPR/NZCV/FPCR/FPSR. Actual access-trap/configuration gates remain unverified.
+
+
+Raw XTN/XTN2 narrowing now selects low bytes from doubled-width elements, preserving the destination low half for XTN2 and clearing its upper half for XTN. Saturating narrowing/QC semantics remain separate. Four-S floating min/max reductions now use three checked helper calls in adjacent-pair tree order, with deferred destination/FPSR commit. Both preserve source aliases and V31, require no ABI layout/signature changes, and retain actual SIMD/FP access and target-profile gates before original execution.
+
+
+The supplied-binary survey retains its full bounded extent-lifting census but selects representative native object samples only from extents with at most 4,096 lifted instructions. Oversized sample candidates are explicitly deferred; later smaller feature examples remain eligible. Summary fields list deferred candidates and any observed features without a compiled representative. An independent validation step checks source hashes, source-map instruction counts, native relocatable ELF headers, module counts and feature accounting. This is a representative compilation limit, not a new supported-instruction or runnable-function claim.

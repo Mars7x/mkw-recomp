@@ -48,6 +48,7 @@ fn words() -> Vec<u32> {
             words.push(base | size);
         }
     }
+    words.extend([0x6e30f820, 0x6eb0f820, 0x6e30c820, 0x6eb0c820]);
     let originals = words.clone();
     for w in originals {
         words.push(w & !(31 << 5)); // destination aliases first source
@@ -102,12 +103,34 @@ unsafe extern "C" fn fail_second(
     }
     0
 }
+unsafe extern "C" fn fail_final(
+    _: u32,
+    _: u32,
+    _: u32,
+    fpsr: u32,
+    input: u64,
+    _: u64,
+    _: u64,
+    result: *mut u64,
+    status: *mut u32,
+) -> i32 {
+    if input == 99 {
+        return 3;
+    }
+    unsafe {
+        *result = 99;
+        *status = fpsr | 1;
+    }
+    0
+}
 #[test]
 fn known_lanes_overlap_upper_clearing_and_transactional_refusal() {
     let path = folder("vector-fp-known");
     let overlap = 0x4e22d421; // V1 = V1 + V2
     let high = 0x4e3fd7ff; // V31 = V31 + V31
-    let code = codes(words().into_iter().chain([overlap, high]));
+    let code = codes(words().into_iter().chain([
+        overlap, high, 0x6e30fbff, 0x6eb0fbff, 0x6e30cbff, 0x6eb0cbff,
+    ]));
     for opt in ["-O0", "-O2"] {
         let library = build(&code, &path, opt);
         let fp_lib = backend(&path, opt);
@@ -229,6 +252,29 @@ fn known_lanes_overlap_upper_clearing_and_transactional_refusal() {
             assert_eq!(cpu.vregs[0], expected, "indexed {w:x}");
             assert_eq!(cpu.fpsr, 0);
         }
+        for (word, expected) in [
+            (0x6e30fbff, 0x40800000),
+            (0x6eb0fbff, 0x3f800000),
+            (0x6e30cbff, 0x40800000),
+            (0x6eb0cbff, 0x3f800000),
+        ] {
+            let native = unsafe {
+                library
+                    .get::<Entry>(format!("vector_{word:x}\0").as_bytes())
+                    .unwrap()
+            };
+            let mut cpu = Cpu {
+                fpsr: 0x08000080,
+                ..Cpu::default()
+            };
+            cpu.vregs[31] = [0x400000003f800000, 0x4080000040400000];
+            {
+                let mut a = backend.attach(&mut cpu);
+                assert_eq!(unsafe { native(a.cpu_mut(), 10) }, 0);
+            }
+            assert_eq!(cpu.vregs[31], [expected, 0]);
+            assert_eq!(cpu.fpsr, 0x08000080);
+        }
         let fmls = unsafe { library.get::<Entry>(b"vector_4ea2cc20\0").unwrap() };
         let mut cpu = Cpu::default();
         cpu.vregs[0] = [0x4120000041200000; 2];
@@ -241,6 +287,41 @@ fn known_lanes_overlap_upper_clearing_and_transactional_refusal() {
         assert_eq!(cpu.vregs[0], [0x4080000040800000; 2]);
         assert_eq!(cpu.fpsr, 0);
         for (w, left, right, expected, flags) in [
+            (
+                0x6e30f820,
+                [0x400000003f800000, 0x4080000040400000],
+                [0, 0],
+                [0x40800000, 0],
+                0,
+            ),
+            (
+                0x6eb0f820,
+                [0x8000000000000000, 0],
+                [0, 0],
+                [0x80000000, 0],
+                0,
+            ),
+            (
+                0x6e30c820,
+                [0xff8123453f800000, 0x4040000040000000],
+                [0, 0],
+                [0x40400000, 0],
+                1,
+            ),
+            (
+                0x6eb0c820,
+                [0x3f800000ffc12345, 0x4040000040000000],
+                [0, 0],
+                [0x3f800000, 0],
+                0,
+            ),
+            (
+                0x6eb0c820,
+                [0xff8123457fc54321, 0x4040000040000000],
+                [0, 0],
+                [0x40000000, 0],
+                1,
+            ),
             (
                 0x6e22f420,
                 [0x400000003f800000, 0x4080000040400000],
@@ -397,7 +478,8 @@ fn known_lanes_overlap_upper_clearing_and_transactional_refusal() {
             assert_eq!(cpu.fpsr, 0x08000080 | flags);
         }
         for word in [
-            0x2e22d420, 0x2e22f420, 0x2ea2f420, 0x2e22c420, 0x2ea2c420, 0x6ea2d420,
+            0x2e22d420, 0x2e22f420, 0x2ea2f420, 0x2e22c420, 0x2ea2c420, 0x6ea2d420, 0x6e30f820,
+            0x6eb0f820, 0x6e30c820, 0x6eb0c820,
         ] {
             let pairwise = unsafe {
                 library
@@ -413,15 +495,33 @@ fn known_lanes_overlap_upper_clearing_and_transactional_refusal() {
             cpu.vregs[1] = if word == 0x6ea2d420 {
                 [0x0000000200000001, 0]
             } else {
-                [1, 0]
+                [1, 2]
             };
             cpu.vregs[2] = [2, 0];
             assert_eq!(unsafe { pairwise(&mut cpu, 10) }, 3);
             assert_eq!(cpu.vregs[0], [123, 456]);
             assert_eq!(cpu.fpsr, 0x08000080);
         }
+        for word in [0x6e30f820, 0x6eb0f820, 0x6e30c820, 0x6eb0c820] {
+            let native = unsafe {
+                library
+                    .get::<Entry>(format!("vector_{word:x}\0").as_bytes())
+                    .unwrap()
+            };
+            let mut cpu = Cpu {
+                fpsr: 0x08000080,
+                floating: Some(fail_final),
+                ..Cpu::default()
+            };
+            cpu.vregs[0] = [123, 456];
+            cpu.vregs[1] = [1, 3];
+            assert_eq!(unsafe { native(&mut cpu, 10) }, 3);
+            assert_eq!(cpu.vregs[0], [123, 456]);
+            assert_eq!(cpu.fpsr, 0x08000080);
+        }
         for word in [
             0x4e22d420, 0x6e22f420, 0x6ea2f420, 0x6e22c420, 0x6ea2c420, 0x6ea2d420, 0x7ee2d420,
+            0x6e30f820, 0x6eb0f820, 0x6e30c820, 0x6eb0c820,
         ] {
             let native = unsafe {
                 library
@@ -438,7 +538,7 @@ fn known_lanes_overlap_upper_clearing_and_transactional_refusal() {
                 cpu.vregs[1] = if word == 0x7ee2d420 {
                     [2, 0]
                 } else {
-                    [0x0000000200000001, 0]
+                    [0x0000000200000001, 2]
                 };
                 cpu.vregs[2] = [2, 0];
                 if mode == 0 {
@@ -526,6 +626,36 @@ fn vector_results_and_flags_match_qemu() {
                         fpsr: 0x08000080,
                         nzcv: 0xb0000000,
                     });
+                }
+            }
+        }
+    }
+    // Number min/max is order-sensitive for signaling and quiet NaNs.
+    // Compare every placement of competing payloads and signed zeros directly
+    // with the full reduction instruction, independently of the composition probe.
+    let patterns = [
+        0u64, 0x80000000, 0x3f800000, 0xbf800000, 0xffc12345, 0x7fc54321, 0xff812345, 0x7f854321,
+    ];
+    for word in [0x6e30f820, 0x6eb0f820, 0x6e30c820, 0x6eb0c820] {
+        for dn in 0..2 {
+            for a in patterns {
+                for b in patterns {
+                    for c in patterns {
+                        for d in patterns {
+                            cases.push(reference::VectorCase {
+                                word,
+                                vectors: [
+                                    [123, 456],
+                                    [a | (b << 32), c | (d << 32)],
+                                    [0, 0],
+                                    [0, 0],
+                                ],
+                                fpcr: dn << 25,
+                                fpsr: 0x08000080,
+                                nzcv: 0xb0000000,
+                            });
+                        }
+                    }
                 }
             }
         }

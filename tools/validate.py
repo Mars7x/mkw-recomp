@@ -54,6 +54,7 @@ if args.game:
         raise SystemExit('Version gate did not reject changed identity.')
     results[-1]['expectation_met'] = True
     run('supplied FDE lifting and native object samples', [str(binary), 'cpu-survey', str(game)])
+    run('bounded native sample evidence', [sys.executable, str(ROOT / 'tools/check_survey_samples.py')])
     link = run('real module link diagnostic', [str(binary), 'link-check', str(game)])
     results[-1]['classification'] = 'implemented and tested' if link.returncode == 0 else 'blocked before guest execution'
     candidate = None

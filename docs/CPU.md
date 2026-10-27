@@ -80,7 +80,7 @@ FNMUL applies its result-sign inversion after the ordinary multiply's rounding a
 
 ## SIMD numeric lanes
 
-S/D 2S/4S/2D arithmetic, FMLA/FMLS and unary operations, vector integer conversions and SIMD scalar S/D conversions lower to a fixed number of checked scalar helper calls. All sources and the accumulator are snapshotted before lane evaluation. Destination bits and sticky FPSR commit only after all lanes succeed; upper unused bits clear. This transactional refusal model handles unsupported profiles without partial vector state and does not implement enabled exception delivery. Half and remaining arithmetic/structure instructions still reject. Native known-pattern and overlap tests plus 52,640 QEMU comparisons at O0/O2 provide software evidence under the restricted FP profile.
+S/D 2S/4S/2D arithmetic, FMLA/FMLS and unary operations, vector integer conversions and SIMD scalar S/D conversions lower to a fixed number of checked scalar helper calls. All sources and the accumulator are snapshotted before lane evaluation. Destination bits and sticky FPSR commit only after all lanes succeed; upper unused bits clear. This transactional refusal model handles unsupported profiles without partial vector state and does not implement enabled exception delivery. Half and remaining arithmetic/structure instructions still reject. Native known-pattern and overlap tests plus 86,304 QEMU comparisons at O0/O2 provide software evidence under the restricted FP profile.
 
 S/D FMUL/FMLA/FMLS by element capture all 128 bits of the indexed source and broadcast the decoded lane to the destination lanes. Scalar forms clear the upper result bits. Lane fields and reserved arrangements are checked ahead of code generation. FMSUB/FNMADD/FNMSUB and FMLS negate the required input bit patterns before the existing fused helper runs, preserving single rounding, input-NaN priority and sign behavior under the restricted legacy profile. They do not use a post-rounded negate.
 
@@ -155,7 +155,7 @@ Scalar/vector S/D FMAXP/FMINP/FMAXNMP/FMINNMP capture adjacent source pairs and 
 
 FABD uses checked helper operation 26: guest-mode subtraction followed by raw result-sign clearing. Rounding and NaN processing occur before the absolute bit operation; cumulative subtraction flags are retained. No host floating arithmetic implements this operation. Unsupported FPCR profiles refuse, and every lane completes before destination/FPSR commit. ABI v7 signatures/layout and upstream source provenance remain unchanged.
 
-The expanded SIMD numeric matrix compares 52,640 synthetic cases with QEMU at O0/O2 with fatal UBSan. Mandatory native expectations additionally cover adjacent-pair ordering, numeric/NaN selection, signed zero, overflow/inexact flags and later-lane refusal. This is software-oracle evidence under the existing restricted FP profile; original functions remain unexecuted.
+The expanded SIMD numeric matrix compares 86,304 synthetic cases with QEMU at O0/O2 with fatal UBSan. Mandatory native expectations additionally cover adjacent-pair ordering, numeric/NaN selection, signed zero, overflow/inexact flags and later-lane refusal. This is software-oracle evidence under the existing restricted FP profile; original functions remain unexecuted.
 
 
 ## Integer min/max and full-width widening
@@ -165,3 +165,13 @@ SMAX/SMIN/UMAX/UMIN select raw source elements across legal B/H/S vectors. Signe
 SHLL/SHLL2 use their separate encoding, selecting the low/high source half and shifting widened B/H/S elements by 8/16/32 respectively. The resulting value fits the doubled unsigned width, including the highest input bit; no shift by 64 or host signed overflow is evaluated. Existing SSHLL/USHLL ranges remain distinct.
 
 Independent i128/u128 expectations now cover 39,744 integer SIMD cases per optimization, with a separate 24,096-case QEMU matrix. The expanded shift/widening matrices cover 68,640 native expectations and 34,320 QEMU cases. All run at O0/O2 with fatal UBSan; these remain diagnostic software tests, with no original-hardware or original-function execution evidence.
+
+
+## Truncating narrowing and floating min/max reductions
+
+XTN takes the low B/H/S bits of each doubled-width element from a full 128-bit source and packs a 64-bit result. XTN clears the upper destination half; XTN2 replaces the upper half while retaining the lower half. Complete source capture preserves overlap and V31. The raw operation does not saturate or change FPSR.QC. Saturating narrow forms remain unsupported. Independent byte selection checks 6,144 native cases per optimization; 24 constructed source/alias/arrangement cases compare with QEMU.
+
+FMAXV/FMINV/FMAXNMV/FMINNMV reduce four S elements with a pair tree: adjacent low pair, adjacent high pair, then their results. This preserves the order-dependent signaling/quiet NaN rules of checked min/max operations 15..18. The helper accumulates sticky flags locally and commits only after all three calls succeed. Mandatory tests include signed-zero/NaN/numeric selection, V31 overlap and refusal at the second and final stages. The existing restricted FP profile remains required; scalar pairwise neighbors retain their separate ownership. The expanded SIMD numeric matrix has 86,304 QEMU fixtures at native O0/O2 with fatal UBSan. A separate 32,768-case software composition probe supports pair-tree routing, without establishing hardware or retail-profile equivalence.
+
+
+The supplied-binary survey retains its full bounded extent-lifting census but selects representative native object samples only from extents with at most 4,096 lifted instructions. Oversized sample candidates are explicitly deferred; later smaller feature examples remain eligible. Summary fields list deferred candidates and any observed features without a compiled representative. An independent validation step checks source hashes, source-map instruction counts, native relocatable ELF headers, module counts and feature accounting. This is a representative compilation limit, not a new supported-instruction or runnable-function claim.

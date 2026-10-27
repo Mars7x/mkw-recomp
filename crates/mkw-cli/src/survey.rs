@@ -31,6 +31,10 @@ pub fn run(root: &Path) -> Result<()> {
         let mut compiled = 0;
         let mut compiled_pac = 0;
         let mut sampled = BTreeSet::new();
+        let mut observed = BTreeSet::new();
+        let mut deferred_samples = 0usize;
+        // This limits representative object selection, never the lifting census.
+        const NATIVE_SAMPLE_INSTRUCTION_LIMIT: usize = 4096;
         let mut failures = BTreeMap::<String, usize>::new();
         for extent in &extents {
             let mut row = json!({"module":name,"extent":extent});
@@ -179,6 +183,12 @@ pub fn run(root: &Path) -> Result<()> {
                                 if v.kind == mkw_arm64::vector_fp::VectorFpKind::Arithmetic(26) {
                                     features.push("fp_absolute_difference");
                                 }
+                                if matches!(
+                                    v.kind,
+                                    mkw_arm64::vector_fp::VectorFpKind::ReduceMinMax(_)
+                                ) {
+                                    features.push("fp_minmax_reduction");
+                                }
                                 if v.rhs_lane.is_some() {
                                     features.push("indexed_vector_fp");
                                 }
@@ -209,6 +219,9 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::Atomic(_) => features.push("lse_atomic"),
                             Op::Simd(v) => {
                                 features.push("simd_register_bits");
+                                if matches!(v, mkw_arm64::simd::Simd::Narrow { .. }) {
+                                    features.push("simd_narrow");
+                                }
                                 if matches!(v, mkw_arm64::simd::Simd::Transform { .. }) {
                                     features.push("simd_raw_transform");
                                 }
@@ -261,10 +274,17 @@ pub fn run(root: &Path) -> Result<()> {
                     }
                     features.sort_unstable();
                     features.dedup();
+                    observed.extend(features.iter().copied());
                     row["instruction_features"] = json!(features);
                     if (pac && compiled_pac < 4)
                         || features.iter().any(|feature| !sampled.contains(feature))
                     {
+                        if ir.len() > NATIVE_SAMPLE_INSTRUCTION_LIMIT {
+                            row["native_sample_deferred"] = json!({"reason":"representative object instruction budget","instructions":ir.len(),"limit":NATIVE_SAMPLE_INSTRUCTION_LIMIT});
+                            deferred_samples += 1;
+                            writeln!(details, "{row}").map_err(|e| e.to_string())?;
+                            continue;
+                        }
                         let dir = Path::new("private/generated/survey")
                             .join(&n.sha256)
                             .join(format!("{:x}", extent.start));
@@ -301,7 +321,7 @@ pub fn run(root: &Path) -> Result<()> {
             }
             writeln!(details, "{row}").map_err(|e| e.to_string())?;
         }
-        summaries.push(json!({"module":name,"fde_extents":extents.len(),"subset_liftable_functions":complete,"subset_liftable_pac_functions":pac_complete,"native_pac_sample_objects":compiled_pac,"native_sample_objects":compiled,"compiled_instruction_features":sampled,"failure_categories":failures}));
+        summaries.push(json!({"module":name,"fde_extents":extents.len(),"subset_liftable_functions":complete,"subset_liftable_pac_functions":pac_complete,"native_pac_sample_objects":compiled_pac,"native_sample_objects":compiled,"compiled_instruction_features":sampled,"uncompiled_instruction_features":observed.difference(&sampled).collect::<Vec<_>>(),"native_sample_instruction_limit":NATIVE_SAMPLE_INSTRUCTION_LIMIT,"deferred_native_sample_candidates":deferred_samples,"failure_categories":failures}));
         eprintln!("{name}: {} FDE extents, {complete} subset-liftable functions, {pac_complete} PAC, {compiled} native sample objects",extents.len());
     }
     details.flush().map_err(|e| e.to_string())?;

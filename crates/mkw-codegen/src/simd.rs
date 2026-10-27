@@ -19,6 +19,11 @@ fn lane(source: LaneSource, bytes: u8) -> String {
 }
 pub fn emit(op: Simd) -> String {
     match op {
+        Simd::Narrow{dst,src,bytes,upper}=>{
+            let bits=bytes*8;let input_bits=bits*2;
+            format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},value=0;for(unsigned lane=0;lane<{};lane++){{unsigned from=lane*{input_bits};value|=((source[from/64]>>(from%64))&UINT64_C({}))<<(lane*{bits});}}c->vregs[{dst}][{}]=value;{}}}\n",8/bytes,mask(bytes),u8::from(upper),if upper {String::new()} else {format!("c->vregs[{dst}][1]=0;")})
+        }
+
         Simd::Transform{dst,src,bytes,vector_bytes,kind}=>{
             let mut out=format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{0,0}};\n");
             match kind{

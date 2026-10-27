@@ -8,6 +8,7 @@ pub enum VectorFpKind {
     ScaledConversion { operation: u8, fractional_bits: u8 },
     PairwiseAdd,
     PairwiseMinMax(u8),
+    ReduceMinMax(u8),
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct VectorFp {
@@ -58,6 +59,24 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
                 },
             })));
         }
+    }
+    let reduction = match w & 0xfffffc00 {
+        0x6e30f800 => Some(15),
+        0x6eb0f800 => Some(16),
+        0x6e30c800 => Some(17),
+        0x6eb0c800 => Some(18),
+        _ => None,
+    };
+    if let Some(operation) = reduction {
+        return Some(Ok(Op::VectorFp(VectorFp {
+            bytes: 4,
+            total: 4,
+            dst: (w & 31) as u8,
+            lhs: ((w >> 5) & 31) as u8,
+            rhs: 0,
+            rhs_lane: None,
+            kind: VectorFpKind::ReduceMinMax(operation),
+        })));
     }
     let scalar_kind = match w & 0xffbffc00 {
         0x7e30d800 => Some(VectorFpKind::PairwiseAdd),
@@ -352,5 +371,33 @@ mod pairwise_minmax_tests {
         }
         assert!(crate::decode(0x2ee2d420, 0).is_err());
         assert!(decode(0x3ea2d420).is_none());
+    }
+}
+
+#[cfg(test)]
+mod reduction_tests {
+    use super::*;
+    #[test]
+    fn reductions_are_four_single_elements_only() {
+        for (base, n) in [
+            (0x6e30f800, 15),
+            (0x6eb0f800, 16),
+            (0x6e30c800, 17),
+            (0x6eb0c800, 18),
+        ] {
+            assert!(
+                matches!(crate::decode(base|0x3ff,0).unwrap().op,Op::VectorFp(VectorFp{bytes:4,total:4,dst:31,lhs:31,kind:VectorFpKind::ReduceMinMax(op),..})if op==n)
+            );
+            for w in [base ^ (1 << 30), base | (1 << 22)] {
+                assert!(crate::decode(w, 0).is_err(), "{w:x}");
+            }
+            assert!(matches!(
+                crate::decode(base | (1 << 28), 0).unwrap().op,
+                Op::VectorFp(VectorFp {
+                    kind: VectorFpKind::PairwiseMinMax(_),
+                    ..
+                })
+            ));
+        }
     }
 }

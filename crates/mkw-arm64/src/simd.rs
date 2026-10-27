@@ -20,6 +20,12 @@ pub enum TransformKind {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Simd {
+    Narrow {
+        dst: u8,
+        src: u8,
+        bytes: u8,
+        upper: bool,
+    },
     Transform {
         dst: u8,
         src: u8,
@@ -132,6 +138,18 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let src = ((w >> 5) & 31) as u8;
     let q = w & (1 << 30) != 0;
     let vector_bytes = if q { 16 } else { 8 };
+    if w & 0xbf3ffc00 == 0x0e212800 {
+        let size = ((w >> 22) & 3) as u8;
+        if size == 3 {
+            return Some(Err("reserved XTN element width".into()));
+        }
+        return Some(Ok(Op::Simd(Simd::Narrow {
+            dst,
+            src,
+            bytes: 1 << size,
+            upper: q,
+        })));
+    }
     if w & 0xbfe08c00 == 0x0e000000 {
         return Some(Ok(Op::Simd(Simd::Table {
             dst,
@@ -577,6 +595,29 @@ mod transform_tests {
         ));
         for w in [0x5e200820, 0x4e200c20, 0x6ea05820] {
             assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod narrow_tests {
+    use super::*;
+    #[test]
+    fn truncation_widths_aliases_and_reserved_neighbors() {
+        for q in 0..2 {
+            for size in 0..4 {
+                let w = 0x0e212bff | (q << 30) | (size << 22);
+                if size == 3 {
+                    assert!(crate::decode(w, 0).is_err());
+                    continue;
+                }
+                assert!(
+                    matches!(crate::decode(w,0).unwrap().op,Op::Simd(Simd::Narrow{dst:31,src:31,bytes,upper})if(bytes,upper)==(1<<size,q!=0))
+                );
+            }
+        }
+        for w in [0x5e212820, 0x2e212820, 0x4e214820] {
+            assert!(decode(w).is_none());
         }
     }
 }
