@@ -139,7 +139,35 @@ pub fn floating_elf(cases: &[FloatingCase]) -> Vec<u8> {
 pub fn conversion_elf(cases: &[FloatingCase]) -> Vec<u8> {
     build_floating_elf(cases, true)
 }
+pub struct VectorCase {
+    pub word: u32,
+    pub vectors: [[u64; 2]; 4],
+    pub fpcr: u32,
+    pub fpsr: u32,
+    pub nzcv: u32,
+}
+pub fn vector_elf(cases: &[VectorCase]) -> Vec<u8> {
+    build_vector_elf(cases, false)
+}
 fn build_floating_elf(cases: &[FloatingCase], conversion: bool) -> Vec<u8> {
+    let vectors: Vec<_> = cases
+        .iter()
+        .map(|c| VectorCase {
+            word: c.word,
+            vectors: [
+                INITIAL_V[0],
+                [c.left, INITIAL_V[1][1]],
+                [c.right, INITIAL_V[2][1]],
+                [c.accumulate, INITIAL_V[3][1]],
+            ],
+            fpcr: c.fpcr,
+            fpsr: c.fpsr,
+            nzcv: c.nzcv,
+        })
+        .collect();
+    build_vector_elf(&vectors, conversion)
+}
+fn build_vector_elf(cases: &[VectorCase], conversion: bool) -> Vec<u8> {
     const BASE: u64 = 0x400000;
     const TEXT: usize = 4096;
     let stride = if conversion { 48 } else { 32 };
@@ -223,14 +251,14 @@ fn build_floating_elf(cases: &[FloatingCase], conversion: bool) -> Vec<u8> {
     }
     for (i, c) in cases.iter().enumerate() {
         for (j, value) in [
-            INITIAL_V[0][0],
-            INITIAL_V[0][1],
-            c.left,
-            INITIAL_V[1][1],
-            c.right,
-            INITIAL_V[2][1],
-            c.accumulate,
-            INITIAL_V[3][1],
+            c.vectors[0][0],
+            c.vectors[0][1],
+            c.vectors[1][0],
+            c.vectors[1][1],
+            c.vectors[2][0],
+            c.vectors[2][1],
+            c.vectors[3][0],
+            c.vectors[3][1],
             u64::from(c.fpcr),
             u64::from(c.fpsr),
         ]

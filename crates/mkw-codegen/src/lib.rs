@@ -7,6 +7,7 @@ mod floating;
 mod integer;
 mod memory;
 mod simd;
+mod vector_fp;
 use mkw_arm64::{Instruction, MemoryOrder, Op, Reg, Width};
 fn r(reg: Reg) -> String {
     match reg {
@@ -38,6 +39,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("simd.rs"),
     include_str!("atomics.rs"),
     include_str!("floating.rs"),
+    include_str!("vector_fp.rs"),
     include_str!("../../../native/cpu.h"),
     include_str!("../../../native/fp.c"),
     include_str!("../../../native/convert.c"),
@@ -85,6 +87,10 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
         let next = format!("goto L_{:x};\n", i.pc + 4);
         match i.op {
             Op::Nop => out += &next,
+            Op::VectorFp(op) => {
+                out += &vector_fp::emit(op);
+                out += &next;
+            }
             Op::ConditionalFloat {
                 operation,
                 condition,

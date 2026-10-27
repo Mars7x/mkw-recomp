@@ -126,3 +126,7 @@ Tests use independently authored system-register field encodings and synthetic g
 ## Negated multiplication and conditional FP
 
 A private synthetic probe compared FNMUL with multiply followed by raw result-sign inversion, including default-NaN mode; the expanded native/QEMU matrix now tests that behavior directly. The adapter delegates numeric multiply to the established scoped helper and inverts the processed result, avoiding a second default-NaN normalization. Conditional FP compares were validated against independent condition truth tables and QEMU for every incoming condition flag combination, including skipped signaling-NaN operands and forced fallback flags. No original executable was run and no reference implementation source was copied.
+
+## SIMD numeric helper reuse
+
+The new vector path uses the already attributed scalar SoftFloat adapters per lane, with original source snapshots, packing and commit logic. Independently authored AArch64 fixtures now initialize full Q0–Q3 values and compare vector results/FPSR/NZCV across arrangements, source/destination aliases and controls. The 13,216 comparisons exercise synthetic instructions only. Capstone separately checks constructed encoding families and arrangements; neither software reference establishes original-hardware behavior or retail FP configuration.

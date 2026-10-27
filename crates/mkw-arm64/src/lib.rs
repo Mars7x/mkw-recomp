@@ -6,6 +6,7 @@ pub mod floating;
 pub mod integer;
 pub mod memory;
 pub mod simd;
+pub mod vector_fp;
 use serde::Serialize;
 pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("lib.rs"),
@@ -15,6 +16,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("simd.rs"),
     include_str!("atomics.rs"),
     include_str!("floating.rs"),
+    include_str!("vector_fp.rs"),
 ];
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Width {
@@ -37,6 +39,7 @@ pub enum MemoryOrder {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Op {
     Nop,
+    VectorFp(vector_fp::VectorFp),
     IntegerUnary {
         width: Width,
         dst: Reg,
@@ -264,7 +267,9 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
     };
     let rd = word & 31;
     let rn = (word >> 5) & 31;
-    let op = if let Some(result) = floating::decode(word) {
+    let op = if let Some(result) = vector_fp::decode(word) {
+        result.map_err(|error| format!("{error} at {pc:#x}"))?
+    } else if let Some(result) = floating::decode(word) {
         result.map_err(|error| format!("{error} at {pc:#x}"))?
     } else if let Some(op) = atomics::decode(word) {
         op
