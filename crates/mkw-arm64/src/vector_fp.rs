@@ -6,6 +6,7 @@ pub enum VectorFpKind {
     Arithmetic(u8),
     Conversion(u8),
     ScaledConversion { operation: u8, fractional_bits: u8 },
+    ReciprocalEstimate,
     PairwiseAdd,
     PairwiseMinMax(u8),
     ReduceMinMax(u8),
@@ -21,6 +22,18 @@ pub struct VectorFp {
     pub kind: VectorFpKind,
 }
 pub fn decode(w: u32) -> Option<Result<Op, String>> {
+    if w & 0xfffffc00 == 0x0ea1d800 {
+        return Some(Ok(Op::VectorFp(VectorFp {
+            bytes: 4,
+            total: 8,
+            dst: (w & 31) as u8,
+            lhs: ((w >> 5) & 31) as u8,
+            rhs: 0,
+            rhs_lane: None,
+            kind: VectorFpKind::ReciprocalEstimate,
+        })));
+    }
+
     if w & (1 << 28) == 0 || w & (1 << 30) != 0 {
         let fixed = match w & 0xaf80fc00 {
             0x0f00e400 => Some(0),
@@ -398,6 +411,48 @@ mod reduction_tests {
                     ..
                 })
             ));
+        }
+    }
+}
+
+#[cfg(test)]
+mod estimate_tests {
+    use super::*;
+    #[test]
+    fn two_s_estimate_register_fields() {
+        for n in [0, 1, 31] {
+            for d in [0, 1, 31] {
+                let Op::VectorFp(v) = crate::decode(0x0ea1d800 | (n << 5) | d, 0).unwrap().op
+                else {
+                    panic!()
+                };
+                assert_eq!(
+                    (v.bytes, v.total, v.dst, v.lhs, v.kind),
+                    (4, 8, d as u8, n as u8, VectorFpKind::ReciprocalEstimate)
+                );
+            }
+        }
+    }
+    #[test]
+    fn other_precision_forms_never_alias_the_two_s_estimate() {
+        for w in [
+            0x4ea1d820, 0x0ee1d820, 0x4ee1d820, 0x0e61d820, 0x5ea1d820, 0x5ee1d820,
+        ] {
+            assert!(
+                !matches!(
+                    crate::decode(w, 0),
+                    Ok(crate::Instruction {
+                        op: Op::VectorFp(VectorFp {
+                            bytes: 4,
+                            total: 8,
+                            kind: VectorFpKind::ReciprocalEstimate,
+                            ..
+                        }),
+                        ..
+                    })
+                ),
+                "{w:x}"
+            );
         }
     }
 }

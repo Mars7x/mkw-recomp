@@ -99,3 +99,14 @@ All **9,410 rejects / 4,558,560 bytes** are inventoried with zero omissions. Str
 A 2S-only estimate prototype now passes privately, reusing the earlier reciprocal assessment; final implementation effort can be lower than the original from-scratch band. The source is not yet integrated and its gain still needs measurement. The original global 4S negative test is preserved.
 
 Halving commit `481eb98` measured **+11 / 29.14 wall minutes = 22.65 extents/hour**, including overlapping publication work and a 14.72-minute full gate. Prefetch's measured end-to-end rate was 311.62/hour. These times describe explicitly scoped wall intervals, not additive engineer-hours. The existing runtime ceiling and the observed PAC/TBI profile difference limit the practical value of chasing the last small static counts.
+
+
+## Measured 2S estimate/CLZ combination
+
+The small combination produces **+18**, exactly its prediction: **214,464 accepted extents**, with no prior acceptance lost. Fifteen additions contain 2S FRECPE and three contain 2S SIMD CLZ. The original global 4S rejection test and every prior test/acceptance rule remain unchanged. The completed estimate prototype reused earlier assessment work; the narrowly scoped CLZ prototype took 2.06 wall minutes through checks while the preceding publication ran. Sharing one full gate improves the return of this already-tested combination relative to two separate publications. Initial from-scratch effort bands are retained as historical forecasts, not asserted actual times.
+
+All **9,392 rejects / 4,400,316 bytes** are inventoried with zero omissions. Strict first-boundary failures remain **8,550**, diagnostic structural barriers **9,132**, runtime/configuration/opaque/policy barriers **787**, and feasible pure-ISA/nonstructural opportunities fall to **59**. Three oversized native-sample candidates are explicitly deferred under the unchanged 4,096-instruction representative limit; every observed feature still compiles in its module. This does not change the acceptance census.
+
+The next highest package is **FRSQRTE+FRSQRTS**, predicting **24** gains with a 210–420-minute from-scratch engineering band plus the validation gate (**3.31–6.40/hour**). Appending other listed singles currently gains nothing additional and costs more. Correct estimate/refinement rounding and exceptions are concrete dependencies; a larger accepted count still cannot establish the missing runtime/configuration contracts.
+
+MLA/XPACI commit `99c4358` measured **+9**, with a scoped 41.88-minute implementation-to-publication interval (**12.89/hour**) and a 15.13-minute complete gate. Prior test files and acceptance rules remained unchanged. These overlapping wall intervals are explicitly scoped and must not be added as engineer-hours.

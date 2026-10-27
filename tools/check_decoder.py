@@ -332,6 +332,14 @@ for q in range(2):
     for rd in [0,1,31]:
      words.add(0x0e209400|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
      for index in range(8):words.add(0x2f000000|(q<<30)|(size<<22)|((index>>2)<<11)|(((index>>1)&1)<<21)|((index&1)<<20)|(rm<<16)|(rn<<5)|rd)
+for q in range(2):
+ for size in range(2):
+  for rn in [0,1,31]:
+   for rd in [0,1,31]:words.add(0x0ea1d800|(q<<30)|(size<<22)|(rn<<5)|rd)
+for q in range(2):
+ for size in range(4):
+  for rn in [0,1,31]:
+   for rd in [0,1,31]:words.add(0x2e204800|(q<<30)|(size<<22)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -369,6 +377,9 @@ for row in rows:
   if word&0xffffffe0==0xdac143e0:
    reg='xzr' if v['register']=='Zero' else 'x'+str(v['register']['Gpr'])
    if (ins.mnemonic,ins.op_str)!=('xpaci',reg) or v['operation']!=2 or v['key']!=0 or v['modifier']!='Zero':errors.append({'word':hex(word),'error':'XPACI operands/profile differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='VectorLeadingZeros':
+  v=op['VectorLeadingZeros'];operands='v'+str(v['dst'])+'.2s, v'+str(v['src'])+'.2s'
+  if (ins.mnemonic,ins.op_str)!=('clz',operands)or(v['bytes'],v['total'])!=(4,8):errors.append({'word':hex(word),'error':'2S CLZ kind/operands differ','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='MultiplyAccumulate':
   v=op['MultiplyAccumulate'];b=v['bytes'];letters={1:'b',2:'h',4:'s'};reg=lambda n:'v'+str(n)+'.'+str(v['total']//b)+letters[b]
   operands=reg(v['dst'])+', '+reg(v['lhs'])+', '+(reg(v['rhs']) if v['rhs_lane'] is None else 'v'+str(v['rhs'])+'.'+letters[b]+'['+str(v['rhs_lane'])+']')
@@ -456,8 +467,11 @@ for row in rows:
   if ins.mnemonic!=expected[v['bytes']][int(v['castagnoli'])]:errors.append({'word':hex(word),'error':'CRC variant differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='VectorFp':
   v=op['VectorFp']
-  expected={'fadd','fsub','fmul','fdiv','fmla','fmls','faddp','fmaxp','fminp','fmaxnmp','fminnmp','fmaxv','fminv','fmaxnmv','fminnmv','fabd','fmax','fmin','fmaxnm','fminnm','frintn','frintp','frintm','frintz','frinta','frintx','frinti','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
+  expected={'frecpe','fadd','fsub','fmul','fdiv','fmla','fmls','faddp','fmaxp','fminp','fmaxnmp','fminnmp','fmaxv','fminv','fmaxnmv','fminnmv','fabd','fmax','fmin','fmaxnm','fminnm','frintn','frintp','frintm','frintz','frinta','frintx','frinti','fabs','fneg','fsqrt','scvtf','ucvtf','fcvtzs','fcvtzu'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'vector numeric family differs','reference':ins.mnemonic+' '+ins.op_str})
+  if v['kind']=='ReciprocalEstimate':
+   operands='v'+str(v['dst'])+'.2s, v'+str(v['lhs'])+'.2s'
+   if (ins.mnemonic,ins.op_str)!=('frecpe',operands):errors.append({'word':hex(word),'error':'2S estimate operands differ','reference':ins.mnemonic+' '+ins.op_str})
   if isinstance(v['kind'],dict) and 'PairwiseMinMax' in v['kind']:
    name={15:'fmaxp',16:'fminp',17:'fmaxnmp',18:'fminnmp'}[v['kind']['PairwiseMinMax']]
    if ins.mnemonic!=name:errors.append({'word':hex(word),'error':'pairwise minmax kind differs','reference':ins.mnemonic})

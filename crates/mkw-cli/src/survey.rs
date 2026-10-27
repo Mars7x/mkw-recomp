@@ -132,6 +132,7 @@ pub fn run(root: &Path) -> Result<()> {
                                 operation: 2,
                                 ..
                             } => features.push("register_pointer_strip"),
+                            Op::VectorLeadingZeros { .. } => features.push("vector_leading_zeros"),
                             Op::MultiplyAccumulate(_) => {
                                 features.push("integer_multiply_accumulate")
                             }
@@ -237,6 +238,10 @@ pub fn run(root: &Path) -> Result<()> {
                                 }
                             }
                             Op::VectorFp(v) => {
+                                if v.kind == mkw_arm64::vector_fp::VectorFpKind::ReciprocalEstimate
+                                {
+                                    features.push("two_s_reciprocal_estimate");
+                                }
                                 features.push("vector_fp");
                                 if matches!(
                                     v.kind,

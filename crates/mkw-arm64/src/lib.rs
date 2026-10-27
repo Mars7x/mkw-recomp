@@ -51,6 +51,12 @@ pub enum Op {
     VectorFp(vector_fp::VectorFp),
     VectorInteger(vector_integer::VectorInteger),
     HalvingInteger(vector_integer::Halving),
+    VectorLeadingZeros {
+        bytes: u8,
+        total: u8,
+        dst: u8,
+        src: u8,
+    },
     MultiplyAccumulate(vector_integer::MultiplyAccumulate),
     VectorCompare(vector_compare::Compare),
     Structure(structures::Structure),
@@ -299,6 +305,13 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
     } else if let Some(result) = simd_shift::decode(word) {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if word & 0xfffffc00 == 0x2ea04800 {
+        Op::VectorLeadingZeros {
+            bytes: 4,
+            total: 8,
+            dst: (word & 31) as u8,
+            src: ((word >> 5) & 31) as u8,
+        }
     } else if let Some(result) = vector_integer::decode_mla(word) {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
@@ -904,6 +917,42 @@ mod xpaci_tests {
                     ..
                 })
             ));
+        }
+    }
+}
+
+#[cfg(test)]
+mod vector_clz_tests {
+    use super::*;
+    #[test]
+    fn two_s_clz_register_fields() {
+        for src in [0, 1, 31] {
+            for dst in [0, 1, 31] {
+                assert!(
+                    matches!(decode(0x2ea04800|(src<<5)|dst,0).unwrap().op,Op::VectorLeadingZeros{bytes:4,total:8,dst:d,src:n}if(d,n)==(dst as u8,src as u8))
+                );
+            }
+        }
+    }
+    #[test]
+    fn neighboring_widths_and_cls_do_not_alias_two_s_clz() {
+        for w in [
+            0x6ea04820, 0x2e204820, 0x2e604820, 0x2ee04820, 0x0ea04820, 0x7ea04820,
+        ] {
+            assert!(
+                !matches!(
+                    decode(w, 0),
+                    Ok(Instruction {
+                        op: Op::VectorLeadingZeros {
+                            bytes: 4,
+                            total: 8,
+                            ..
+                        },
+                        ..
+                    })
+                ),
+                "{w:x}"
+            );
         }
     }
 }

@@ -105,6 +105,17 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
                 out += &vector_compare::emit(op);
                 out += &next;
             }
+            Op::VectorLeadingZeros {
+                bytes,
+                total,
+                dst,
+                src,
+            } => {
+                let bits = bytes * 8;
+                let mask = (1u64 << bits) - 1;
+                out+=&format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t value=(source[half]>>shift)&UINT64_C({mask}),count=0;for(unsigned bit={bits};bit;bit--){{if(value&(UINT64_C(1)<<(bit-1)))break;count++;}}output[half]|=count<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes);
+                out += &next;
+            }
             Op::MultiplyAccumulate(v) => {
                 out += &vector_integer::emit_mla(v);
                 out += &next;

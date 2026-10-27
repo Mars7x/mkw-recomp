@@ -124,3 +124,12 @@ MLA supports B/H/S vector registers and H/S indexed elements with modulo lane ar
 XPACI retains an explicit GPR/zero-register destination and zero modifier in PAC IR. Existing PAC hints retain their LR/SP operands. It calls the existing checked strip operation and refuses a missing backend/context; failures do not commit a register result. CPU ABI v9 and the attributed legacy 39-bit/no-TBI PAC helper are unchanged. Independent native state/budget/profile tests check 111,264 cases per optimization, plus callback/failure probes.
 
 The 1,280 QEMU XPACI comparisons use addresses shared by the diagnostic and QEMU profiles, including canonical top bytes. A separate synthetic test demonstrates QEMU retaining a noncanonical top tag byte while the no-TBI diagnostic helper strips it. This expected profile difference is asserted, not hidden by changing the backend. Actual game PAC/VA/TBI/access configuration remains unverified, and no original function executes.
+
+
+## 2S reciprocal estimates and leading-zero counts
+
+2S FRECPE uses original integer midpoint quantization, explicit normalization and IEEE bit assembly. It handles quiet/signaling NaNs, signed zero/infinity, tiny-input overflow under each supported rounding mode and sticky FPSR. The diagnostic profile requires an attached FP backend and preserves the existing FPCR whitelist; 4S, scalar and other precisions remain outside this implementation. The existing global 4S rejection test is unchanged. CPU ABI v9 and callback operations are unchanged.
+
+Independent real-valued midpoint expectations cover 1,040,912 native cases per optimization, including every normal exponent/bucket edge, subnormal boundaries, signs and exceptional controls. All 25,728 synthetic QEMU cases match O0/O2 with fatal UBSan. Missing-backend and unsupported-profile tests preserve destination/FPSR state.
+
+2S SIMD CLZ snapshots sources, counts each lane and clears the unused upper half while preserving GPR/control/FP/fault state. Independent leading-zero expectations check 262,144 native cases per optimization; 3,864 synthetic QEMU cases match O0/O2 with fatal UBSan. No helper/ABI extension is required. Target access/FP configuration remains unverified and original execution stays gated.

@@ -254,3 +254,10 @@ The [official Arm A64 reference](https://documentation-service.arm.com/static/67
 MLA arithmetic and original lane/accumulator snapshots follow the instruction facts in [Arm's reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab); the independent byte/u128 oracle and QEMU matrix check modulo behavior and indexed fields. XPACI register lowering uses the existing attributed strip helper and its explicit diagnostic profile; [Arm documents the instruction/data address distinction](https://support.arm.com/documentation/dui0801/l/A64-General-Instructions/XPACD--XPACI--XPACLRI--A64-).
 
 The observed QEMU top-byte difference is consistent with [its parameterized pointer reconstruction](https://github.com/qemu/qemu/blob/v8.2.2/target/arm/tcg/pauth_helper.c): a software reference under different VA/TBI settings is not a target profile oracle. The QEMU source was inspected only; no new implementation was copied. A separate original synthetic ELF fixture records the expected difference, while native full-bit checks retain the existing no-TBI contract. Original game execution remains gated.
+
+
+## Narrowed estimate/count scope
+
+The original 2S estimate implementation follows [Arm's defined reciprocal quantization](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85). The emitted integer ratio and normalization differ from the test oracle's real-valued midpoint construction. Private QEMU compares results and flags; no reference implementation was copied. The existing 4S test constraint is preserved, and alternative/increased-precision FP modes remain outside the established diagnostic profile.
+
+The 2S CLZ form covers every remaining observed leading-zero blocker. Its C bit scan is checked against an independent native leading-zero primitive and synthetic QEMU; existing test files are unchanged. This small scoped addition was validated while the preceding publication ran and shares the estimate publication gate.
