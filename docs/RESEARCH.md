@@ -116,3 +116,9 @@ The selected unchanged SoftFloat sources now include signed/unsigned integer con
 ## Scalar bit and carry validation
 
 The next supplied-binary blockers included scalar REV and CLZ. Their fixed-width permutations/counts, plus RBIT/CLS and carry-chain operations, now lower through original unsigned C. Reserved width/opcode fields remain errors. Independent native tests compare bit operations with Rust builtins/byte swaps and carry/overflow flags with wide mathematical results, rather than copying the emitter's flag formula into the oracle. [Arm A64 bit-operation overview](https://developer.arm.com/-/media/Files/pdf/graphics-and-multimedia/ARMv8_InstructionSetOverview.pdf).
+
+## Thread-register requirements
+
+A private first-MRS census identified mostly software thread-register reads, with a smaller cache/counter remainder. LLVM's system operand definitions corroborate the architectural field encodings. QEMU's register table separately records EL0 read/write access for TPIDR_EL0 and EL0 read-only access for TPIDRRO_EL0; those GPL source records were inspected, not copied. The project uses original per-Cpu storage and an explicit configuration gate, not emulator register infrastructure or host TLS. [LLVM system operands](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/AArch64/AArch64SystemOperands.td), [QEMU architectural register access table](https://github.com/qemu/qemu/blob/master/target/arm/helper.c).
+
+Tests use independently authored system-register field encodings and synthetic guest blocks. Thread-register values and layout are not inferred from Linux/QEMU defaults or asserted to be the retail application's TLS ABI. Cache geometry and counter frequencies remain unverified and are not supplied as guessed constants.

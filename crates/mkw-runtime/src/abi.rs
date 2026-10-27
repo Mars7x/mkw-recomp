@@ -1,7 +1,7 @@
-//! ABI v6 mirrors native/cpu.h; integration tests compare its size and offsets
+//! ABI v7 mirrors native/cpu.h; integration tests compare its size and offsets
 //! against the C compiler before invoking generated native functions.
 use std::ffi::c_void;
-pub const CPU_ABI_VERSION: u32 = 6;
+pub const CPU_ABI_VERSION: u32 = 7;
 /// Internal dispatcher request, never a completed guest return.
 pub const EXIT_TAIL: i32 = 8;
 pub type Call = unsafe extern "C" fn(*mut c_void, *mut Cpu, u64, *mut u64) -> i32;
@@ -42,4 +42,17 @@ pub struct Cpu {
     pub fpsr: u32,
     pub floating: Option<FloatingCallback>,
     pub convert: Option<ConvertCallback>,
+    pub tpidr_el0: u64,
+    pub tpidrro_el0: u64,
+    pub thread_state_configured: u32,
+}
+
+impl Cpu {
+    /// Configure raw guest software thread-register values. These are not host
+    /// pointers and do not allocate/initialize TLS or validate game startup.
+    pub fn configure_thread_registers(&mut self, tpidr_el0: u64, tpidrro_el0: u64) {
+        self.tpidr_el0 = tpidr_el0;
+        self.tpidrro_el0 = tpidrro_el0;
+        self.thread_state_configured = 1;
+    }
 }

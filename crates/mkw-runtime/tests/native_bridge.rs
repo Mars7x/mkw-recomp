@@ -330,7 +330,7 @@ fn registered_indirect_native_calls_rebase_and_refuse_unknown_targets() {
         "{}",
         String::from_utf8_lossy(&build.stderr)
     );
-    // SAFETY: both symbols were compiled above from the ABI-v6 emitter. The
+    // SAFETY: both symbols were compiled above from the ABI-v7 emitter. The
     // library outlives all borrowed targets/attachments and all native invocations.
     unsafe {
         let lib = libloading::Library::new(&library).unwrap();

@@ -44,7 +44,7 @@ size_t convert_offset(void){{return offsetof(MkwCpu,convert);}}\nunsigned abi_ve
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    // SAFETY: locally compiled synthetic ABI-v6 functions; check layout before calls.
+    // SAFETY: locally compiled synthetic ABI-v7 functions; check layout before calls.
     unsafe {
         let library = libloading::Library::new(lib).unwrap();
         assert_eq!(
@@ -80,6 +80,7 @@ size_t convert_offset(void){{return offsetof(MkwCpu,convert);}}\nunsigned abi_ve
         library
     }
 }
+#[allow(dead_code)] // Shared with non-FP native fixtures.
 pub fn backend(path: &Path, opt: &str) -> libloading::Library {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let output = path.join(&opt[1..]);

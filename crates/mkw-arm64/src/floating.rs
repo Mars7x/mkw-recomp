@@ -6,6 +6,8 @@ pub enum SystemReg {
     Fpcr,
     Fpsr,
     Nzcv,
+    TpidrEl0,
+    TpidrroEl0,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Floating {
@@ -78,6 +80,8 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
         0xd53b4400 | 0xd51b4400 => Some(SystemReg::Fpcr),
         0xd53b4420 | 0xd51b4420 => Some(SystemReg::Fpsr),
         0xd53b4200 | 0xd51b4200 => Some(SystemReg::Nzcv),
+        0xd53bd040 | 0xd51bd040 => Some(SystemReg::TpidrEl0),
+        0xd53bd060 => Some(SystemReg::TpidrroEl0),
         _ => None,
     };
     if let Some(register) = system {
@@ -232,5 +236,41 @@ mod conversion_tests {
         for w in [0x1ee20020, 0x1ea20020, 0x1e2a0020, 0x1e2c0020, 0x1ee1c020] {
             assert!(crate::decode(w, 0).is_err(), "{w:08x}");
         }
+    }
+}
+
+#[cfg(test)]
+mod thread_tests {
+    use super::*;
+    fn system(read: bool, op2: u32, rt: u32) -> u32 {
+        0xd5000000 | (u32::from(read) << 21) | (3 << 19) | (3 << 16) | (13 << 12) | (op2 << 5) | rt
+    }
+    #[test]
+    fn guest_thread_registers_require_explicit_el0_access_forms() {
+        assert!(matches!(
+            crate::decode(system(true, 2, 0), 0).unwrap().op,
+            Op::SystemRegister {
+                register: SystemReg::TpidrEl0,
+                read: true,
+                ..
+            }
+        ));
+        assert!(matches!(
+            crate::decode(system(false, 2, 31), 0).unwrap().op,
+            Op::SystemRegister {
+                register: SystemReg::TpidrEl0,
+                read: false,
+                value: Reg::Zero
+            }
+        ));
+        assert!(matches!(
+            crate::decode(system(true, 3, 31), 0).unwrap().op,
+            Op::SystemRegister {
+                register: SystemReg::TpidrroEl0,
+                read: true,
+                value: Reg::Zero
+            }
+        ));
+        assert!(crate::decode(system(false, 3, 0), 0).is_err());
     }
 }

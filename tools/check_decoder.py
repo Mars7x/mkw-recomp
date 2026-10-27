@@ -71,7 +71,7 @@ for size in range(4):
    for rn in [0,31]:words.add(0x08a07c00|(size<<30)|((order&1)<<22)|((order>>1)<<15)|(rs<<16)|(rn<<5)|rt)
 for kind in [0xd503309f,0xd50330bf]:
  for option in range(16):words.add(kind|(option<<8))
-for register in [0xd53b4400,0xd53b4420,0xd53b4200,0xd51b4400,0xd51b4420,0xd51b4200]:
+for register in [0xd53b4400,0xd53b4420,0xd53b4200,0xd51b4400,0xd51b4420,0xd51b4200,0xd53bd040,0xd53bd060,0xd51bd040]:
  for rt in range(32):words.add(register|rt)
 for ftype in range(4):
  for operation in range(16):

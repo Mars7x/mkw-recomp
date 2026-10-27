@@ -67,6 +67,15 @@ pub fn run(root: &Path) -> Result<()> {
                     row["subset_instructions"] = json!(ir.len());
                     row["requires_atomic_memory_backend"] =
                         json!(ir.iter().any(|i| matches!(i.op, mkw_arm64::Op::Atomic(_))));
+                    row["requires_thread_register_configuration"] =
+                        json!(ir.iter().any(|i| matches!(
+                            i.op,
+                            mkw_arm64::Op::SystemRegister {
+                                register: mkw_arm64::floating::SystemReg::TpidrEl0
+                                    | mkw_arm64::floating::SystemReg::TpidrroEl0,
+                                ..
+                            }
+                        )));
                     row["requires_floating_backend"] = json!(ir.iter().any(|i| matches!(
                         i.op,
                         mkw_arm64::Op::Floating(_) | mkw_arm64::Op::Convert(_)
@@ -99,6 +108,12 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::FloatSelect { .. } => features.push("fp_conditional_select"),
                             Op::Convert(_) => features.push("fp_integer_conversion"),
                             Op::Floating(_) => features.push("scalar_fp"),
+                            Op::SystemRegister {
+                                register:
+                                    mkw_arm64::floating::SystemReg::TpidrEl0
+                                    | mkw_arm64::floating::SystemReg::TpidrroEl0,
+                                ..
+                            } => features.push("thread_register_state"),
                             Op::SystemRegister { .. } => features.push("fp_nzcv_register"),
                             Op::Barrier { .. } => features.push("data_barrier"),
                             Op::Atomic(_) => features.push("lse_atomic"),
