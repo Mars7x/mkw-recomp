@@ -309,6 +309,14 @@ for q in range(2):
   for size in range(4):
    for base in [0x0e284800,0x0e285800,0x0e286800,0x0e287800]:
     for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(q<<30)|(scalar<<28)|(size<<22)|(rn<<5)|rd)
+for hint in range(32):
+ for rn in [1,31]:
+  for imm in [0,1,4095]:words.add(0xf9800000|(imm<<10)|(rn<<5)|hint)
+  for imm in [0,1,255,256,511]:words.add(0xf8800000|(imm<<12)|(rn<<5)|hint)
+  for option in range(8):
+   for shift in range(2):
+    for rm in [2,31]:words.add(0xf8a00800|(rm<<16)|(option<<13)|(shift<<12)|(rn<<5)|hint)
+ for imm in [0,1,0x3ffff,0x40000,0x7ffff]:words.add(0xd8000000|(imm<<5)|hint)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -499,6 +507,23 @@ for row in rows:
  elif kind in {'ConditionalCompare','IndirectBranch','Multiply','Divide'}:
   expected={'ConditionalCompare':{'ccmp','ccmn'},'IndirectBranch':{'br'},'Multiply':{'mul','mneg','madd','msub','smull','smnegl','smaddl','smsubl','umull','umnegl','umaddl','umsubl','smulh','umulh'},'Divide':{'udiv','sdiv'}}[kind]
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'integer/control family differs','reference':ins.mnemonic})
+ elif kind=='Prefetch':
+  from capstone.arm64_const import ARM64_EXT_UXTW,ARM64_EXT_SXTW,ARM64_EXT_SXTX
+  v=op['Prefetch'];address=v['address'];name='prfum' if v['unscaled'] else 'prfm'
+  if ins.mnemonic!=name:errors.append({'word':hex(word),'error':'prefetch family differs','reference':ins.mnemonic})
+  if v['hint']!=word&31:errors.append({'word':hex(word),'error':'prefetch hint bits differ'})
+  operand=ins.operands[-1]
+  reg=lambda r: 'sp' if r=='Sp' else 'xzr' if r=='Zero' else 'x'+str(r['Gpr'])
+  if 'Literal' in address:
+   if operand.imm&((1<<64)-1)!=address['Literal']:errors.append({'word':hex(word),'error':'prefetch literal address differs'})
+  else:
+   if decoder.reg_name(operand.mem.base)!=reg(v['base']):errors.append({'word':hex(word),'error':'prefetch base differs'})
+   if 'Offset' in address:
+    if operand.mem.disp!=address['Offset']:errors.append({'word':hex(word),'error':'prefetch offset differs'})
+   elif 'Register' in address:
+    a=address['Register'];index=reg(a['index']);index=('w'+index[1:]) if a['extend'] in {2,6} else index
+    if decoder.reg_name(operand.mem.index)!=index or operand.shift.value!=a['shift'] or operand.ext!={2:ARM64_EXT_UXTW,3:0,6:ARM64_EXT_SXTW,7:ARM64_EXT_SXTX}[a['extend']]:errors.append({'word':hex(word),'error':'prefetch index/extension/shift differs','reference':ins.op_str})
+   else:errors.append({'word':hex(word),'error':'prefetch unexpectedly writes back'})
  elif kind=='Memory':
   transfer=op['Memory'];name=decoder.reg_name(ins.operands[0].reg);vector='Vector'in transfer['first']
   expected_vector=name[0]in'bh sdq'.replace(' ','')

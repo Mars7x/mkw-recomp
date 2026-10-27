@@ -116,6 +116,7 @@ pub fn run(root: &Path) -> Result<()> {
                             Op,
                         };
                         match instruction.op {
+                            Op::Prefetch(_) => features.push("prefetch_hint"),
                             Op::YieldHint => features.push("yield_hint"),
                             Op::FloatSelect { .. } => features.push("fp_conditional_select"),
                             Op::Convert(v) => {

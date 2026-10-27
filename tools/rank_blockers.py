@@ -52,7 +52,8 @@ def run(validation_minutes):
         if not ins:result=('opaque:undecoded','opaque')
         else:
             ins=ins[0];name=ins.mnemonic
-            if name in RUNTIME or name.startswith(EXCLUSIVE):result=('runtime:'+name,'runtime')
+            if name in {'prfm','prfum'} and ((word>>5)&31)==31 and (word&0xff000000)!=0xd8000000:result=('configuration:prefetch-sp','configuration')
+            elif name in RUNTIME or name.startswith(EXCLUSIVE):result=('runtime:'+name,'runtime')
             elif name in {'dc','ic','tlbi','at','sys','sysl','isb','dsb','dmb'}:result=('configuration:'+name,'configuration')
             elif name in {'mrs','msr'}:
                 operands=[x.strip()for x in ins.op_str.split(',')];register=operands[-1]if name=='mrs'else operands[0];result=('configuration:'+name+':'+register,'configuration')

@@ -94,6 +94,9 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
         out+=&format!("L_{:x}: ; /* guest {:016x}, instruction {:08x} */\n c->pc=c->module_base+UINT64_C({}); if (!*budget) return 2; --*budget;\n",i.pc,i.pc,i.word,i.pc);
         let next = format!("goto L_{:x};\n", i.pc + 4);
         match i.op {
+            // The explicit diagnostic cache profile performs no prefetch action.
+            // Operands remain in IR; no guest address is dereferenced or probed.
+            Op::Prefetch(_) => out += &next,
             Op::Nop => out += &next,
             // Architectural scheduling hint: the diagnostic profile chooses no
             // scheduling effect. It still consumes its normal instruction budget.

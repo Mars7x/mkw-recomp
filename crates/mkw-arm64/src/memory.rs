@@ -27,6 +27,55 @@ pub struct Transfer {
     pub width: Width,
     pub non_temporal: bool,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct Prefetch {
+    pub hint: u8,
+    pub base: Reg,
+    pub address: AddressMode,
+    pub unscaled: bool,
+}
+fn prefetch(w: u32, pc: u64) -> Option<Result<Op, String>> {
+    let hint = (w & 31) as u8;
+    let base = reg((w >> 5) & 31, true);
+    let (address, unscaled) = if w & 0xff000000 == 0xd8000000 {
+        (
+            AddressMode::Literal(pc.wrapping_add((signed_offset(w) * 4) as u64)),
+            false,
+        )
+    } else if w & 0xffc00000 == 0xf9800000 {
+        (AddressMode::Offset(i64::from((w >> 10) & 4095) * 8), false)
+    } else if w & 0xffe00c00 == 0xf8800000 {
+        (AddressMode::Offset(signed((w >> 12) & 511, 9)), true)
+    } else if w & 0xffe00c00 == 0xf8a00800 {
+        let extend = ((w >> 13) & 7) as u8;
+        if !matches!(extend, 2 | 3 | 6 | 7) {
+            return Some(Err("reserved prefetch register extension".into()));
+        }
+        (
+            AddressMode::Register {
+                index: reg((w >> 16) & 31, false),
+                extend,
+                shift: if w & (1 << 12) != 0 { 3 } else { 0 },
+            },
+            false,
+        )
+    } else {
+        return None;
+    };
+    if base == Reg::Sp && !matches!(address, AddressMode::Literal(_)) {
+        return Some(Err("stack-pointer prefetch profile unsupported".into()));
+    }
+    Some(Ok(Op::Prefetch(Prefetch {
+        hint,
+        base: if matches!(address, AddressMode::Literal(_)) {
+            Reg::Zero
+        } else {
+            base
+        },
+        address,
+        unscaled,
+    })))
+}
 fn signed(value: u32, bits: u32) -> i64 {
     ((value as i64) << (64 - bits)) >> (64 - bits)
 }
@@ -51,6 +100,9 @@ fn scalar(size: u32, opc: u32) -> Result<(bool, u8, bool, Width), String> {
     }
 }
 pub fn decode(w: u32, pc: u64) -> Option<Result<Op, String>> {
+    if let Some(result) = prefetch(w, pc) {
+        return Some(result);
+    }
     let vector = w & (1 << 26) != 0;
     let rt = w & 31;
     let rn = (w >> 5) & 31;
@@ -257,5 +309,73 @@ mod tests {
                 ..
             })
         ));
+    }
+}
+
+#[cfg(test)]
+mod prefetch_tests {
+    use super::*;
+    #[test]
+    fn prefetch_address_hint_fields_and_extreme_offsets() {
+        let Op::Prefetch(p) = crate::decode(0xf9800000 | (4095 << 10) | (1 << 5) | 31, 0x1000)
+            .unwrap()
+            .op
+        else {
+            panic!()
+        };
+        assert_eq!(
+            (p.hint, p.base, p.address, p.unscaled),
+            (31, Reg::Gpr(1), AddressMode::Offset(32760), false)
+        );
+        let Op::Prefetch(p) = crate::decode(0xf8800000 | (256 << 12) | (1 << 5) | 3, 0)
+            .unwrap()
+            .op
+        else {
+            panic!()
+        };
+        assert_eq!(
+            (p.hint, p.base, p.address, p.unscaled),
+            (3, Reg::Gpr(1), AddressMode::Offset(-256), true)
+        );
+        let Op::Prefetch(p) = crate::decode(
+            0xf8a00800 | (31 << 16) | (6 << 13) | (1 << 12) | (1 << 5) | 7,
+            0,
+        )
+        .unwrap()
+        .op
+        else {
+            panic!()
+        };
+        assert_eq!(
+            p.address,
+            AddressMode::Register {
+                index: Reg::Zero,
+                extend: 6,
+                shift: 3
+            }
+        );
+        let Op::Prefetch(p) = crate::decode(0xd8000000 | (0x40000 << 5) | 9, 0x1000)
+            .unwrap()
+            .op
+        else {
+            panic!()
+        };
+        assert_eq!(
+            (p.hint, p.base, p.address),
+            (
+                9,
+                Reg::Zero,
+                AddressMode::Literal(0x1000u64.wrapping_sub(1048576))
+            )
+        );
+    }
+    #[test]
+    fn prefetch_does_not_accept_reserved_writeback_unprivileged_or_extensions() {
+        for w in [
+            0xf98003e0, 0xf88003e0, 0xf8a26be0, 0xf8800420, 0xf8800c20, 0xf8800820, 0xf8a20820,
+            0xf9c00020, 0xdc000020,
+        ] {
+            assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
     }
 }

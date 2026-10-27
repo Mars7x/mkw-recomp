@@ -214,6 +214,7 @@ pub enum Op {
         target: u64,
     },
     Memory(memory::Transfer),
+    Prefetch(memory::Prefetch),
     PointerAuth {
         key: u8,
         operation: u8,

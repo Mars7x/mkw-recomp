@@ -10,7 +10,7 @@ The diagnostic CFG continues after decode failures assuming ordinary fallthrough
 
 The original strict result has 8,548 CFG-boundary failures. Diagnostic continuation finds edge issues in 9,132 rejected extents; this larger number includes fallthrough after unknown/trap/data words and is conditional on that recovery assumption. Only 350 extents have a nonstructural requirement set containing solely candidate ISA work. Unsupported runtime/configuration/opaque/policy requirements occur in 762 rejected extents, overlapping the edge-blocked group.
 
-## Priorities
+## Priorities at the AES baseline
 
 The ranker evaluates individual fixes and all pairs/triples of candidate families. Predicted gain counts a rejected extent only when the complete diagnostic CFG blocker set is covered and no structural issue remains. Engineering effort is an explicit estimate, with a separate assumed 15-minute validation gate; ranges are not measured implementation times. Shared-family savings are stated in the tool. Cache/system-register, syscall, exclusive-monitor, exception, opaque and unsupported control-flow work is identified separately rather than assigned a cheap ISA score.
 
@@ -41,3 +41,21 @@ This is a material limit on the usefulness of further small ISA survey wins. Bou
 - `python3 tools/validate.py --game base` retains all prior correctness/negative gates and additionally checks the diagnostics/ranking. Each gate now records elapsed seconds privately.
 
 All detailed binary-derived inventories remain private. Published documentation contains aggregate evidence and original tool/source code only.
+
+
+## Measured prefetch result and refreshed priorities
+
+The same strict survey now accepts **214,426 extents: +228**, exactly matching the PRFM/PRFUM prediction. The accepted sets were compared by module/extent identity: no previously accepted extent was lost. All 228 additions contain typed prefetch hints. SP-based forms remain rejected under the existing negative test, and none of the predicted additions required them. Tests, CFG/tail/identity/size rules and representative limits are unchanged.
+
+The remaining 9,430 rejects contain 4,588,952 inventoried bytes, with zero omissions. Strict CFG-boundary failures remain 8,548; optimistic diagnostic edge-blocked extents remain 9,132. Pure ISA/nonstructural opportunities fall to 122. Runtime/configuration/opaque/policy barriers still occur in 762 extents (overlapping structural barriers).
+
+| Refreshed fix combination | Conditional predicted gain | Implementation estimate | Estimated gain/hour including 15-minute validation |
+|---|---:|---:|---:|
+| FRECPE + FRECPS | 40 | 150–300 min | 7.62–14.55 |
+| FRECPE + FRECPS + XPACI | 45 | 170–345 min | 7.50–14.59 |
+| SHADD + SHSUB + UHADD | 11 | 30–75 min | 7.33–14.67 |
+| FRECPE + FRECPS + MLA | 44 | 170–345 min | 7.33–14.27 |
+
+The first package leads by midpoint estimate only; these wide ranges overlap. Its approximation, exceptional-input and rounding requirements must be assessed before committing engineering time. The preceding complete gate actually took 16.91 minutes, close to the explicit 15-minute ranking assumption; no validation work is omitted to improve throughput.
+
+Prefetch implementation start through isolated verification and strict supplied-binary measurement took 28.15 minutes (**486 gained extents/hour**), excluding upfront shared portfolio analysis and the final publication gate. A private effort receipt records timestamps and the baseline commit. Publication completion is recorded after push, avoiding invented historical timings. These diagnostic gains do not remove the runtime ceiling described above.
