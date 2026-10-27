@@ -129,6 +129,21 @@ pub fn run(root: &Path) -> Result<()> {
                                 features.push("simd_integer_lanes_reduction");
                                 if matches!(
                                     v,
+                                    mkw_arm64::vector_integer::VectorInteger::MultiplyHigh { .. }
+                                ) {
+                                    features.push("simd_saturating_multiply_high");
+                                    if matches!(
+                                        v,
+                                        mkw_arm64::vector_integer::VectorInteger::MultiplyHigh {
+                                            rhs_lane: Some(_),
+                                            ..
+                                        }
+                                    ) {
+                                        features.push("simd_saturating_multiply_indexed");
+                                    }
+                                }
+                                if matches!(
+                                    v,
                                     mkw_arm64::vector_integer::VectorInteger::Lanes {
                                         kind: mkw_arm64::vector_integer::Kind::Negate,
                                         ..

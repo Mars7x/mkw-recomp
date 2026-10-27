@@ -8,6 +8,31 @@ fn mask(bytes: u8) -> u64 {
 }
 pub fn emit(op: VectorInteger) -> String {
     match op {
+        VectorInteger::MultiplyHigh {
+            bytes,
+            total,
+            dst,
+            lhs,
+            rhs,
+            rounding,
+            rhs_lane,
+        } => {
+            let bits = bytes * 8;
+            let sign = 1u64 << (bits - 1);
+            let mask = mask(bytes);
+            let increment = if rounding { sign } else { 0 };
+            let rhs_expression = if let Some(lane) = rhs_lane {
+                let offset = u32::from(lane) * u32::from(bits);
+                format!("(right[{}]>>{})", offset / 64, offset % 64)
+            } else {
+                "(right[half]>>shift)".into()
+            };
+            // H/S operands fit int64. min*min is the only saturating case and
+            // is removed before doubling; all remaining doubled/rounded products
+            // fit int64. Unsigned shift plus the output mask avoids signed shifts.
+            format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},output[2]={{0,0}};uint32_t fpsr=c->fpsr;for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t a=(left[half]>>shift)&UINT64_C({mask}),b={rhs_expression}&UINT64_C({mask}),value;if(a==UINT64_C({sign})&&b==UINT64_C({sign})){{value=UINT64_C({});fpsr|=UINT32_C(134217728);}}else{{int64_t sa=(int64_t)(a^UINT64_C({sign}))-INT64_C({sign}),sb=(int64_t)(b^UINT64_C({sign}))-INT64_C({sign});int64_t scaled=(sa*sb)*INT64_C(2)+INT64_C({increment});value=((uint64_t)scaled>>{bits})&UINT64_C({mask});}}output[half]|=value<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];c->fpsr=fpsr;}}\n",total/bytes,sign-1)
+        }
+
         VectorInteger::Lanes {
             bytes,
             total,

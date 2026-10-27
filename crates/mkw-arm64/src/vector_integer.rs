@@ -1,4 +1,4 @@
-//! Non-saturating SIMD integer arithmetic, masks and scalar reductions.
+//! SIMD integer arithmetic, masks, reductions and saturating high products.
 use super::Op;
 use serde::Serialize;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -31,6 +31,15 @@ pub enum Reduction {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum VectorInteger {
+    MultiplyHigh {
+        bytes: u8,
+        total: u8,
+        dst: u8,
+        lhs: u8,
+        rhs: u8,
+        rounding: bool,
+        rhs_lane: Option<u8>,
+    },
     Lanes {
         bytes: u8,
         total: u8,
@@ -57,6 +66,67 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let bytes = 1 << size;
     let dst = (w & 31) as u8;
     let lhs = ((w >> 5) & 31) as u8;
+    let indexed = match w & 0xaf00f400 {
+        0x0f00c000 => Some(false),
+        0x0f00d000 => Some(true),
+        _ => None,
+    };
+    if let Some(rounding) = indexed {
+        if size != 1 && size != 2 {
+            return Some(Err("reserved indexed saturating high-product width".into()));
+        }
+        let high = ((w >> 11) & 1) as u8;
+        let low = ((w >> 21) & 1) as u8;
+        let middle = ((w >> 20) & 1) as u8;
+        let lane = if size == 1 {
+            high * 4 + low * 2 + middle
+        } else {
+            high * 2 + low
+        };
+        let rhs = ((w >> 16) & if size == 1 { 15 } else { 31 }) as u8;
+        let scalar = w & (1 << 28) != 0;
+        return Some(Ok(Op::VectorInteger(VectorInteger::MultiplyHigh {
+            bytes,
+            total: if scalar {
+                bytes
+            } else if q {
+                16
+            } else {
+                8
+            },
+            dst,
+            lhs,
+            rhs,
+            rounding,
+            rhs_lane: Some(lane),
+        })));
+    }
+    let multiply = match w & 0xaf20fc00 {
+        0x0e20b400 => Some(false),
+        0x2e20b400 => Some(true),
+        _ => None,
+    };
+    if let Some(rounding) = multiply {
+        if size != 1 && size != 2 {
+            return Some(Err("reserved saturating high-product width".into()));
+        }
+        let scalar = w & (1 << 28) != 0;
+        return Some(Ok(Op::VectorInteger(VectorInteger::MultiplyHigh {
+            bytes,
+            total: if scalar {
+                bytes
+            } else if q {
+                16
+            } else {
+                8
+            },
+            dst,
+            lhs,
+            rhs: ((w >> 16) & 31) as u8,
+            rounding,
+            rhs_lane: None,
+        })));
+    }
     let reduction = match w & 0xbf3ffc00 {
         0x0e303800 => Some(Reduction::SignedLong),
         0x2e303800 => Some(Reduction::UnsignedLong),
@@ -241,5 +311,69 @@ mod negate_tests {
             }
         }
         assert!(decode(0x6e207820).is_none());
+    }
+}
+
+#[cfg(test)]
+mod multiply_high_tests {
+    use super::*;
+    #[test]
+    fn signed_high_product_widths_and_scalar_domain() {
+        for rounding in 0..2 {
+            for scalar in 0..2 {
+                for q in 0..2 {
+                    for size in 0..4 {
+                        let w = 0x0e3fb7ff
+                            | (rounding << 29)
+                            | (scalar << 28)
+                            | (q << 30)
+                            | (size << 22);
+                        if scalar == 1 && q == 0 {
+                            assert!(decode(w).is_none());
+                            continue;
+                        }
+                        if size != 1 && size != 2 {
+                            assert!(crate::decode(w, 0).is_err(), "{w:x}");
+                            continue;
+                        }
+                        assert!(
+                            matches!(crate::decode(w,0).unwrap().op,Op::VectorInteger(VectorInteger::MultiplyHigh{bytes,total,dst:31,lhs:31,rhs:31,rounding:r,..})if(bytes,total,r)==(1<<size,if scalar==1{1<<size}else{8<<q},rounding!=0))
+                        );
+                    }
+                }
+            }
+        }
+        for w in [0x2e20bc20, 0x4e209420] {
+            assert!(decode(w).is_none());
+        }
+    }
+}
+
+#[cfg(test)]
+mod indexed_product_tests {
+    use super::*;
+    #[test]
+    fn indexed_product_lanes_and_shared_register_bits() {
+        for size in [1, 2] {
+            for lane in 0..if size == 1 { 8 } else { 4 } {
+                let index = if size == 1 {
+                    ((lane >> 2) << 11) | (((lane >> 1) & 1) << 21) | ((lane & 1) << 20)
+                } else {
+                    ((lane >> 1) << 11) | ((lane & 1) << 21)
+                };
+                let w = 0x4f00d3ff
+                    | (size << 22)
+                    | index
+                    | (15 << 16)
+                    | if size == 2 { 1 << 20 } else { 0 };
+                assert!(
+                    matches!(crate::decode(w,0).unwrap().op,Op::VectorInteger(VectorInteger::MultiplyHigh{dst:31,lhs:31,rhs,rhs_lane:Some(n),..})if (rhs,n)==(if size==1{15}else{31},lane as u8))
+                );
+            }
+        }
+        for w in [0x4f00d020, 0x4fc0d020] {
+            assert!(crate::decode(w, 0).is_err());
+        }
+        assert!(decode(0x1f40d020).is_none());
     }
 }

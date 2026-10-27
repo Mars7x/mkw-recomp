@@ -237,6 +237,19 @@ for scalar in range(2):
   for imm in range(128):
    for base in [0x0f008400,0x0f008c00,0x2f008400,0x2f008c00]:
     for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(scalar<<28)|(q<<30)|(imm<<16)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for size in range(4):
+   for base in [0x0e20b400,0x2e20b400]:
+    for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(1,2,1)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for size in range(4):
+   for h in range(2):
+    for l in range(2):
+     for m in range(2):
+      for base in [0x0f00c000,0x0f00d000]:
+       for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,15)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(h<<11)|(l<<21)|(m<<20)|(rm<<16)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -269,7 +282,13 @@ for row in rows:
   elif ins.mnemonic==name and ins.operands[-1].imm!=v['amount']:errors.append({'word':hex(word),'error':'SIMD shift amount differs','reference':ins.op_str})
  elif kind=='VectorInteger':
   variant,v=next(iter(op['VectorInteger'].items()));letters={1:'b',2:'h',4:'s',8:'d'}
-  if variant=='Lanes':
+  if variant=='MultiplyHigh':
+   name='sqrdmulh' if v['rounding'] else 'sqdmulh';scalar=bool(word&(1<<28))
+   register=lambda n:letters[v['bytes']]+str(n) if scalar else 'v'+str(n)+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
+   operands=', '.join(register(v[k]) for k in ['dst','lhs'])+', '
+   if v['rhs_lane'] is None:operands+=register(v['rhs'])
+   else:operands+='v'+str(v['rhs'])+'.'+letters[v['bytes']]+'['+str(v['rhs_lane'])+']'
+  elif variant=='Lanes':
    name={'Add':'add','Subtract':'sub','Negate':'neg','SignedMax':'smax','SignedMin':'smin','UnsignedMax':'umax','UnsignedMin':'umin','Equal':'cmeq','Test':'cmtst','SignedGe':'cmge','SignedGt':'cmgt','UnsignedGe':'cmhs','UnsignedGt':'cmhi','SignedLe':'cmle','SignedLt':'cmlt'}[v['kind']]
    scalar=bool(word&(1<<28));register=lambda n: letters[v['bytes']]+str(n) if scalar else 'v'+str(n)+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
    operands=register(v['dst'])+', '+register(v['lhs'])

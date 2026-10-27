@@ -101,3 +101,6 @@ Interleaved LD2/ST2 now use a distinct typed structure operation and one checked
 
 
 Non-saturating integer NEG and SHRN/SHRN2 now use defined unsigned native arithmetic with complete source snapshots. NEG wraps per element; SHRN drops bits without rounding and clears the unused upper half, while SHRN2 replaces only the upper destination half. All legal narrowing amounts and B/H/S output widths are bounded at decode time; scalar/reserved neighbors retain their previous ownership or reject. No callbacks, ABI v7 changes or saturation/QC semantics are introduced. Original execution and actual SIMD/FP access-trap behavior remain gated.
+
+
+SQDMULH/SQRDMULH now lower H/S scalar/vector register and indexed-element operands to native integer arithmetic. Source snapshots and exact lane decoding preserve aliases; bounded int64 products handle minimum-times-minimum saturation before doubling, followed by unsigned high-half extraction. FPSR.QC is sticky and all other status/control fields remain unchanged. Independent i128 expectations and QEMU matrices run at O0/O2 with fatal UBSan. No numerical helper, upstream source or ABI v7 change is introduced. Accumulating variants, actual access traps and target/bootstrap gates remain unverified or unsupported.
