@@ -51,6 +51,13 @@ pub enum Op {
     VectorFp(vector_fp::VectorFp),
     VectorInteger(vector_integer::VectorInteger),
     HalvingInteger(vector_integer::Halving),
+    UnsignedAbsDifference(vector_integer::UnsignedAbsDifference),
+    PolynomialMultiply(vector_integer::PolynomialMultiply),
+    WidenSingleVector {
+        dst: u8,
+        src: u8,
+        upper: bool,
+    },
     PairwiseMinMax(vector_integer::PairwiseMinMax),
     PairwiseLongSum(vector_integer::PairwiseLongSum),
     SaturatingShiftImmediate(vector_integer::SaturatingShiftImmediate),
@@ -305,6 +312,18 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
     let op = if let Some(result) = structures::decode(word) {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if let Some(result) = vector_integer::decode_unsigned_abs(word) {
+        result
+            .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if let Some(result) = vector_integer::decode_polynomial(word) {
+        result
+            .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if word & 0xbffffc00 == 0x0e617800 {
+        Op::WidenSingleVector {
+            dst: (word & 31) as u8,
+            src: ((word >> 5) & 31) as u8,
+            upper: word & (1 << 30) != 0,
+        }
     } else if let Some(result) = vector_integer::decode_pairwise(word) {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?

@@ -271,3 +271,8 @@ The original estimate/refinement lowering follows the instruction facts in [Arm'
 ## Signed pairwise/widening/saturating provenance
 
 Original signed comparisons, widened pair sums and i128 shift/clamp arithmetic follow instruction facts in [Arm's A64 guide](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab) and [armasm reference](https://documentation-service.arm.com/static/5f3fa899428f7a6b3328fd44). Independent byte/i128 expectations and synthetic QEMU check semantics; private Capstone checks operand fields and reserved neighbors. No instruction implementation was copied. Existing decoder entry-point exclusions are preserved through separate typed operations. CPU ABI v9 and target-access gates remain unchanged.
+
+
+## Polynomial/widening/difference provenance
+
+Original carryless multiplication follows [Arm's PMULL instruction facts](https://developer.arm.com/documentation/ddi0602/2026-06/SIMD-FP-Instructions/PMULL--PMULL2--Polynomial-multiply-long-); its shift/XOR implementation is checked by independent coefficient convolution and synthetic QEMU. Vector widening and unsigned-difference arrangements follow [Arm's armasm reference](https://documentation-service.arm.com/static/5f3fa899428f7a6b3328fd44). Independent exact S-to-D/NaN and byte-difference expectations supplement QEMU and private Capstone field checks. No reference instruction implementation was copied. Existing attributed floating callbacks are reused without ABI or profile changes; actual target access/feature configuration remains unverified.

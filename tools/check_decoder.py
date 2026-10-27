@@ -348,6 +348,12 @@ for q in range(2):
     for rm in [0,2,31]:words.add(0x0ea0fc00|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
 for rn in [0,1,31]:
  for rd in [0,1,31]:
+  for q in range(2):
+   for rm in [0,7,31]:
+    for size in range(4):
+     for base in [0x2e207000,0x2e207400]:words.add(base|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+    for size in range(4):words.add(0x0e20e000|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+   for size in range(4):words.add(0x0e217800|(q<<30)|(size<<22)|(rn<<5)|rd)
   for base in [0x0ea0a400,0x0ea0ac00]:
    for rm in [0,2,31]:words.add(base|(rm<<16)|(rn<<5)|rd)
   for q in range(2):
@@ -390,6 +396,15 @@ for row in rows:
   if word&0xffffffe0==0xdac143e0:
    reg='xzr' if v['register']=='Zero' else 'x'+str(v['register']['Gpr'])
    if (ins.mnemonic,ins.op_str)!=('xpaci',reg) or v['operation']!=2 or v['key']!=0 or v['modifier']!='Zero':errors.append({'word':hex(word),'error':'XPACI operands/profile differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='UnsignedAbsDifference':
+  v=op[kind];b=v['bytes'];letters={1:'b',2:'h',4:'s',8:'d'};reg=lambda r,b,t:'v'+str(r)+'.'+str(t//b)+letters[b];name='uabdl2'if v['upper']else'uabdl'if v['long']else'uabd';source_total=16 if v['upper']else 8 if v['long']else v['total'];operands=reg(v['dst'],b*2 if v['long']else b,v['total'])+', '+reg(v['lhs'],b,source_total)+', '+reg(v['rhs'],b,source_total)
+  if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'unsigned absolute operands differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='PolynomialMultiply':
+  v=op[kind];name='pmull2'if v['upper']else'pmull';shape='.2d'if v['upper']else'.1d';operands='v'+str(v['dst'])+'.1q, v'+str(v['lhs'])+shape+', v'+str(v['rhs'])+shape
+  if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'polynomial operands differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='WidenSingleVector':
+  v=op[kind];name='fcvtl2'if v['upper']else'fcvtl';shape='.4s'if v['upper']else'.2s';operands='v'+str(v['dst'])+'.2d, v'+str(v['src'])+shape
+  if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'single widening operands differ','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='VectorLeadingZeros':
   v=op['VectorLeadingZeros'];operands='v'+str(v['dst'])+'.2s, v'+str(v['src'])+'.2s'
   if (ins.mnemonic,ins.op_str)!=('clz',operands)or(v['bytes'],v['total'])!=(4,8):errors.append({'word':hex(word),'error':'2S CLZ kind/operands differ','reference':ins.mnemonic+' '+ins.op_str})

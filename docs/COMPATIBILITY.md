@@ -9,7 +9,7 @@
 | Function discovery | Partially implemented | 223,856 validated CIE/FDE extents plus candidates; indirect resolution incomplete |
 | Synthetic native translation | Implemented and tested | Host x86-64 executable ran; limited instruction subset |
 | Guest memory/relocation foundation | Partially implemented | Synthetic Rust/native memory and dispatcher tests pass; 309,844 relocations apply/read back; serialized diagnostic ordering |
-| Actual game CPU translation | Partially implemented | 214,499 subset-liftable indexed extents with possible unbound tails; 121 object samples; no complete module |
+| Actual game CPU translation | Partially implemented | 214,505 subset-liftable indexed extents with possible unbound tails; 122 object samples; no complete module |
 | Actual runtime bootstrap | Not started | No guest instruction execution |
 | Vulkan/shaders/game frame | Not started | Container observations only |
 | SDL3 input/audio, VFS/saves | Not started | No runtime implementations |
@@ -143,3 +143,6 @@ CPU ABI v9 and all callback operations remain unchanged. The original FPCR white
 
 
 Scoped signed pairwise min/max, long pair sums and 4S saturating immediate shifts add eleven strict survey acceptances. Independent native/QEMU checks cover signed extrema, all legal immediate amounts, sticky QC, aliases and upper clearing. CPU ABI v9, all existing tests and strict acceptance remain unchanged. The remaining 24 pure ISA opportunities are small relative to CFG/runtime/configuration blockers; higher acceptance does not establish runnable functions or a target access profile.
+
+
+64-bit polynomial multiply, S-to-D vector widening and unsigned absolute differences add six strict survey acceptances. Independent native/QEMU checks pass; widening preserves destination/FPSR on callback failure. CPU ABI v9, the FPCR whitelist and every previous test/acceptance rule remain unchanged. The remaining 18 purely ISA opportunities are small relative to runtime/configuration/CFG dependencies. No original function has executed.

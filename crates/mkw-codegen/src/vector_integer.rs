@@ -541,3 +541,25 @@ pub fn emit_saturating_immediate(
     );
     format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},output[2]={{0,0}};uint32_t saturated=0;for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t raw=(source[half]>>shift)&UINT64_C({mask});__int128 value=({input})*(((__int128)1)<<{amount}),low={minimum},high={maximum};if(value<low){{value=low;saturated=1;}}if(value>high){{value=high;saturated=1;}}output[half]|=((uint64_t)value&UINT64_C({mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];if(saturated)c->fpsr|=UINT32_C(0x08000000);}}\n",total/bytes)
 }
+
+pub fn emit_polynomial(v: mkw_arm64::vector_integer::PolynomialMultiply) -> String {
+    let half = u8::from(v.upper);
+    format!("{{uint64_t a=c->vregs[{}][{half}],b=c->vregs[{}][{half}];__uint128_t product=0;for(unsigned bit=0;bit<64;bit++){{if((b>>bit)&1)product^=(__uint128_t)a<<bit;}}c->vregs[{}][0]=(uint64_t)product;c->vregs[{}][1]=(uint64_t)(product>>64);}}\n",v.lhs,v.rhs,v.dst,v.dst)
+}
+pub fn emit_widen_single(dst: u8, src: u8, upper: bool) -> String {
+    let half = u8::from(upper);
+    format!("{{uint64_t source=c->vregs[{src}][{half}],output[2]={{0,0}};uint32_t fpsr=c->fpsr;if(!c->floating){{c->fault_status=3;return 3;}}for(unsigned lane=0;lane<2;lane++){{int status=c->floating(14,4,c->fpcr,fpsr,(source>>(lane*32))&UINT64_C(0xffffffff),0,0,&output[lane],&fpsr);if(status){{c->fault_status=status;return status;}}}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];c->fpsr=fpsr;}}\n")
+}
+
+pub fn emit_unsigned_abs(v: mkw_arm64::vector_integer::UnsignedAbsDifference) -> String {
+    let bits = v.bytes * 8;
+    let width = if v.long { bits * 2 } else { bits };
+    let count = if v.long {
+        8 / v.bytes
+    } else {
+        v.total / v.bytes
+    };
+    let start = if v.upper { 64 } else { 0 };
+    let mask = (1u64 << bits) - 1;
+    format!("{{uint64_t a[2]={{c->vregs[{}][0],c->vregs[{}][1]}},b[2]={{c->vregs[{}][0],c->vregs[{}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{count};lane++){{unsigned input={start}+lane*{bits},dest=lane*{width};uint64_t left=(a[input/64]>>(input%64))&UINT64_C({mask}),right=(b[input/64]>>(input%64))&UINT64_C({mask});uint64_t result=left>=right?left-right:right-left;output[dest/64]|=result<<(dest%64);}}c->vregs[{}][0]=output[0];c->vregs[{}][1]=output[1];}}\n",v.lhs,v.lhs,v.rhs,v.rhs,v.dst,v.dst)
+}

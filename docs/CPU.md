@@ -311,3 +311,12 @@ CPU ABI v9 and all callback operations remain unchanged. The original FPCR white
 Separate typed operations add 2S signed SMINP/SMAXP, SADDLP from B/H/S pairs in legal 64/128-bit vectors, and 4S SQSHL immediate amounts 0–31. Original emitters snapshot sources before packing results. Pairwise min/max compares signed lanes; SADDLP widens each signed pair before summing; SQSHL uses i128 intermediates, clamps and sets sticky FPSR.QC only on saturation. Unused upper bits clear where required. No backend callback or ABI v9 change is needed. Legacy family-local exclusions and all existing tests remain unchanged.
 
 Independent byte/i128 tests check 25,392 min/max, 2,208 long-pair and 14,656 saturating cases per optimization; 25,360 synthetic QEMU cases match O0/O2 with fatal UBSan. Every legal immediate, threshold neighborhoods, aliases, V31 and preserved control/register state are checked. Actual SIMD access/trap configuration remains unverified; no original function executes.
+
+
+## Polynomial products, unsigned differences and vector widening
+
+64-bit PMULL/PMULL2 snapshot the selected source halves and compute the 128-bit carryless product through defined unsigned shifts/XOR. Independent coefficient convolution checks all basis-pair degrees, dense patterns and aliases. B/H/S UABD and UABDL/UABDL2 snapshot full sources, form unsigned differences, widen when required, and clear unused output bits. No integer operation changes FPSR or needs a callback.
+
+S-to-D FCVTL/FCVTL2 snapshot the selected two S lanes, invoke existing format-conversion operation 14 for each, and commit vector/FPSR only after both succeed. The existing backend validates FPCR and ABI v9. Missing backend, unsupported profiles and stage-one/two callback faults refuse without partial destination/FPSR state. Other precisions stay outside this operation. Tests independently check finite exact widening and NaN payload/IOC/default-NaN rules.
+
+Independent native checks cover 352,800 polynomial, 99,024 widening and 271,104 unsigned-difference cases per optimization; 9,576 synthetic QEMU cases match O0/O2 with fatal UBSan. Every prior test and acceptance gate remains unchanged. These implementations establish no target SIMD access/feature configuration and permit no original execution.

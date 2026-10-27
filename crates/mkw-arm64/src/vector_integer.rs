@@ -1429,3 +1429,146 @@ mod integer_gap_tests {
         }
     }
 }
+
+/// Carryless 64-by-64 multiplication; Q selects both source halves.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct PolynomialMultiply {
+    pub dst: u8,
+    pub lhs: u8,
+    pub rhs: u8,
+    pub upper: bool,
+}
+pub fn decode_polynomial(w: u32) -> Option<Result<Op, String>> {
+    if w & 0xbfe0fc00 != 0x0ee0e000 {
+        return None;
+    }
+    Some(Ok(Op::PolynomialMultiply(PolynomialMultiply {
+        dst: (w & 31) as u8,
+        lhs: ((w >> 5) & 31) as u8,
+        rhs: ((w >> 16) & 31) as u8,
+        upper: w & (1 << 30) != 0,
+    })))
+}
+#[cfg(test)]
+mod polynomial_tests {
+    use super::*;
+    #[test]
+    fn polynomial_and_single_widen_fields() {
+        for q in 0..2 {
+            for d in [0, 7, 31] {
+                for n in [0, 9, 31] {
+                    for m in [0, 13, 31] {
+                        let Op::PolynomialMultiply(p) =
+                            crate::decode(0x0ee0e000 | (q << 30) | (m << 16) | (n << 5) | d, 0)
+                                .unwrap()
+                                .op
+                        else {
+                            panic!()
+                        };
+                        assert_eq!(
+                            (p.dst, p.lhs, p.rhs, p.upper),
+                            (d as u8, n as u8, m as u8, q != 0)
+                        );
+                    }
+                }
+            }
+            for d in [0, 31] {
+                for n in [0, 31] {
+                    let Op::WidenSingleVector { dst, src, upper } =
+                        crate::decode(0x0e617800 | (q << 30) | (n << 5) | d, 0)
+                            .unwrap()
+                            .op
+                    else {
+                        panic!()
+                    };
+                    assert_eq!((dst, src, upper), (d as u8, n as u8, q != 0));
+                }
+            }
+        }
+        // Other element sizes must never alias the scoped 64-bit polynomial record.
+        for base in [0x0e20e000, 0x0e60e000, 0x0ea0e000, 0x2ee0e000] {
+            assert!(decode_polynomial(base).is_none());
+        }
+        for base in [0x0e217800, 0x0ea17800, 0x0ee17800] {
+            assert!(!matches!(
+                crate::decode(base, 0).map(|v| v.op),
+                Ok(Op::WidenSingleVector { .. })
+            ));
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct UnsignedAbsDifference {
+    pub bytes: u8,
+    pub total: u8,
+    pub dst: u8,
+    pub lhs: u8,
+    pub rhs: u8,
+    pub long: bool,
+    pub upper: bool,
+}
+pub fn decode_unsigned_abs(w: u32) -> Option<Result<Op, String>> {
+    let long = match w & 0xbf20fc00 {
+        0x2e207400 => false,
+        0x2e207000 => true,
+        _ => return None,
+    };
+    let size = (w >> 22) & 3;
+    if size == 3 {
+        return Some(Err("reserved unsigned absolute difference size".into()));
+    }
+    let q = w & (1 << 30) != 0;
+    Some(Ok(Op::UnsignedAbsDifference(UnsignedAbsDifference {
+        bytes: 1 << size,
+        total: if long || q { 16 } else { 8 },
+        dst: (w & 31) as u8,
+        lhs: ((w >> 5) & 31) as u8,
+        rhs: ((w >> 16) & 31) as u8,
+        long,
+        upper: long && q,
+    })))
+}
+#[cfg(test)]
+mod unsigned_absolute_tests {
+    use super::*;
+    #[test]
+    fn exact_unsigned_absolute_arrangements() {
+        for q in 0..2 {
+            for size in 0..3 {
+                for base in [0x2e207000, 0x2e207400] {
+                    let Op::UnsignedAbsDifference(v) = crate::decode(
+                        base | (q << 30) | (size << 22) | (31 << 16) | (7 << 5) | 31,
+                        0,
+                    )
+                    .unwrap()
+                    .op
+                    else {
+                        panic!()
+                    };
+                    let long = base == 0x2e207000;
+                    assert_eq!(
+                        (v.bytes, v.total, v.dst, v.lhs, v.rhs, v.long, v.upper),
+                        (
+                            1 << size,
+                            if long || q != 0 { 16 } else { 8 },
+                            31,
+                            7,
+                            31,
+                            long,
+                            long && q != 0
+                        )
+                    );
+                }
+            }
+        }
+        for q in 0..2 {
+            for base in [0x2ee07000, 0x2ee07400] {
+                assert!(crate::decode(base | (q << 30), 0).is_err());
+            }
+        }
+        for base in [0x0e207000, 0x0e207400, 0x2e205000, 0x2e205400] {
+            assert!(decode_unsigned_abs(base).is_none());
+        }
+    }
+}

@@ -139,6 +139,15 @@ pub fn run(root: &Path) -> Result<()> {
                                 "signed_pairwise_max"
                             }),
                             Op::PairwiseLongSum(_) => features.push("signed_long_pair_sum"),
+                            Op::UnsignedAbsDifference(v) => features.push(if v.long {
+                                "unsigned_absolute_difference_long"
+                            } else {
+                                "unsigned_absolute_difference"
+                            }),
+                            Op::PolynomialMultiply(_) => features.push("polynomial_multiply_64"),
+                            Op::WidenSingleVector { .. } => {
+                                features.push("vector_single_to_double")
+                            }
                             Op::SaturatingShiftImmediate(_) => {
                                 features.push("signed_saturating_immediate")
                             }

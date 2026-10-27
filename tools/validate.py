@@ -85,3 +85,5 @@ run('blocker ranking synthetic checks', [sys.executable, str(ROOT/'tools/rank_bl
 run('complete blocker-set candidate enumeration', [sys.executable, str(ROOT/'tools/test_rank_candidates.py')])
 run('publication source snapshot guards', [sys.executable, str(ROOT / 'tools/test_publish_snapshot.py')])
 run('public artifact guard', [sys.executable, str(ROOT/'tools/check_public_tree.py')])
+
+run('five-fix candidate ranking', [sys.executable, str(ROOT / 'tools/test_rank_five.py')])
