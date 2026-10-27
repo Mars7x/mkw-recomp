@@ -9,6 +9,7 @@ pub mod simd;
 pub mod structures;
 pub mod vector_compare;
 pub mod vector_fp;
+pub mod vector_integer;
 use serde::Serialize;
 pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("lib.rs"),
@@ -20,6 +21,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("atomics.rs"),
     include_str!("floating.rs"),
     include_str!("vector_fp.rs"),
+    include_str!("vector_integer.rs"),
     include_str!("vector_compare.rs"),
 ];
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -44,6 +46,7 @@ pub enum MemoryOrder {
 pub enum Op {
     Nop,
     VectorFp(vector_fp::VectorFp),
+    VectorInteger(vector_integer::VectorInteger),
     VectorCompare(vector_compare::Compare),
     Structure(structures::Structure),
     Crc32 {
@@ -281,6 +284,9 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
     let rd = word & 31;
     let rn = (word >> 5) & 31;
     let op = if let Some(result) = structures::decode(word) {
+        result
+            .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if let Some(result) = vector_integer::decode(word) {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
     } else if let Some(result) = vector_compare::decode(word) {

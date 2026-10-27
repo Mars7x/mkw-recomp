@@ -168,6 +168,17 @@ for q in range(2):
     for extension in range(2):
      for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(0,30,31)]:words.add(0x0e000000|(q<<30)|(size<<22)|(u<<29)|((count-1)<<13)|(extension<<12)|(rm<<16)|(rn<<5)|rd)
    for rd,rn in [(0,1),(0,0),(31,31)]:words.add(0x0e205800|(q<<30)|(size<<22)|(u<<29)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for size in range(4):
+   for base in [0x0e208400,0x2e208400,0x2e208c00,0x0e208c00,0x0e203c00,0x0e203400,0x2e203c00,0x2e203400]:
+    for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31),(1,2,1)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+   for base in [0x0e209800,0x2e208800,0x0e208800,0x2e209800,0x0e20a800]:
+    for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(scalar<<28)|(q<<30)|(size<<22)|(rn<<5)|rd)
+for q in range(2):
+ for size in range(4):
+  for base in [0x0e303800,0x2e303800,0x0e31b800]:
+   for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(q<<30)|(size<<22)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -180,7 +191,17 @@ for row in rows:
  word=row['word'];decoded=list(decoder.disasm(word.to_bytes(4,'little'),0x1000));op=row['instruction']['op'];kind=next(iter(op))if isinstance(op,dict)else op;counts[kind]+=1
  if len(decoded)!=1:errors.append({'word':hex(word),'error':'accepted encoding not decoded by Capstone'});continue
  ins=decoded[0]
- if kind=='VectorCompare':
+ if kind=='VectorInteger':
+  variant,v=next(iter(op['VectorInteger'].items()));letters={1:'b',2:'h',4:'s',8:'d'}
+  if variant=='Lanes':
+   name={'Add':'add','Subtract':'sub','Equal':'cmeq','Test':'cmtst','SignedGe':'cmge','SignedGt':'cmgt','UnsignedGe':'cmhs','UnsignedGt':'cmhi','SignedLe':'cmle','SignedLt':'cmlt'}[v['kind']]
+   scalar=bool(word&(1<<28));register=lambda n: letters[v['bytes']]+str(n) if scalar else 'v'+str(n)+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
+   operands=register(v['dst'])+', '+register(v['lhs'])+', '+(register(v['rhs']) if v['rhs'] is not None else '#0')
+  else:
+   name={'Sum':'addv','SignedLong':'saddlv','UnsignedLong':'uaddlv'}[v['kind']];output=v['bytes'] if v['kind']=='Sum' else v['bytes']*2
+   operands=letters[output]+str(v['dst'])+', v'+str(v['src'])+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
+  if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'integer SIMD kind/arrangement/operands differ','reference':ins.mnemonic+' '+ins.op_str,'expected':name+' '+operands})
+ elif kind=='VectorCompare':
   v=op['VectorCompare'];expected={'Equal':'fcmeq','GreaterEqual':'facge' if v['absolute'] else 'fcmge','Greater':'facgt' if v['absolute'] else 'fcmgt','LessEqual':'fcmle','Less':'fcmlt'}[v['relation']]
   if ins.mnemonic!=expected:errors.append({'word':hex(word),'error':'SIMD FP comparison relation differs','reference':ins.mnemonic+' '+ins.op_str})
   scalar=bool(word&(1<<28));size=8 if word&(1<<22) else 4;total=size if scalar else 16 if word&(1<<30) else 8

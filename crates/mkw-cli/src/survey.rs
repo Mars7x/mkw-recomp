@@ -115,6 +115,7 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::Convert(_) => features.push("fp_integer_conversion"),
                             Op::ConditionalFloat { .. } => features.push("conditional_fp_compare"),
                             Op::VectorCompare(_) => features.push("simd_fp_comparison"),
+                            Op::VectorInteger(_) => features.push("simd_integer_lanes_reduction"),
                             Op::VectorFp(v) => {
                                 features.push("vector_fp");
                                 if matches!(

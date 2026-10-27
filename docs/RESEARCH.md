@@ -162,3 +162,7 @@ Independent synthetic probes first distinguished equality's quiet-NaN behavior f
 ## Raw table/count evidence
 
 Original table lookup lowering is checked by independently concatenating byte arrays and indexing a Vec, including fallback behavior, full-Q table sources for 64-bit results and modulo-32 register lists. Byte population count is checked with Rust u8::count_ones. The native matrix covers 34,816 cases per O0/O2 optimization; a separate 120-case synthetic QEMU run checks encodings/arrangements. Constructed Capstone cases also preserve neighboring EXT and reject unsupported variants. No reference implementation code was copied, and no game/hardware execution occurred. [Arm instruction reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab).
+
+## Integer SIMD evidence
+
+Original ordinary-lane/reduction lowering is checked against separate i128/u128 mathematical references, including signed interpretation, modulo-width truncation, all-lane extrema and widened sums. The native matrix covers 28,992 cases per optimization; independently authored AArch64 fixtures compare 17,568 cases with QEMU at O0/O2. Constructed Capstone cases check exact instruction names, scalar/vector arrangements and operands, while boundary tests retain existing FCCMP/FCSEL forms. No reference implementation source was copied; original functions remain unexecuted. [Arm instruction reference](https://documentation-service.arm.com/static/6245c734b059dc5ff9a8bdab).
