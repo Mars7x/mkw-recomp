@@ -34,7 +34,7 @@ def run(label, command, *, cwd=ROOT, required=True):
 run('format', ['cargo', 'fmt', '--all', '--', '--check'])
 run('lint', ['cargo', 'clippy', '--workspace', '--all-targets', '--offline', '--locked', '--', '-D', 'warnings'])
 run('unit and native semantic tests', ['cargo', 'test', '--workspace', '--offline', '--locked'])
-run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native'])
+run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting'])
 run('native synthetic demo', ['cargo', 'run', '--release', '--offline', '--locked', '--', 'aot-demo'])
 binary = ROOT / 'target/release/mkw-recomp'
 header = run('native ELF header', ['readelf', '-h', str(ROOT / 'private/builds/synthetic/aot-demo')])
@@ -58,6 +58,13 @@ if args.game:
     results[-1]['expectation_met'] = True
     run('supplied FDE lifting and native object samples', [str(binary), 'cpu-survey', str(game)])
     run('bounded native sample evidence', [sys.executable, str(ROOT / 'tools/check_survey_samples.py')])
+    run('explicit exclusive-v10 conditional compiler survey', [str(binary), 'cpu-survey-exclusive-v10', str(game)])
+    explicit = json.loads((ROOT / 'private/analysis/cpu-exclusive-v10/summary.json').read_text())
+    strict = json.loads((ROOT / 'private/analysis/cpu-survey-summary.json').read_text())
+    expected = {m['module']: (m['fde_extents'], m['subset_liftable_functions']) for m in strict['modules']}
+    observed = {m['module']: (m['indexed_extents'], m['default_accepted']) for m in explicit['modules']}
+    if observed != expected or explicit['game_code_executed'] or explicit['default_acceptance_changed'] or explicit['target_profile_verified']:
+        raise SystemExit('Explicit v10 survey changed the strict baseline or execution/profile gates')
     run('all rejected-extent blocker diagnostics', [str(binary), 'cpu-blockers', str(game)])
     if (ROOT/'private/tools/python/capstone').is_dir():
         run('all-blocker coverage prioritization', [sys.executable, str(ROOT/'tools/rank_blockers.py')])

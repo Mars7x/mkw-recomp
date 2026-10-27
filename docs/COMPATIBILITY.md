@@ -161,3 +161,9 @@ The exclusive-memory backend primitive implements real checked conditional-store
 
 
 The coherent v10 native frame/table contract now routes plain, ordered, LSE, barrier and exclusive operations through one owned memory authority. Nine native C/AOT/QEMU/contention/fault tests pass in debug/release with O0/O2 fatal UBSan C builds. CPU-v9 layout, callback signatures, old tests and default acceptance remain unchanged; the old loader rejects v10 markers. Native v9 leaf interoperability uses the explicit v9 prefix. LL/SC instruction acceptance, cross-module v10 dispatch and real target profile validation remain pending; the default survey stays 214,521. No original guest execution occurs.
+
+
+A checked version-10 single-entry loader now runs trusted synthetic functions through owned attachments after validating marker/address/callback/context/authority identities. Budgets, rebased PC, transfer faults and tail statuses have native semantic tests. The host tail router follows registered targets; nested calls and interior-PC resume remain absent. It does not validate target executable identity or enable original guest execution. Default survey acceptance remains unchanged.
+
+
+An explicit diagnostic v10 compiler profile now lowers single-register exclusive loads/stores and CLREX through the coherent native table. It conditionally lifts/compiles 64 additional supplied extents; default strict coverage and ABI-v9 acceptance remain unchanged. Pair forms, constrained-unpredictable overlaps, invalid typed IR and unresolved CFG edges refuse. The diagnostic SP-alignment rule is explicit and is not a verified target configuration. Native synthetic tests compare values/status against QEMU, exact budgets/faults and split-entry reservations; no original function executes.

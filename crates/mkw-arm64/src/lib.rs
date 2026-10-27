@@ -2,6 +2,7 @@
 //! PAC operations carry explicit semantics; a configured backend is required at execution.
 pub mod atomics;
 pub mod bitops;
+pub mod exclusive;
 pub mod floating;
 pub mod integer;
 pub mod memory;
@@ -21,6 +22,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("simd_shift.rs"),
     include_str!("structures.rs"),
     include_str!("atomics.rs"),
+    include_str!("exclusive.rs"),
     include_str!("floating.rs"),
     include_str!("vector_fp.rs"),
     include_str!("vector_integer.rs"),
@@ -46,6 +48,7 @@ pub enum MemoryOrder {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Op {
+    Exclusive(exclusive::Exclusive),
     Nop,
     YieldHint,
     VectorFp(vector_fp::VectorFp),
@@ -623,18 +626,40 @@ pub fn classify(w: u32) -> &'static str {
 /// Reachable CFG for the supported subset. Unknown reachable words and escaping edges
 /// are hard errors; no scanning through unsupported code and no interpreter fallback.
 pub fn lift(bytes: &[u8], base: u64, entry: u64) -> Result<Vec<Instruction>, String> {
-    lift_bounded(bytes, base, entry, false)
+    lift_bounded(bytes, base, entry, false, decode)
 }
 /// Exact function extents may end in a direct tail branch to a separate registered
 /// entry. Unlike strict slice lifting, only explicit B edges may escape the extent.
 pub fn lift_function(bytes: &[u8], base: u64, entry: u64) -> Result<Vec<Instruction>, String> {
-    lift_bounded(bytes, base, entry, true)
+    lift_bounded(bytes, base, entry, true, decode)
+}
+/// Explicit diagnostic profile only; default decoding and acceptance stay unchanged.
+pub fn decode_exclusive_v10(word: u32, pc: u64) -> Result<Instruction, String> {
+    match exclusive::decode(word) {
+        Some(op) => Ok(Instruction {
+            word,
+            pc,
+            op: Op::Exclusive(op),
+        }),
+        None => decode(word, pc),
+    }
+}
+pub fn lift_exclusive_v10(bytes: &[u8], base: u64, entry: u64) -> Result<Vec<Instruction>, String> {
+    lift_bounded(bytes, base, entry, false, decode_exclusive_v10)
+}
+pub fn lift_function_exclusive_v10(
+    bytes: &[u8],
+    base: u64,
+    entry: u64,
+) -> Result<Vec<Instruction>, String> {
+    lift_bounded(bytes, base, entry, true, decode_exclusive_v10)
 }
 fn lift_bounded(
     bytes: &[u8],
     base: u64,
     entry: u64,
     tails: bool,
+    decoder: fn(u32, u64) -> Result<Instruction, String>,
 ) -> Result<Vec<Instruction>, String> {
     use std::collections::{BTreeMap, VecDeque};
     if bytes.len() % 4 != 0 || base % 4 != 0 || entry % 4 != 0 {
@@ -653,7 +678,7 @@ fn lift_bounded(
             return Err(format!("unresolved CFG edge {pc:#x}"));
         }
         let at = (pc - base) as usize;
-        let mut ins = decode(
+        let mut ins = decoder(
             u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()),
             pc,
         )?;

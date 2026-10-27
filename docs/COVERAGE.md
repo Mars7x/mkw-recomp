@@ -198,3 +198,24 @@ The next native dependency is now implemented: an explicit v10 frame/v1 table wi
 **Default strict gain: +0, total 214,521.** The 64 exclusive-monitor opportunities remain conditional until capability-scoped LL/SC IR/emission and an appropriate native entry path are integrated and measured. New runtime code is not itself additional instruction acceptance. The current bounded diagnostics still have zero feasible pure ISA sets; runtime/CFG/target contracts dominate. No original function executes.
 
 Commit `4978215` published the reservation primitive with **+0** default strict gain, all **273 Rust tests** plus the release semantic suite passing. Its complete gate took **17.65 minutes**. That phase deliberately addressed the measured runtime dependency instead of inventing new survey gains.
+
+
+### Checked v10 entry dependency
+
+The single-entry v10 loader now validates library markers, address metadata and a live owned coherent attachment before native invocation. Four new O0/O2 C/native entry/tail semantic and refusal tests pass in debug/release. **Default strict gain remains +0, 214,521 accepted extents**; all prior tests and acceptance rules are unchanged. Runtime-bound survey work still needs explicit capability-scoped LL/SC lowering and target configuration, and cross-module calls need a coherent v10 dispatcher. No runtime contract is counted as new accepted coverage.
+
+
+A follow-up inventory of every existing diagnostic exclusive site finds only single-register forms: 8 LDXR, 6 STXR, 62 LDAXR, 61 STLXR and 52 CLREX sites across rejected extents. The 64 monitor-only nonstructural candidates split into 52 requiring LDAXR+STLXR+CLREX, nine requiring LDAXR+STLXR, and three requiring LDXR+STXR. Thus adding CLREX to the acquire/release pair conditionally raises its count from nine to 61, whereas any individual family gains zero. No pair-exclusive form appears in this bounded inventory. Prioritize the coherent single-register package; pair lowering can wait. These remain conditional static requirements, with unchanged strict acceptance and unverified target configuration.
+
+
+### Measured explicit v10 compiler profile
+
+The single-register package realizes the 64 conditional opportunities in an opt-in compiler profile: three extents in main and 61 in SDK. All 64 additional v10 objects compile at O2 with warnings denied, within the existing 4,096-instruction representative-object limit. The explicit profile therefore has 214,585 subset-liftable extents; default strict coverage remains 214,521, **+0 default gain**. Neither figure counts runnable functions or establishes the target memory/PAC/service/dispatch profile.
+
+Reproduce with `target/release/mkw-recomp cpu-survey-exclusive-v10 base`. The command verifies input identity first and writes only private artifacts under `private/analysis/cpu-exclusive-v10/`. The additive validation gate compares every module's exact extent/default-accepted counts with the ordinary strict census. Existing CFG bounds, unknown-instruction refusal, old tests and object limits are unchanged. Further pure ISA inventory offers little return until target configuration, coherent cross-module routing and the remaining CFG boundaries are resolved.
+
+
+The checked loader also has a host-side registered tail router. Its synthetic two-library tests establish budget progress, rebasing and reservation continuity; they add zero default survey coverage and do not supply nested call routing or target configuration. Entry/tail/scoped-lowering work shares one full validation gate to avoid paying that gate for each prerequisite separately.
+
+
+A private audit of the 64 additional generated objects finds nested call sites in **60 extents (385 sites)** and tail requests in **five extents (five sites)**, with overlap. The host tail router is tested, but nested BL/BLR routing remains unbound. This measured dependency takes priority over further ISA surveys; compilation gains do not establish runnable code. Target identity/configuration and other callees remain required.

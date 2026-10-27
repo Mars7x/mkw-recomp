@@ -303,3 +303,9 @@ The reservation authority, opaque identity/quota handling and complete checked-m
 ## Versioned native contract provenance
 
 The v10 frame/v1 table, owned callback attachment, coherent prefix routing and native C layout/fault tests are original implementations. Prefix memory/LSE/barrier semantics retain the existing project's contracts and arithmetic; independent byte/i128 expectations, unchanged v9 AOT leaves and actual-native-callback QEMU sequences check routing and data effects. No external implementation was copied and all existing third-party notices remain unchanged. Serialized normal-memory contention tests establish only that profile; target trap/granule, physical aliases/MMIO and hardware weak-memory behavior remain unverified. No default decoding or original-execution gate changes.
+
+
+The checked v10 entry loader and its synthetic C fixtures are original project code, following the existing versioned-loader pattern with the new owned-attachment contract. No external implementation was copied. Its tests establish explicit callback ownership, native ABI and budget/fault behavior; they do not establish target execution identity or hardware concurrency behavior.
+
+
+Single-register exclusive field decoding, typed IR, explicit-profile CFG/emission and synthetic generated-native fixtures are original project work. The Arm instruction reference supplies architectural field/status/overlap definitions; no external implementation was copied. Independent Capstone checks cover 8,192 load encodings, 262,144 store encodings (including 15,880 overlap refusals) and 16 CLREX immediates. QEMU comparisons remain software references, not hardware validation. [Arm A64 instruction reference](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85).

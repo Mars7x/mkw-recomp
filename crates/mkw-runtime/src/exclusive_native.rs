@@ -93,6 +93,35 @@ pub struct Attachment<'a> {
     _bridge: &'a mut Bridge,
 }
 impl Attachment<'_> {
+    pub(crate) fn validate(&self) -> Result<(), String> {
+        let expected = std::ptr::addr_of!(*self._bridge.context).cast_mut().cast();
+        let c = &*self.cpu;
+        macro_rules! same {
+            ($actual:expr,$expected:expr) => {
+                $actual.map(|f| f as usize) == $expected.map(|f| f as usize)
+            };
+        }
+        if !std::ptr::eq(c.exclusive, &OPS)
+            || c.exclusive_context != expected
+            || c.base.memory_context != expected
+            || !same!(c.base.memory, OPS.memory)
+            || !same!(c.base.ordered_memory, OPS.ordered_memory)
+            || !same!(c.base.atomic_memory, OPS.atomic_memory)
+            || !same!(c.base.barrier, OPS.barrier)
+            || c.base.call.is_some()
+            || !c.base.call_context.is_null()
+        {
+            return Err("invalid/coherency-mismatched v10 attachment".into());
+        }
+        self._bridge
+            .context
+            .memory
+            .lock()
+            .map_err(|_| "exclusive memory lock poisoned")?
+            .validate_owner(&self._bridge.context.owner)
+            .map_err(|e| format!("invalid exclusive owner: {e:?}"))
+    }
+
     pub fn cpu_mut(&mut self) -> &mut CpuV10 {
         self.cpu
     }

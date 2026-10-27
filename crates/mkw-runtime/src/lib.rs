@@ -5,6 +5,7 @@ pub mod atomics;
 pub mod bridge;
 pub mod dispatch;
 pub mod exclusive;
+pub mod exclusive_entry;
 pub mod exclusive_native;
 pub mod floating;
 mod linker;

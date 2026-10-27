@@ -3,6 +3,7 @@ mod arithmetic;
 mod atomics;
 mod bitops;
 mod condition;
+mod exclusive;
 mod floating;
 mod integer;
 mod memory;
@@ -44,6 +45,8 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("simd_shift.rs"),
     include_str!("structures.rs"),
     include_str!("atomics.rs"),
+    include_str!("exclusive.rs"),
+    include_str!("../../../native/exclusive_v10.h"),
     include_str!("floating.rs"),
     include_str!("vector_fp.rs"),
     include_str!("vector_integer.rs"),
@@ -57,6 +60,13 @@ pub const SOURCE_INPUTS: &[&str] = &[
 ];
 pub const HEADER: &str = include_str!("../../../native/cpu.h");
 pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
+    emit_profile(ins, entry, false)
+}
+/// Explicit serialized-owned-memory v10 profile; old entry ABI is unchanged.
+pub fn emit_exclusive_v10(ins: &[Instruction], entry: u64) -> Result<String, String> {
+    emit_profile(ins, entry, true)
+}
+fn emit_profile(ins: &[Instruction], entry: u64, exclusive_v10: bool) -> Result<String, String> {
     if ins.is_empty() {
         return Err("empty translation".into());
     }
@@ -87,13 +97,24 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
             }
         }
     }
-    let mut out = format!(
+    let mut out = if exclusive_v10 {
+        format!("{HEADER}\n{}\nunsigned mkw_guest_v10_budget_abi_version(void){{return MKW_CPU_V10_ABI_VERSION;}}\nint mkw_guest_v10_budget(MkwCpuV10 *frame,uint64_t *budget){{if(!mkw_exclusive_v10_valid(frame))return 3;MkwCpu *c=&frame->base;\n goto L_{entry:x};\n",include_str!("../../../native/exclusive_v10.h"))
+    } else {
+        format!(
         "{HEADER}\nunsigned mkw_guest_budget_abi_version(void){{return MKW_CPU_ABI_VERSION;}}\nint mkw_guest_budget(MkwCpu *c, uint64_t *budget) {{\n goto L_{entry:x};\n"
-    );
+    )
+    };
     for i in ins {
         out+=&format!("L_{:x}: ; /* guest {:016x}, instruction {:08x} */\n c->pc=c->module_base+UINT64_C({}); if (!*budget) return 2; --*budget;\n",i.pc,i.pc,i.word,i.pc);
         let next = format!("goto L_{:x};\n", i.pc + 4);
         match i.op {
+            Op::Exclusive(op) => {
+                if !exclusive_v10 {
+                    return Err("exclusive IR requires explicit v10 profile".into());
+                }
+                out += &exclusive::emit(op)?;
+                out += &next;
+            }
             // The explicit diagnostic cache profile performs no prefetch action.
             // Operands remain in IR; no guest address is dereferenced or probed.
             Op::Prefetch(_) => out += &next,
@@ -484,7 +505,9 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
         }
     }
     out += "}\n";
-    out += "int mkw_guest(MkwCpu *c,uint64_t budget){int status=mkw_guest_budget(c,&budget);if(status==MKW_EXIT_TAIL){if(!c->call){c->fault_status=3;return 3;}return c->call(c->call_context,c,c->pc,&budget);}return status; }\n";
+    if !exclusive_v10 {
+        out += "int mkw_guest(MkwCpu *c,uint64_t budget){int status=mkw_guest_budget(c,&budget);if(status==MKW_EXIT_TAIL){if(!c->call){c->fault_status=3;return 3;}return c->call(c->call_context,c,c->pc,&budget);}return status; }\n";
+    }
     Ok(out)
 }
 #[cfg(test)]
