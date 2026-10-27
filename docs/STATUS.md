@@ -1,18 +1,18 @@
 # Status — October 27, 2026
 
-Saturating immediate narrowing shifts and widening SIMD arithmetic are implemented and tested; automatic source-only publication and periodic continuations remain active. **No game-derived function has executed. Mario Kart World has not booted, rendered or become playable.**
+Right-shift accumulation/rounding and integer pairwise addition are implemented and tested; automatic source-only publication and periodic continuations remain active. **No game-derived function has executed. Mario Kart World has not booted, rendered or become playable.**
 
 ## Latest implementation
 
-- Added SQSHRN/SQRSHRN, UQSHRN/UQRSHRN and SQSHRUN/SQRSHRUN across every legal immediate amount, scalar results and vector low/upper halves. Unsigned bounded shifts plus extracted rounding bits feed shared saturation lowering, preserving aliases/retained halves and sticky QC without 64-bit pre-shift addition overflow.
-- Independent i128 division/clamp expectations cover 1,225,728 native cases per optimization; 612,864 synthetic QEMU cases match O0/O2 with fatal UBSan. Plain saturating narrowing regressions pass through the shared lowering. A private staged exhaustive H-to-B experiment additionally checked 3,145,728 cases.
-- Added SADDL/UADDL/SSUBL/USUBL and SADDW/UADDW/SSUBW/USUBW with low/upper variants, full source snapshots and defined widened wrap. Independent i128 expectations cover 74,880 native cases per optimization; 49,920 synthetic QEMU cases match O0/O2 with fatal UBSan.
-- The combined survey accepts 53 further extents: accepted categories include 38 saturating narrowing-shift and 15 widening arithmetic extents (overlap). One further native representative object compiles. SQRSHRN and UADDW no longer appear among first blockers; SSRA now blocks 16 extents.
-- Saturating add/subtract/narrowing and register shifts were validated and published as `bb397fa`. Earlier widening products are `2f15125`; ABI v8 complete multiple-register transport is `85d077a`. No new upstream sources were added. README, game inputs/generated code, credentials and private artifacts remain excluded from GitHub.
+- Added SSRA/USRA, SRSHR/URSHR and SRSRA/URSRA across every legal immediate amount, vector arrangement and D scalar form. Full-width cases avoid invalid C shifts, extracted rounding bits avoid overflowing pre-shift additions and accumulation wraps per element. Source snapshots preserve aliases; flags/QC remain unchanged.
+- Independent i128 floor-division/accumulation expectations cover 456,192 native cases per optimization; 414,720 synthetic QEMU cases match O0/O2 with fatal UBSan. All amounts, full-width behavior, rounding ties, accumulator wrap and selected V31 aliases are covered.
+- Added ADDP vector pair concatenation and D scalar pair reduction, with modular sums, source snapshots and upper clearing. Independent u128 byte-array expectations cover 11,960 native cases per optimization; 7,800 synthetic QEMU cases match O0/O2 with fatal UBSan.
+- The combined survey accepts 37 further extents: accepted categories include 25 accumulating/rounded right-shift and 12 integer pairwise extents (overlap). Four further native representative objects compile. SSRA and ADDP no longer appear among first blockers.
+- Saturating narrowing shifts and widening arithmetic were validated and published as `69f81a9`; preceding saturating arithmetic/register shifts are `bb397fa`. No new upstream sources were added. README, game inputs/generated code, credentials and private artifacts remain excluded from GitHub.
 
 ## Supplied-binary evidence
 
-All **223,856 indexed CIE/FDE extents** validate. The survey lowers **214,111 indexed extents**, including **126,820 with PAC operations**, up from 214,058 under the same tail policy. **38 accepted extents contain contiguous LD1 lists and 61 contain LD3/LD4 interleaving** (categories overlap). **58,450 contain direct extent tails; 14,153 contain indirect BR** (categories overlap). Configuration/helpers/callees/targets remain incomplete or unbound; these are not runnable-function or full-module counts. **Ninety-nine representative game-derived samples compile into native objects, 63 with PAC; none execute.**
+All **223,856 indexed CIE/FDE extents** validate. The survey lowers **214,148 indexed extents**, including **126,844 with PAC operations**, up from 214,111 under the same tail policy. **38 accepted extents contain contiguous LD1 lists and 61 contain LD3/LD4 interleaving** (categories overlap). **58,453 contain direct extent tails; 14,158 contain indirect BR** (categories overlap). Configuration/helpers/callees/targets remain incomplete or unbound; these are not runnable-function or full-module counts. **One hundred three representative game-derived samples compile into native objects, 67 with PAC; none execute.**
 
 Native samples now have a 4,096-instruction representative limit. One oversized candidate is explicitly deferred; every observed feature still has a compiled representative in its module. These object counts use the new sampling policy and are not directly comparable with prior first-feature selections.
 
@@ -20,7 +20,9 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 
 ## Validation
 
-- **179 Rust tests pass**, including extended memory capacity, multiple structures and stale-ABI refusal checks and earlier scaled conversion/rounding/integer SIMD/FP/memory semantics, plus all prior native thread-register, bit/carry, conversion, FP, SIMD, LSE, PAC and control-flow regressions.
+- **185 Rust tests pass**, including extended memory capacity, multiple structures and stale-ABI refusal checks and earlier scaled conversion/rounding/integer SIMD/FP/memory semantics, plus all prior native thread-register, bit/carry, conversion, FP, SIMD, LSE, PAC and control-flow regressions.
+- **414,720 accumulating/rounded right-shift fixtures** match QEMU at O0/O2; independent i128 floor-division/accumulation expectations check 456,192 native cases per optimization, including full-width shifts.
+- **7,800 integer ADDP fixtures** match QEMU at O0/O2; independent u128 byte-array expectations check 11,960 native cases per optimization, including scalar reduction and vector pair ordering.
 - **612,864 saturating narrowing-shift fixtures** match QEMU at O0/O2; independent i128 floor-division/clamp expectations check 1,225,728 native cases per optimization across every legal amount and rounding/saturation boundary.
 - **49,920 widening add/subtract fixtures** match QEMU at O0/O2; independent i128 expectations check 74,880 native cases per optimization, including wide-left and upper-source variants.
 - **141,504 saturating add/subtract fixtures** and **10,800 saturating narrowing fixtures** match QEMU at O0/O2; independent i128 clamps check 212,256 and 21,600 native cases per optimization.
@@ -43,7 +45,7 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 - **86,304 SIMD numeric fixtures** match QEMU at O0/O2, covering lane selection/arrangements, overlapping sources/destinations, rounding/default-NaN controls and sticky FPSR.
 - **7,232 conversion fixtures** match QEMU 8.2.2 at native O0/O2 with fatal UBSan, checking vector/general-register results, FPSR, NZCV and FPCR across W/X and S/D, controls, integer boundaries, fractions, signed zeros, infinities and quiet/signaling NaNs.
 - The expanded **26,416 FP/selection fixtures** also match QEMU at O0/O2. Earlier **2,741 SIMD**, **160 LSE** and **4,096 QARMA5** software comparisons remain passing. QEMU shares broad SoftFloat lineage and is not a hardware oracle; optional unavailability is explicitly recorded.
-- **147,808 constructed encodings**, including **65,028 accepted encodings**, pass private Capstone family/width/immediate checks. This checks decoding, not runtime semantics or hardware behavior.
+- **156,868 constructed encodings**, including **70,620 accepted encodings**, pass private Capstone family/width/immediate checks. This checks decoding, not runtime semantics or hardware behavior.
 - Native semantic cases run at O0/O2 with fatal undefined-behavior instrumentation. Synthetic programs only are executed; native game sample objects are compilation evidence.
 - **4,096 independent QARMA5 comparisons pass** against privately compiled QEMU reference code. The game's PAC profile is still unverified. The legacy/QARMA5/39-bit/no-TBI backend remains diagnostic and selected only by synthetic tests.
 - Formatting, Clippy with warnings denied, exact ExeFS/segment hashes, changed-identity refusal and truncated-CFG refusal pass. Public artifact checks exclude original inputs and all generated/private data.
@@ -59,14 +61,14 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 |---|---|---|
 | 0 investigation | Partially implemented | Retail version/completeness, graphics/resource analysis |
 | 1 foundation | Partially implemented | Synthetic native/Rust bridges pass; ISA and runtime semantics incomplete |
-| 2 game CPU translation | Partially implemented | 214,111 subset-liftable indexed extents with possible unbound tails/profiles; 99 objects; no complete module |
+| 2 game CPU translation | Partially implemented | 214,148 subset-liftable indexed extents with possible unbound tails/profiles; 103 objects; no complete module |
 | 3 runtime bootstrap | Not started | Load-time linking passes; no actual game execution/startup |
 | 4–8 graphics through packaging | Not started | No genuine game frame, native input/audio or gameplay |
 
 ## Files changed this session
 
-Saturating immediate narrowing-shift and widening arithmetic IR/decoder/emitter; shared saturation lowering; independent i128 and synthetic QEMU matrices; neighboring decoder regression expectations; survey features and Capstone metadata; CPU/compatibility/research/status documentation. CPU ABI v8 and upstream sources are unchanged. Original inputs remain unchanged and all game-derived outputs stay private.
+Accumulating/rounded right-shift and integer ADDP IR/decoder/emitter; independent i128/u128 and synthetic QEMU matrices; survey features and Capstone metadata; CPU/compatibility/research/status documentation. Seven implementation/test/checker source changes were matched byte-for-byte against an isolated tested copy before the supplied-input survey. CPU ABI v8 and upstream sources are unchanged. Original inputs remain unchanged and all game-derived outputs stay private.
 
 ## Next concrete dependencies
 
-The leading first blockers now include UDF (457 extents), undecoded (122), SVC (79), LDAXR (60), FRECPE (32), MRS (28), FRSQRTE (26), YIELD (18), SSRA (16), ADDP (13), LD3R (12) and AESE (8). Counts are first blockers, not dynamic frequencies. Next add validated right-shift accumulation, integer pairwise arithmetic and multi-register lane/replication forms. Three-register lane/replication transfers additionally require checked 3/6/12-byte memory sizes and an explicit ABI revision; current v8 rejects those sizes. Reciprocal estimates need exact architectural approximation/exception semantics. Exclusive monitors need a defined concurrency model; existing serialized memory support does not imply hardware transaction equivalence. UDF/undecoded words and unresolved CFG edges require investigation; SVC requires actual service ABI work. Target cache/counter/PAC/FP/address configuration, SP/access-trap policies, TLS templates/allocation, actual guest threading, indirect binding and bootstrap/services remain gates before original execution.
+The leading first blockers now include UDF (457 extents), undecoded (122), SVC (79), LDAXR (61), FRECPE (32), MRS (28), FRSQRTE (26), YIELD (18), LD3R (12), AESE (8), MUL (7) and XPACI (7). Counts are first blockers, not dynamic frequencies. Next add validated multi-register lane/replication forms. Three-register lane/replication transfers additionally require checked 3/6/12-byte memory sizes and an explicit ABI revision; current v8 rejects those sizes. Ordered sizes must stay exactly 1/2/4/8 even when plain sizes expand. Reciprocal estimates need exact architectural approximation/exception semantics. Exclusive monitors need a defined concurrency model; existing serialized memory support does not imply hardware transaction equivalence. UDF/undecoded words and unresolved CFG edges require investigation; SVC requires actual service ABI work. Target cache/counter/PAC/FP/address configuration, SP/access-trap policies, TLS templates/allocation, actual guest threading, indirect binding and bootstrap/services remain gates before original execution.

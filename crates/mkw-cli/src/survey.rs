@@ -129,6 +129,18 @@ pub fn run(root: &Path) -> Result<()> {
                                 features.push("simd_integer_lanes_reduction");
                                 if matches!(
                                     v,
+                                    mkw_arm64::vector_integer::VectorInteger::PairwiseAdd { .. }
+                                ) {
+                                    features.push("simd_integer_pairwise_add");
+                                }
+                                if matches!(
+                                    v,
+                                    mkw_arm64::vector_integer::VectorInteger::RightShift { .. }
+                                ) {
+                                    features.push("simd_right_shift_accumulate_round");
+                                }
+                                if matches!(
+                                    v,
                                     mkw_arm64::vector_integer::VectorInteger::WidenArithmetic { .. }
                                 ) {
                                     features.push("simd_widening_arithmetic");

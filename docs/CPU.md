@@ -235,3 +235,13 @@ Independent i128 division/clamp expectations check 1,225,728 native cases per op
 ## Widening integer add/subtract
 
 SADDL/UADDL/SSUBL/USUBL and SADDW/UADDW/SSUBW/USUBW support B/H/S inputs and upper-source variants. Wide-left forms retain the full-width left operand; upper selection applies only to narrow sources. Complete snapshots preserve aliases and unsigned arithmetic defines widened wrap while sign extension applies to signed narrow sources. Independent i128 expectations cover 74,880 native cases per optimization; 49,920 synthetic QEMU cases match O0/O2 with fatal UBSan. No callbacks, flags or ABI changes are introduced.
+
+## Right-shift accumulation and rounding
+
+SSRA/USRA, SRSHR/URSHR and SRSRA/URSRA support every legal immediate amount, vector arrangement and D scalar form. Explicit full-width cases avoid shifting C values by 64; extracted rounding bits avoid overflowing a pre-shift addition. Accumulation wraps per element, source/destination aliases are snapshotted and unused destination bits clear. FPSR.QC and unrelated CPU state remain unchanged.
+
+Independent i128 floor-division/accumulation expectations check 456,192 native cases per optimization; 414,720 synthetic QEMU cases match O0/O2 with fatal UBSan. Counts at element width, rounding ties, extremes, accumulator wrap and V31 aliases are included. No callbacks or ABI change are required.
+
+## Integer pairwise addition
+
+ADDP supports legal B/H/S/D vectors and D scalar reduction. Vector results concatenate pair sums from the left and right snapshots; scalar results sum the two D lanes and clear the upper half. Unsigned arithmetic defines element wrap and no flags change. Independent u128 byte-array expectations cover 11,960 native cases per optimization; 7,800 synthetic QEMU cases match O0/O2 with fatal UBSan, including aliasing, V31, vector ordering and upper clearing. Original target/access/bootstrap gates and software-reference limitations remain.

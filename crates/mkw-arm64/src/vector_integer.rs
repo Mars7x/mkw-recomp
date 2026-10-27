@@ -43,6 +43,23 @@ pub enum NarrowKind {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum VectorInteger {
+    PairwiseAdd {
+        bytes: u8,
+        total: u8,
+        dst: u8,
+        lhs: u8,
+        rhs: Option<u8>,
+    },
+    RightShift {
+        bytes: u8,
+        total: u8,
+        dst: u8,
+        src: u8,
+        amount: u8,
+        signed: bool,
+        rounding: bool,
+        accumulate: bool,
+    },
     WidenArithmetic {
         bytes: u8,
         dst: u8,
@@ -133,6 +150,66 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let bytes = 1 << size;
     let dst = (w & 31) as u8;
     let lhs = ((w >> 5) & 31) as u8;
+    if w & 0xbf20fc00 == 0x0e20bc00 {
+        if !q && size == 3 {
+            return Some(Err("reserved vector ADDP width".into()));
+        }
+        return Some(Ok(Op::VectorInteger(VectorInteger::PairwiseAdd {
+            bytes,
+            total: if q { 16 } else { 8 },
+            dst,
+            lhs,
+            rhs: Some(((w >> 16) & 31) as u8),
+        })));
+    }
+    if w & 0xff3ffc00 == 0x5e31b800 {
+        if size != 3 {
+            return Some(Err("reserved scalar ADDP width".into()));
+        }
+        return Some(Ok(Op::VectorInteger(VectorInteger::PairwiseAdd {
+            bytes: 8,
+            total: 8,
+            dst,
+            lhs,
+            rhs: None,
+        })));
+    }
+    let right_shift = match w & 0xaf80fc00 {
+        0x0f001400 => Some((true, false, true)),
+        0x2f001400 => Some((false, false, true)),
+        0x0f002400 => Some((true, true, false)),
+        0x2f002400 => Some((false, true, false)),
+        0x0f003400 => Some((true, true, true)),
+        0x2f003400 => Some((false, true, true)),
+        _ => None,
+    };
+    if let Some((signed, rounding, accumulate)) = right_shift {
+        let imm = ((w >> 16) & 127) as u8;
+        if imm < 8 {
+            return None;
+        }
+        let bits = 1u8 << (7 - imm.leading_zeros());
+        let scalar = w & (1 << 28) != 0;
+        if (scalar && bits != 64) || (!scalar && !q && bits == 64) {
+            return Some(Err("reserved right shift arrangement".into()));
+        }
+        return Some(Ok(Op::VectorInteger(VectorInteger::RightShift {
+            bytes: bits / 8,
+            total: if scalar {
+                8
+            } else if q {
+                16
+            } else {
+                8
+            },
+            dst,
+            src: lhs,
+            amount: (u16::from(bits) * 2 - u16::from(imm)) as u8,
+            signed,
+            rounding,
+            accumulate,
+        })));
+    }
     let widen_arithmetic = match w & 0x9f20fc00 {
         0x0e200000 => Some((false, false)),
         0x0e202000 => Some((false, true)),
@@ -872,6 +949,93 @@ mod widen_arithmetic_tests {
                     }
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod right_shift_tests {
+    use super::*;
+    #[test]
+    fn right_shift_counts_scalar_domains_and_full_width() {
+        for base in [
+            0x0f001400, 0x2f001400, 0x0f002400, 0x2f002400, 0x0f003400, 0x2f003400,
+        ] {
+            for scalar in 0..2 {
+                for q in 0..2 {
+                    for imm in 0..128 {
+                        let result = decode(base | (scalar << 28) | (q << 30) | (imm << 16) | 0x20);
+                        if (scalar != 0 && q == 0) || imm < 8 {
+                            assert!(result.is_none());
+                            continue;
+                        }
+                        let bits = 1u32 << (31 - imm.leading_zeros());
+                        if (scalar != 0 && bits != 64) || (scalar == 0 && q == 0 && bits == 64) {
+                            assert!(result.unwrap().is_err());
+                            continue;
+                        }
+                        let Op::VectorInteger(VectorInteger::RightShift {
+                            bytes,
+                            amount,
+                            total,
+                            ..
+                        }) = result.unwrap().unwrap()
+                        else {
+                            panic!()
+                        };
+                        assert_eq!(u32::from(bytes) * 16 - u32::from(amount), imm);
+                        assert!(amount >= 1 && amount <= bytes * 8);
+                        assert_eq!(
+                            total,
+                            if scalar != 0 {
+                                8
+                            } else if q != 0 {
+                                16
+                            } else {
+                                8
+                            }
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod pairwise_add_tests {
+    use super::*;
+    #[test]
+    fn pairwise_add_arrangements_and_scalar_domains() {
+        for q in 0..2 {
+            for size in 0..4 {
+                let result = decode(0x0e22bc20 | (q << 30) | (size << 22)).unwrap();
+                if q == 0 && size == 3 {
+                    assert!(result.is_err());
+                    continue;
+                }
+                let Op::VectorInteger(VectorInteger::PairwiseAdd {
+                    bytes, total, rhs, ..
+                }) = result.unwrap()
+                else {
+                    panic!()
+                };
+                assert_eq!((bytes, total, rhs), (1 << size, 8 << q, Some(2)));
+            }
+        }
+        for size in 0..4 {
+            let result = decode(0x5e31b820 | (size << 22)).unwrap();
+            if size != 3 {
+                assert!(result.is_err());
+                continue;
+            }
+            let Op::VectorInteger(VectorInteger::PairwiseAdd {
+                bytes, total, rhs, ..
+            }) = result.unwrap()
+            else {
+                panic!()
+            };
+            assert_eq!((bytes, total, rhs), (8, 8, None));
         }
     }
 }

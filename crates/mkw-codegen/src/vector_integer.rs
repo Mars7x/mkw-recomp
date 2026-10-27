@@ -8,6 +8,57 @@ fn mask(bytes: u8) -> u64 {
 }
 pub fn emit(op: VectorInteger) -> String {
     match op {
+        VectorInteger::PairwiseAdd {
+            bytes,
+            total,
+            dst,
+            lhs,
+            rhs,
+        } => {
+            let bits = bytes * 8;
+            let mask = mask(bytes);
+            let pairs = if rhs.is_some() { total / bytes / 2 } else { 1 };
+            let right = rhs.unwrap_or(lhs);
+            let sources = if rhs.is_some() { 2 } else { 1 };
+            format!("{{uint64_t source[2][2]={{{{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},{{c->vregs[{right}][0],c->vregs[{right}][1]}}}},output[2]={{0,0}};for(unsigned side=0;side<{sources};side++)for(unsigned pair=0;pair<{pairs};pair++){{unsigned first=pair*{bits}*2,second=first+{bits},out=(side*{pairs}+pair)*{bits};uint64_t a=(source[side][first/64]>>(first%64))&UINT64_C({mask}),b=(source[side][second/64]>>(second%64))&UINT64_C({mask});output[out/64]|=((a+b)&UINT64_C({mask}))<<(out%64);}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n")
+        }
+
+        VectorInteger::RightShift {
+            bytes,
+            total,
+            dst,
+            src,
+            amount,
+            signed,
+            rounding,
+            accumulate,
+        } => {
+            let bits = bytes * 8;
+            let mask = mask(bytes);
+            let sign = 1u64 << (bits - 1);
+            let shifted = if amount == bits {
+                if signed {
+                    format!("(a&UINT64_C({sign}))?UINT64_C({mask}):UINT64_C(0)")
+                } else {
+                    "UINT64_C(0)".into()
+                }
+            } else if signed {
+                format!(
+                    "(a>>{amount})|((a&UINT64_C({sign}))?UINT64_C({}):UINT64_C(0))",
+                    mask ^ (mask >> amount)
+                )
+            } else {
+                format!("a>>{amount}")
+            };
+            let round = if rounding {
+                format!("value+=((a>>{})&UINT64_C(1));", amount - 1)
+            } else {
+                String::new()
+            };
+            let add = if accumulate { "value+=prior;" } else { "" };
+            format!("{{uint64_t source[2]={{c->vregs[{src}][0],c->vregs[{src}][1]}},old[2]={{c->vregs[{dst}][0],c->vregs[{dst}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t a=(source[half]>>shift)&UINT64_C({mask}),prior=(old[half]>>shift)&UINT64_C({mask});(void)a;(void)prior;uint64_t value={shifted};{round}{add}output[half]|=(value&UINT64_C({mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes)
+        }
+
         VectorInteger::WidenArithmetic {
             bytes,
             dst,

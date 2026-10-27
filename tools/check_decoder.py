@@ -285,6 +285,16 @@ for scalar in range(2):
    for size in range(4):
     for base in [0x0e200000,0x0e202000,0x0e201000,0x0e203000]:
      for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(base|(scalar<<28)|(q<<30)|(u<<29)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+for scalar in range(2):
+ for q in range(2):
+  for imm in range(128):
+   for base in [0x0f001400,0x2f001400,0x0f002400,0x2f002400,0x0f003400,0x2f003400]:
+    for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(scalar<<28)|(q<<30)|(imm<<16)|(rn<<5)|rd)
+for q in range(2):
+ for size in range(4):
+  for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,31)]:words.add(0x0e20bc00|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+for size in range(4):
+ for rd,rn in [(0,1),(0,0),(31,31)]:words.add(0x5e31b800|(size<<22)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -317,7 +327,14 @@ for row in rows:
   elif ins.mnemonic==name and ins.operands[-1].imm!=v['amount']:errors.append({'word':hex(word),'error':'SIMD shift amount differs','reference':ins.op_str})
  elif kind=='VectorInteger':
   variant,v=next(iter(op['VectorInteger'].items()));letters={1:'b',2:'h',4:'s',8:'d'}
-  if variant=='WidenArithmetic':
+  if variant=='PairwiseAdd':
+   name='addp';b=v['bytes'];reg=lambda n:'v'+str(n)+'.'+str(v['total']//b)+letters[b]
+   operands=reg(v['dst'])+', '+reg(v['lhs'])+', '+reg(v['rhs']) if v['rhs'] is not None else 'd'+str(v['dst'])+', v'+str(v['lhs'])+'.2d'
+  elif variant=='RightShift':
+   name=('s' if v['signed'] else 'u')+('r' if v['rounding'] else '')+('sra' if v['accumulate'] else 'shr')
+   b=v['bytes'];scalar=bool(word&(1<<28));reg=lambda n:letters[b]+str(n) if scalar else 'v'+str(n)+'.'+str(v['total']//b)+letters[b]
+   operands=reg(v['dst'])+', '+reg(v['src'])+', #'+(hex(v['amount']) if v['amount']>=10 else str(v['amount']))
+  elif variant=='WidenArithmetic':
    name=('s' if v['signed'] else 'u')+('sub' if v['subtract'] else 'add')+('w' if v['wide_lhs'] else 'l')+('2' if v['upper'] else '')
    b=v['bytes'];dest=lambda n:'v'+str(n)+'.'+str(8//b)+letters[b*2];reg=lambda n:'v'+str(n)+'.'+str((16 if v['upper'] else 8)//b)+letters[b]
    operands=dest(v['dst'])+', '+(dest(v['lhs']) if v['wide_lhs'] else reg(v['lhs']))+', '+reg(v['rhs'])
