@@ -95,6 +95,7 @@ dependencies = [
 name = "mkw-cli"
 version = "0.1.0"
 dependencies = [
+ "libloading",
  "mkw-arm64",
  "mkw-codegen",
  "mkw-formats",
@@ -124,6 +125,7 @@ dependencies = [
 name = "mkw-runtime"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "libloading",
  "mkw-arm64",
  "mkw-codegen",

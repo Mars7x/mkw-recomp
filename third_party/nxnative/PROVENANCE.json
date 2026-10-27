@@ -1,0 +1,42 @@
+{
+  "repository": "https://github.com/seedds/nxnative",
+  "revision": "c8ab8166f68296dc712a4ec13b892535d9d790c6",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 seedds",
+  "ancestor": "nxnative acknowledges jhaizhou-ops/d2r-mobile as the generic native-host origin; its MIT copyright notice is also retained",
+  "source_files": {
+    "LICENSE": "a65554a74de59bf4d2210f3d4381c67d6fc6fa78f237f83c85543773319efa7b",
+    "dm/host/hle_fs.c": "6a3b8e2f7a0a2f28aea6216a2b065ca10facc9d72f5602c652b14d32f1bdbb54",
+    "dm/host/hle.h": "f86f59b92eca933899b28e9d4a502e4008d9698af44c233fcd9b09eab7b76336"
+  },
+  "adapted_functions": [
+    "h_fs_OpenFile (read-only subset)",
+    "h_fs_ReadFile",
+    "h_fs_ReadFileExact",
+    "h_fs_GetFileSize",
+    "h_fs_CloseFile",
+    "err_res (read-only error mapping)"
+  ],
+  "adaptation": "crates/mkw-runtime/src/romfs_hle.rs",
+  "changes": [
+    "Rust port of the selected service semantics, not the complete Darwin host",
+    "checked GuestAddr arguments and output batches through the owned memory authority",
+    "preconfigured read-only mount, no save/write or fake mount success",
+    "Linux fd-relative O_NOFOLLOW traversal; no guest-pointer-to-host-pointer casts",
+    "opaque per-filesystem namespace/monotonic handles, quotas and read-size bounds",
+    "versioned native HLE dispatch; original game execution not enabled"
+  ],
+  "not_adopted": [
+    "upstream game profiles or patches",
+    "Darwin Mach/APFS/save paths",
+    "success-returning generic service stubs",
+    "upstream CPU instruction rewriting, shaders, game files or generated code"
+  ],
+  "adaptation_sha256": "314343b5d9788dfdd2078e9512eac7dcbdf239e0868820a2bb40ad4cfa2633c0",
+  "ancestor_license": {
+    "source": "https://github.com/jhaizhou-ops/d2r-mobile/blob/main/LICENSE",
+    "retrieved_utc": "2026-10-27",
+    "retained_path": "third_party/nxnative/d2r-mobile-LICENSE",
+    "sha256": "5811600bb8fc4522d3310e8e0e637a1bb14b7c64412f8cfc6234872eb53129b9"
+  }
+}

@@ -2,8 +2,18 @@
 use mkw_formats::{unwind, Nso};
 use std::{fs, path::Path, process::Command};
 pub fn run(root: &Path) -> Result<(), String> {
+    run_profile(root, false)
+}
+pub fn run_v2(root: &Path) -> Result<(), String> {
+    run_profile(root, true)
+}
+fn run_profile(root: &Path, calls_v2: bool) -> Result<(), String> {
     super::analysis::verify(root, Path::new("private/analysis"))?;
-    let output = Path::new("private/analysis/cpu-exclusive-v10");
+    let output = Path::new(if calls_v2 {
+        "private/analysis/cpu-exclusive-v2"
+    } else {
+        "private/analysis/cpu-exclusive-v10"
+    });
     fs::create_dir_all(output).map_err(|e| e.to_string())?;
     let mut modules = Vec::new();
     let mut details = Vec::new();
@@ -48,7 +58,11 @@ pub fn run(root: &Path) -> Result<(), String> {
                     let src = dir.join("guest.c");
                     fs::write(
                         &src,
-                        mkw_codegen::emit_exclusive_v10(&ir, extent.start as u64)?,
+                        if calls_v2 {
+                            mkw_codegen::emit_exclusive_calls_v10(&ir, extent.start as u64)?
+                        } else {
+                            mkw_codegen::emit_exclusive_v10(&ir, extent.start as u64)?
+                        },
                     )
                     .map_err(|e| e.to_string())?;
                     let result = Command::new("cc")
@@ -79,7 +93,7 @@ pub fn run(root: &Path) -> Result<(), String> {
         }
         modules.push(serde_json::json!({"module":name,"nso_sha256":n.sha256,"indexed_extents":extents.len(),"default_accepted":old,"exclusive_v10_conditional_additional":new,"additional_compiled_objects":compiled,"additional_deferred":deferred}));
     }
-    let result = serde_json::json!({"modules":modules,"details_private":details,"game_code_executed":false,"default_acceptance_changed":false,"target_profile_verified":false,"limitations":"Explicit serialized owned normal-memory v10 compiler profile only; executable identity/configuration, aliases/MMIO, traps, weak ordering, PAC and call/dispatch backends remain gated. New objects are compilation evidence, never runtime coverage."});
+    let result = serde_json::json!({"modules":modules,"details_private":details,"cpu_frame_version":10,"exclusive_table_version":if calls_v2 {2}else{1},"game_code_executed":false,"default_acceptance_changed":false,"target_profile_verified":false,"limitations":"Explicit serialized owned normal-memory v10 compiler profile only; executable identity/configuration, aliases/MMIO, traps, weak ordering, PAC and call/dispatch backends remain gated. New objects are compilation evidence, never runtime coverage."});
     fs::write(
         output.join("summary.json"),
         serde_json::to_vec_pretty(&result).unwrap(),

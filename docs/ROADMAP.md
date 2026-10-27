@@ -10,3 +10,7 @@
 8. Profile correct gameplay before optimization, enhancements or Flatpak packaging.
 
 The long-term acceptance criteria remain the user's original phases. The foundation does not relax them or replace the original game with a recreation.
+
+## Pinned upstream reuse and bounded runtime integration (October 27)
+
+See [UPSTREAM_REUSE.md](UPSTREAM_REUSE.md) and upstream-reuse-audit.json for pinned nxnative/LASRecomp/nx2android source findings, licenses, portability costs and ranked execution/frame opportunities. The selected nxnative-derived five-API read-only filesystem profile now uses checked host targets on the coherent v10/table-v2 router. Five exact supplied provider descriptors cover ten references; a synthetic native wrapper reads 1,342 supplied RomFS bytes matching an independent stream. This is opt-in service transport, not proof of the retail SDK object layout or original game startup. Six call, four filesystem and two hook tests add to existing checks; no original code executes. Default survey gain stays zero (214,521); conditional v1/v2 totals stay 214,585. Prior acceptance and correctness checks remain required. Runtime configuration, thread/TLS ownership and Switch 2 graphics/shader identification now take priority over further survey-only work.

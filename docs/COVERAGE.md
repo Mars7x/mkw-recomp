@@ -219,3 +219,16 @@ The checked loader also has a host-side registered tail router. Its synthetic tw
 
 
 A private audit of the 64 additional generated objects finds nested call sites in **60 extents (385 sites)** and tail requests in **five extents (five sites)**, with overlap. The host tail router is tested, but nested BL/BLR routing remains unbound. This measured dependency takes priority over further ISA surveys; compilation gains do not establish runnable code. Target identity/configuration and other callees remain required.
+
+
+### Coherent call-routing dependency
+
+The explicit table-v2 router binds the next measured native dependency, retaining the owned memory authority across registered direct/indirect calls and tails. Six new native tests pass in debug/release; 96 nested-call sequences per optimization match QEMU and independent value/status expectations. The v2 compiler survey compiles exactly the same 64 additional supplied extents as v1, so **new default gain is zero and new conditional compiler gain beyond v1 is zero**. The totals remain 214,521 default / 214,585 conditional. All old tests and acceptance limits remain unchanged.
+
+Reproduce with `target/release/mkw-recomp cpu-survey-exclusive-v2 base`. Separate private artifacts live under `private/analysis/cpu-exclusive-v2/`; the mandatory gate compares module hashes, exact extents, baseline counts, object limits and deferrals with the v1 report. Game-derived code is only compiled into objects, never loaded/executed.
+
+The complete static call inventory finds 273 direct / 112 indirect sites in the additional extents. 218 direct sites reach 62 unindexed stubs; exact X16/X17 dataflow, zero-addend JUMP_SLOT metadata and diagnostic link bindings agree for every one. Of their bound provider starts, 59 are strict-accepted and three have structural CFG failures with no remaining decode issues. These are static sites, not execution frequencies. Runtime import configuration and structural/call-target dependencies now dominate; widening FDE boundaries or more pure ISA fixes would not resolve this measured ceiling. The synthetic import-thunk fixture proves transport semantics, not recognition or acceptance of those game extents.
+
+## Pinned upstream reuse and bounded runtime integration (October 27)
+
+See [UPSTREAM_REUSE.md](UPSTREAM_REUSE.md) and upstream-reuse-audit.json for pinned nxnative/LASRecomp/nx2android source findings, licenses, portability costs and ranked execution/frame opportunities. The selected nxnative-derived five-API read-only filesystem profile now uses checked host targets on the coherent v10/table-v2 router. Five exact supplied provider descriptors cover ten references; a synthetic native wrapper reads 1,342 supplied RomFS bytes matching an independent stream. This is opt-in service transport, not proof of the retail SDK object layout or original game startup. Six call, four filesystem and two hook tests add to existing checks; no original code executes. Default survey gain stays zero (214,521); conditional v1/v2 totals stay 214,585. Prior acceptance and correctness checks remain required. Runtime configuration, thread/TLS ownership and Switch 2 graphics/shader identification now take priority over further survey-only work.

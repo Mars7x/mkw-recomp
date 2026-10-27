@@ -8,9 +8,9 @@ use crate::{
 use libloading::{Library, Symbol};
 type Function = unsafe extern "C" fn(*mut CpuV10, *mut u64) -> i32;
 pub struct Entry<'code> {
-    function: Symbol<'code, Function>,
-    address: GuestAddr,
-    module_base: u64,
+    pub(crate) function: Symbol<'code, Function>,
+    pub(crate) address: GuestAddr,
+    pub(crate) module_base: u64,
 }
 impl<'code> Entry<'code> {
     /// # Safety
@@ -23,6 +23,24 @@ impl<'code> Entry<'code> {
         symbol: &[u8],
         address: GuestAddr,
         module_base: u64,
+    ) -> Result<Self, String> {
+        unsafe { Self::load_contract(library, symbol, address, module_base, None) }
+    }
+    pub(crate) unsafe fn load_table(
+        library: &'code Library,
+        symbol: &[u8],
+        address: GuestAddr,
+        module_base: u64,
+        table_version: u32,
+    ) -> Result<Self, String> {
+        unsafe { Self::load_contract(library, symbol, address, module_base, Some(table_version)) }
+    }
+    unsafe fn load_contract(
+        library: &'code Library,
+        symbol: &[u8],
+        address: GuestAddr,
+        module_base: u64,
+        table_version: Option<u32>,
     ) -> Result<Self, String> {
         if address.0 % 4 != 0 || module_base % 4096 != 0 || address.0 < module_base {
             return Err("invalid native v10 target address/base".into());
@@ -38,6 +56,15 @@ impl<'code> Entry<'code> {
             .map_err(|e| e.to_string())?;
         if unsafe { version() } != CPU_V10_ABI_VERSION {
             return Err("native v10 target ABI version mismatch".into());
+        }
+        if let Some(expected) = table_version {
+            let mut query = name.to_vec();
+            query.extend_from_slice(b"_exclusive_version\0");
+            let version = unsafe { library.get::<unsafe extern "C" fn() -> u32>(&query) }
+                .map_err(|e| e.to_string())?;
+            if unsafe { version() } != expected {
+                return Err("native exclusive-v2 target version mismatch".into());
+            }
         }
         // SAFETY: the caller guarantees the advertised version's function ABI.
         let function = unsafe { library.get::<Function>(symbol) }.map_err(|e| e.to_string())?;

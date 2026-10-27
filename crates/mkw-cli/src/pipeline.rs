@@ -72,7 +72,14 @@ int main(void) {MkwCpu c={0}; c.x[30]=0xdead;
     )?;
     Ok(())
 }
-pub fn link_check(root: &Path) -> Result<()> {
+/// Shared diagnostic linking only; never executes an original function.
+pub(crate) fn prepare_link(
+    root: &Path,
+) -> Result<(
+    Vec<mkw_runtime::LoadedModule>,
+    mkw_runtime::Memory,
+    mkw_runtime::RelocationPlan,
+)> {
     super::analysis::verify(root, Path::new("private/analysis"))?;
     let mut modules = Vec::new();
     for path in super::analysis::walk(&root.join("exefs"))? {
@@ -118,6 +125,10 @@ pub fn link_check(root: &Path) -> Result<()> {
     )?;
     plan.apply(&mut memory)?;
     plan.verify_applied(&memory)?;
+    Ok((modules, memory, plan))
+}
+pub fn link_check(root: &Path) -> Result<()> {
+    let (modules, mut memory, plan) = prepare_link(root)?;
     memory.seal();
     let receipt = json!({"modules":modules.iter().map(|m|json!({"name":m.name,"base":m.base.0,"source_sha256":m.nso.sha256})).collect::<Vec<_>>(),"mapped_bytes":memory.mapped_bytes(),"regions":memory.region_count(),"relocations_applied":plan.len(),"relocation_readback_verified":true,"module_base_policy":"diagnostic alphabetical-file order, 0x7100000000 + i*0x10000000; not a proven game process layout","limitations":"explicit observed-order process lookup; guest address layout remains diagnostic; no final RelRo transition, initializers, TLS, service runtime, or guest execution","guest_code_executed":false});
     json_write(Path::new("private/analysis/link-check.json"), receipt)?;

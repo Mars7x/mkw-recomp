@@ -5,10 +5,16 @@ pub mod atomics;
 pub mod bridge;
 pub mod dispatch;
 pub mod exclusive;
+pub mod exclusive_calls;
 pub mod exclusive_entry;
 pub mod exclusive_native;
 pub mod floating;
+pub mod host_call;
 mod linker;
+#[cfg(target_os = "linux")]
+pub mod romfs_hle;
+#[cfg(target_os = "linux")]
+pub mod romfs_hooks;
 pub use linker::LinkScopes;
 use mkw_formats::{Nso, Result};
 use serde::Serialize;

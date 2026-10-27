@@ -10,6 +10,7 @@ path = "src/main.rs"
 mkw-formats = { path = "../mkw-formats" }
 mkw-arm64 = { path = "../mkw-arm64" }
 mkw-codegen = { path = "../mkw-codegen" }
+libloading.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 mkw-runtime = { path = "../mkw-runtime" }

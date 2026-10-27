@@ -10,9 +10,10 @@
 | Synthetic native translation | Implemented and tested | Host x86-64 executable ran; limited instruction subset |
 | Guest memory/relocation foundation | Partially implemented | Synthetic Rust/native memory and dispatcher tests pass; 309,844 relocations apply/read back; serialized diagnostic ordering |
 | Actual game CPU translation | Partially implemented | 214,521 subset-liftable indexed extents with possible unbound tails; 125 object samples; no complete module |
-| Actual runtime bootstrap | Not started | No guest instruction execution |
+| Actual runtime bootstrap | Not started | Synthetic native service boundary passes; no original instruction execution |
 | Vulkan/shaders/game frame | Not started | Container observations only |
-| SDL3 input/audio, VFS/saves | Not started | No runtime implementations |
+| Read-only filesystem HLE | Partially implemented | Five opt-in APIs; synthetic supplied-data probe; SDK layout/target authorization unverified |
+| SDL3 input/audio, saves | Not started | No runtime implementations |
 | Title screen through all gameplay modes | Not started | No game execution or rendering |
 | ARM64 host, Fedora, RADV, Wayland/X11, Flatpak | Not started | Current test environment only; packaging deferred |
 
@@ -167,3 +168,10 @@ A checked version-10 single-entry loader now runs trusted synthetic functions th
 
 
 An explicit diagnostic v10 compiler profile now lowers single-register exclusive loads/stores and CLREX through the coherent native table. It conditionally lifts/compiles 64 additional supplied extents; default strict coverage and ABI-v9 acceptance remain unchanged. Pair forms, constrained-unpredictable overlaps, invalid typed IR and unresolved CFG edges refuse. The diagnostic SP-alignment rule is explicit and is not a verified target configuration. Native synthetic tests compare values/status against QEMU, exact budgets/faults and split-entry reservations; no original function executes.
+
+
+The opt-in CPU-v10/exclusive-table-v2 profile now routes registered synthetic direct/indirect calls and tails through the same owned memory/reservation authority. Caller module bases restore, generated return PCs are checked, budgets are shared and depth/tail progress is bounded. V1/v2 table capabilities are distinct; CPU-v10 layout, ABI-v9 prefix calls and published v1 headers remain unchanged. Six new debug/release O0/O2 fatal-UBSan tests include 96 native/QEMU sequences per optimization and an original configured import-thunk fixture. Both explicit compiler profiles still cover the same conditional 64 extra extents; default coverage does not increase. Real module/import registration, indirect targets, physical alias/MMIO behavior, target traps/granule/weak-memory settings and original execution remain gated.
+
+## Pinned upstream reuse and bounded runtime integration (October 27)
+
+See [UPSTREAM_REUSE.md](UPSTREAM_REUSE.md) and upstream-reuse-audit.json for pinned nxnative/LASRecomp/nx2android source findings, licenses, portability costs and ranked execution/frame opportunities. The selected nxnative-derived five-API read-only filesystem profile now uses checked host targets on the coherent v10/table-v2 router. Five exact supplied provider descriptors cover ten references; a synthetic native wrapper reads 1,342 supplied RomFS bytes matching an independent stream. This is opt-in service transport, not proof of the retail SDK object layout or original game startup. Six call, four filesystem and two hook tests add to existing checks; no original code executes. Default survey gain stays zero (214,521); conditional v1/v2 totals stay 214,585. Prior acceptance and correctness checks remain required. Runtime configuration, thread/TLS ownership and Switch 2 graphics/shader identification now take priority over further survey-only work.

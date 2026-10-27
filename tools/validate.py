@@ -34,7 +34,7 @@ def run(label, command, *, cwd=ROOT, required=True):
 run('format', ['cargo', 'fmt', '--all', '--', '--check'])
 run('lint', ['cargo', 'clippy', '--workspace', '--all-targets', '--offline', '--locked', '--', '-D', 'warnings'])
 run('unit and native semantic tests', ['cargo', 'test', '--workspace', '--offline', '--locked'])
-run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting'])
+run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks'])
 run('native synthetic demo', ['cargo', 'run', '--release', '--offline', '--locked', '--', 'aot-demo'])
 binary = ROOT / 'target/release/mkw-recomp'
 header = run('native ELF header', ['readelf', '-h', str(ROOT / 'private/builds/synthetic/aot-demo')])
@@ -44,6 +44,7 @@ if 'Advanced Micro Devices X86-64' not in header.stdout:
 if args.game:
     game = args.game.resolve()
     run('exact supplied ExeFS identity', [str(binary), 'verify', str(game)])
+    run('synthetic native HLE read of supplied RomFS', [str(binary), 'romfs-hle-check', str(game)])
     manifest = json.loads((ROOT / 'private/analysis/exefs-manifest.json').read_text())
     # Change only a test copy of manifest metadata, never any game input.
     negative = output / 'negative-version-gate'
@@ -65,6 +66,13 @@ if args.game:
     observed = {m['module']: (m['indexed_extents'], m['default_accepted']) for m in explicit['modules']}
     if observed != expected or explicit['game_code_executed'] or explicit['default_acceptance_changed'] or explicit['target_profile_verified']:
         raise SystemExit('Explicit v10 survey changed the strict baseline or execution/profile gates')
+    run('explicit exclusive-v2 conditional compiler survey', [str(binary), 'cpu-survey-exclusive-v2', str(game)])
+    routed = json.loads((ROOT / 'private/analysis/cpu-exclusive-v2/summary.json').read_text())
+    if (routed['modules'] != explicit['modules'] or routed['details_private'] != explicit['details_private']
+            or routed['cpu_frame_version'] != 10 or routed['exclusive_table_version'] != 2
+            or explicit['exclusive_table_version'] != 1 or routed['game_code_executed']
+            or routed['default_acceptance_changed'] or routed['target_profile_verified']):
+        raise SystemExit('Exclusive-v2 routing changed compiler coverage, limits, identities or execution gates')
     run('all rejected-extent blocker diagnostics', [str(binary), 'cpu-blockers', str(game)])
     if (ROOT/'private/tools/python/capstone').is_dir():
         run('all-blocker coverage prioritization', [sys.executable, str(ROOT/'tools/rank_blockers.py')])

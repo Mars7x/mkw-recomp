@@ -185,6 +185,19 @@ impl ExclusiveMemory {
         self.write(address, &value.to_le_bytes()[..width.bytes()])?;
         Ok(true)
     }
+    /// Commit a host service's discontiguous outputs under the same authority.
+    /// Mappings cannot change inside this owned borrow; every range validates
+    /// before the first write or reservation invalidation.
+    pub(crate) fn write_batch(&mut self, writes: &[(GuestAddr, &[u8])]) -> Result<(), Error> {
+        for (address, bytes) in writes {
+            self.validate_access(*address, bytes.len(), true)?;
+        }
+        for (address, bytes) in writes {
+            self.write(*address, bytes)
+                .expect("validated unchanged owned memory mappings");
+        }
+        Ok(())
+    }
     /// All transfers validate completely before mutation; failed ordinary stores do not invalidate.
     pub fn write(&mut self, address: GuestAddr, bytes: &[u8]) -> Result<(), Error> {
         let last = if bytes.is_empty() {

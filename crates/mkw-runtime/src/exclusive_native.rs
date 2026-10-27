@@ -36,9 +36,9 @@ pub struct CpuV10 {
     pub exclusive: *const Ops,
     pub exclusive_context: *mut c_void,
 }
-struct Context {
-    memory: Arc<Mutex<ExclusiveMemory>>,
-    owner: Owner,
+pub(crate) struct Context {
+    pub(crate) memory: Arc<Mutex<ExclusiveMemory>>,
+    pub(crate) owner: Owner,
 }
 pub struct Bridge {
     context: Box<Context>,
@@ -93,6 +93,10 @@ pub struct Attachment<'a> {
     _bridge: &'a mut Bridge,
 }
 impl Attachment<'_> {
+    pub(crate) fn parts(&mut self) -> (&mut CpuV10, &Context) {
+        (&mut *self.cpu, &self._bridge.context)
+    }
+
     pub(crate) fn validate(&self) -> Result<(), String> {
         let expected = std::ptr::addr_of!(*self._bridge.context).cast_mut().cast();
         let c = &*self.cpu;
