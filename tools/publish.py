@@ -36,6 +36,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repository', required=True, help='Authorized GitHub HTTPS repository URL')
     parser.add_argument('--message', required=True)
+    parser.add_argument('--visibility', choices=['private', 'public'], default='private',
+                        help='Explicitly authorized expected visibility; never changes it')
     args = parser.parse_args()
     if not args.repository.startswith('https://github.com/') or not args.repository.endswith('.git'):
         parser.error('Use a GitHub HTTPS .git repository URL without credentials')
@@ -47,8 +49,8 @@ def main():
     account = json.loads(subprocess.check_output(['gh', 'api', 'user'], text=True))
     remote = json.loads(subprocess.check_output(['gh', 'repo', 'view', owner_name,
                                                '--json', 'isPrivate'], text=True))
-    if not remote['isPrivate']:
-        raise SystemExit('Refusing publication to a non-private repository')
+    if remote['isPrivate'] != (args.visibility == 'private'):
+        raise SystemExit('Repository visibility differs from the explicitly authorized expectation')
     checkout = ROOT / 'private/publish'
     checkout.mkdir(parents=True, exist_ok=True)
     if not (checkout / '.git').exists():
