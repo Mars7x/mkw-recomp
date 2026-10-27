@@ -387,15 +387,14 @@ for row in rows:
   if isinstance(wb,dict):operands+=', #'+str(wb['Immediate']) if 'Immediate' in wb else ', '+reg(wb['Register'])
   if (ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'interleaved structure arrangement/register/writeback differs','reference':ins.mnemonic+' '+ins.op_str,'expected':name+' '+operands})
  elif kind=='Structure':
-  v=op['Structure'];expected='ld1r' if v['replicate'] else 'ld1' if v['load'] else 'st1'
-  if ins.mnemonic!=expected:errors.append({'word':hex(word),'error':'single structure family differs','reference':ins.mnemonic+' '+ins.op_str})
-  if v['replicate']:
-   prefix='{v'+str(v['vector'])+'.'+str(v['replicate']//v['bytes'])+{1:'b',2:'h',4:'s',8:'d'}[v['bytes']]+'}'
-   if not ins.op_str.startswith(prefix):errors.append({'word':hex(word),'error':'replication arrangement differs','reference':ins.op_str})
-  else:
-   prefix='{v'+str(v['vector'])+'.'+{1:'b',2:'h',4:'s',8:'d'}[v['bytes']]+'}'
-   if not ins.op_str.startswith(prefix):errors.append({'word':hex(word),'error':'structure register/element width differs','reference':ins.op_str})
-   if ins.operands[0].vector_index!=v['lane']:errors.append({'word':hex(word),'error':'structure lane differs','reference':ins.op_str})
+  v=op['Structure'];name=('ld' if v['load'] else 'st')+str(v['registers'])+('r' if v['replicate'] else '')
+  letters={1:'b',2:'h',4:'s',8:'d'};arr=(str(v['replicate']//v['bytes']) if v['replicate'] else '')+letters[v['bytes']]
+  operands='{'+', '.join('v'+str((v['vector']+n)%32)+'.'+arr for n in range(v['registers']))+'}'
+  if not v['replicate']:operands+='['+(hex(v['lane']) if v['lane']>=10 else str(v['lane']))+']'
+  reg=lambda r:'sp' if r=='Sp' else 'x'+str(r['Gpr'])
+  operands+=', ['+reg(v['base'])+']';wb=v['writeback']
+  if isinstance(wb,dict):operands+=', #'+str(wb['Immediate']) if 'Immediate' in wb else ', '+reg(wb['Register'])
+  if(ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'lane/replicate list arrangement/register/writeback differs','reference':ins.mnemonic+' '+ins.op_str,'expected':name+' '+operands})
  elif kind=='Crc32':
   expected={1:('crc32b','crc32cb'),2:('crc32h','crc32ch'),4:('crc32w','crc32cw'),8:('crc32x','crc32cx')}
   v=op['Crc32']

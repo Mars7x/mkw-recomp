@@ -318,11 +318,20 @@ pub fn run(root: &Path) -> Result<()> {
                             } else {
                                 "interleaved_three_four_structure"
                             }),
-                            Op::Structure(v) => features.push(if v.replicate == 0 {
-                                "simd_lane_memory"
-                            } else {
-                                "simd_replicate_memory"
-                            }),
+                            Op::Structure(v) => {
+                                features.push(if v.replicate == 0 {
+                                    "simd_lane_memory"
+                                } else {
+                                    "simd_replicate_memory"
+                                });
+                                if v.registers > 1 {
+                                    features.push(if v.replicate == 0 {
+                                        "simd_multi_lane_memory"
+                                    } else {
+                                        "simd_multi_replicate_memory"
+                                    });
+                                }
+                            }
                             Op::IntegerUnary { .. } | Op::CarryArithmetic { .. } => {
                                 features.push("integer_bits_carry")
                             }

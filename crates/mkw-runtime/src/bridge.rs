@@ -55,13 +55,13 @@ impl MemoryBridge {
         bytes: usize,
     ) -> Result<(), String> {
         let result = (|| {
-            if !matches!(bytes, 1 | 2 | 4 | 8 | 16 | 24 | 32 | 48 | 64)
+            if !matches!(bytes, 1 | 2 | 3 | 4 | 6 | 8 | 12 | 16 | 24 | 32 | 48 | 64)
                 || words.len() < bytes.div_ceil(8)
             {
                 return Err("unsupported memory width".into());
             }
             if order != MemoryOrder::Plain {
-                if bytes > 8 || (order == MemoryOrder::Release) != store {
+                if !matches!(bytes, 1 | 2 | 4 | 8) || (order == MemoryOrder::Release) != store {
                     return Err("invalid ordered memory operation".into());
                 }
                 if address.0 % (bytes as u64) != 0 {
@@ -197,7 +197,10 @@ unsafe fn dispatch(
         3 => MemoryOrder::Release,
         _ => return 3,
     };
-    if !matches!(bytes, 1 | 2 | 4 | 8 | 16 | 24 | 32 | 48 | 64) {
+    if !matches!(bytes, 1 | 2 | 3 | 4 | 6 | 8 | 12 | 16 | 24 | 32 | 48 | 64) {
+        return 3;
+    }
+    if order != MemoryOrder::Plain && !matches!(bytes, 1 | 2 | 4 | 8) {
         return 3;
     }
     // SAFETY: Attachment keeps the pinned bridge alive. The generated ABI always

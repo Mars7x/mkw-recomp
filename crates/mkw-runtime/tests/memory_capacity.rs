@@ -11,7 +11,7 @@ mod support;
 use support::*;
 #[test]
 fn extended_plain_transfers_validate_full_ranges_and_buffers() {
-    for bytes in [24usize, 48, 64] {
+    for bytes in [3usize, 6, 12, 24, 48, 64] {
         let mut m = Memory::default();
         m.map(
             GuestAddr(0x1000),
@@ -22,7 +22,7 @@ fn extended_plain_transfers_validate_full_ranges_and_buffers() {
         .unwrap();
         m.map(
             GuestAddr(0x1000 + (bytes / 2) as u64),
-            vec![0xa5; bytes / 2],
+            vec![0xa5; bytes - bytes / 2],
             Permissions::RW,
             "synthetic second half",
         )
@@ -51,8 +51,19 @@ fn extended_plain_transfers_validate_full_ranges_and_buffers() {
                 bytes,
             )
             .unwrap();
-        assert_eq!(&output[..bytes / 8], &initial[..bytes / 8]);
-        assert!(output[bytes / 8..].iter().all(|&v| v == u64::MAX));
+        let needed = bytes.div_ceil(8);
+        let expected_bytes: Vec<_> = initial
+            .into_iter()
+            .flat_map(u64::to_le_bytes)
+            .take(bytes)
+            .collect();
+        let actual_bytes: Vec<_> = output[..needed]
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect();
+        assert_eq!(&actual_bytes[..bytes], expected_bytes);
+        assert!(actual_bytes[bytes..].iter().all(|&v| v == 0));
+        assert!(output[needed..].iter().all(|&v| v == u64::MAX));
         let mut short = [0xdeadbeefu64; 8];
         let before = short;
         assert!(bridge
@@ -60,7 +71,7 @@ fn extended_plain_transfers_validate_full_ranges_and_buffers() {
                 MemoryOrder::Plain,
                 false,
                 GuestAddr(0x1000),
-                &mut short[..bytes / 8 - 1],
+                &mut short[..bytes.div_ceil(8) - 1],
                 bytes
             )
             .is_err());
@@ -70,7 +81,7 @@ fn extended_plain_transfers_validate_full_ranges_and_buffers() {
                 MemoryOrder::Plain,
                 true,
                 GuestAddr(0x1000),
-                &mut short[..bytes / 8 - 1],
+                &mut short[..bytes.div_ceil(8) - 1],
                 bytes
             )
             .is_err());
@@ -103,7 +114,12 @@ fn extended_plain_transfers_validate_full_ranges_and_buffers() {
                 bytes,
             )
             .unwrap();
-        assert_eq!(&unchanged[..bytes / 8], &initial[..bytes / 8]);
+        let unchanged_bytes: Vec<_> = unchanged[..needed]
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .take(bytes)
+            .collect();
+        assert_eq!(unchanged_bytes, expected_bytes);
         for order in [
             MemoryOrder::AcquireRcpc,
             MemoryOrder::AcquireRcsc,
@@ -125,10 +141,27 @@ fn extended_plain_transfers_validate_full_ranges_and_buffers() {
             let c = attachment.cpu_mut();
             let callback = c.memory.unwrap();
             let mut sentinel = [0x12345678u64; 8];
-            for invalid in [0u32, 3, 40, 65, 128] {
+            for invalid in [0u32, 5, 7, 9, 40, 65, 128] {
                 assert_eq!(
                     unsafe {
                         callback(c.memory_context, 0, 0x1000, sentinel.as_mut_ptr(), invalid)
+                    },
+                    3
+                );
+                assert_eq!(sentinel, [0x12345678; 8]);
+            }
+            let ordered = c.ordered_memory.unwrap();
+            for invalid in [3u32, 6, 12, 24, 48, 64] {
+                assert_eq!(
+                    unsafe {
+                        ordered(
+                            c.memory_context,
+                            1,
+                            0,
+                            0x1000,
+                            sentinel.as_mut_ptr(),
+                            invalid,
+                        )
                     },
                     3
                 );
@@ -138,10 +171,10 @@ fn extended_plain_transfers_validate_full_ranges_and_buffers() {
     }
 }
 #[test]
-fn abi8_rejects_stale_native_entries_and_fp_backends_before_loading() {
-    assert_eq!(CPU_ABI_VERSION, 8);
-    let path = folder("abi8-refusal");
-    let code="unsigned current_budget_abi_version(void){return MKW_CPU_ABI_VERSION;}\nint current_budget(MkwCpu*c,uint64_t*b){(void)c;(void)b;return 0;}\nunsigned stale_budget_abi_version(void){return 7;}\nint stale_budget(MkwCpu*c,uint64_t*b){(void)c;(void)b;return 0;}\nint missing_budget(MkwCpu*c,uint64_t*b){(void)c;(void)b;return 0;}\nunsigned mkw_fp_abi_version(void){return 7;}\n";
+fn abi9_rejects_stale_native_entries_and_fp_backends_before_loading() {
+    assert_eq!(CPU_ABI_VERSION, 9);
+    let path = folder("abi9-refusal");
+    let code="unsigned current_budget_abi_version(void){return MKW_CPU_ABI_VERSION;}\nint current_budget(MkwCpu*c,uint64_t*b){(void)c;(void)b;return 0;}\nunsigned stale_budget_abi_version(void){return 8;}\nint stale_budget(MkwCpu*c,uint64_t*b){(void)c;(void)b;return 0;}\nint missing_budget(MkwCpu*c,uint64_t*b){(void)c;(void)b;return 0;}\nunsigned mkw_fp_abi_version(void){return 8;}\n";
     for opt in ["-O0", "-O2"] {
         let library = build(code, &path, opt);
         unsafe {

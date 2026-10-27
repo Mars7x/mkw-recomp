@@ -44,7 +44,7 @@ size_t convert_offset(void){{return offsetof(MkwCpu,convert);}}\nunsigned abi_ve
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    // SAFETY: locally compiled synthetic ABI-v8 functions; check layout before calls.
+    // SAFETY: locally compiled synthetic ABI-v9 functions; check layout before calls.
     unsafe {
         let library = libloading::Library::new(lib).unwrap();
         assert_eq!(

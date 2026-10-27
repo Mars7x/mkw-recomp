@@ -4,7 +4,22 @@ use mkw_arm64::{
     Width,
 };
 pub fn emit(op: Structure) -> String {
-    let mut out=format!("{{uint64_t address={},value[1]={{0}},old[2]={{c->vregs[{}][0],c->vregs[{}][1]}};c->fault_address=address;\n",r(op.base),op.vector,op.vector);
+    let count = op.registers;
+    let bits = op.bytes * 8;
+    let mask = if op.bytes == 8 {
+        u64::MAX
+    } else {
+        (1u64 << bits) - 1
+    };
+    let offset = u32::from(op.lane) * u32::from(bits);
+    let mut out = format!(
+        "{{uint64_t address={},value[4]={{0}},old[{count}][2];c->fault_address=address;\n",
+        r(op.base)
+    );
+    for slot in 0..count {
+        let reg = (op.vector + slot) % 32;
+        out += &format!("old[{slot}][0]=c->vregs[{reg}][0];old[{slot}][1]=c->vregs[{reg}][1];\n");
+    }
     if op.writeback != Writeback::None {
         let step = match op.writeback {
             Writeback::Immediate(n) => format!("UINT64_C({n})"),
@@ -13,42 +28,34 @@ pub fn emit(op: Structure) -> String {
         };
         out += &format!("uint64_t updated_base=address+{step};\n");
     }
-    let offset = u32::from(op.lane) * u32::from(op.bytes) * 8;
-    let mask = if op.bytes == 8 {
-        u64::MAX
-    } else {
-        (1u64 << (op.bytes * 8)) - 1
-    };
     if !op.load {
-        out += &format!(
-            "value[0]=(old[{}]>>{})&UINT64_C({mask});\n",
-            offset / 64,
-            offset % 64
-        );
+        out+=&format!("for(unsigned slot=0;slot<{count};slot++){{unsigned to=slot*{bits};uint64_t element=(old[slot][{}]>>{})&UINT64_C({mask});value[to/64]|=element<<(to%64);}}\n",offset/64,offset%64);
     }
-    out+=&format!("if(!c->memory){{c->fault_status=3;return 3;}}int status=c->memory(c->memory_context,{},address,value,{});if(status){{c->fault_status=status;return status;}}\n",u8::from(!op.load),op.bytes);
+    out+=&format!("if(!c->memory){{c->fault_status=3;return 3;}}int status=c->memory(c->memory_context,{},address,value,{});if(status){{c->fault_status=status;return status;}}\n",u8::from(!op.load),op.bytes*count);
     if op.load {
+        out+=&format!("for(unsigned slot=0;slot<{count};slot++){{unsigned from=slot*{bits};uint64_t element=(value[from/64]>>(from%64))&UINT64_C({mask});");
         if op.replicate != 0 {
-            out+=&format!("old[0]=0;old[1]=0;for(unsigned b=0;b<{};b+={})old[b/8]|=(value[0]&UINT64_C({mask}))<<((b%8)*8);\n",op.replicate,op.bytes);
+            out+=&format!("old[slot][0]=0;old[slot][1]=0;for(unsigned b=0;b<{};b+={})old[slot][b/8]|=element<<((b%8)*8);",op.replicate,op.bytes);
         } else {
             out += &format!(
-                "old[{}]=(old[{}]&~UINT64_C({}))|((value[0]&UINT64_C({mask}))<<{});\n",
+                "old[slot][{}]=(old[slot][{}]&~UINT64_C({}))|(element<<{});",
                 offset / 64,
                 offset / 64,
                 mask << (offset % 64),
                 offset % 64
             );
         }
-        out += &format!(
-            "c->vregs[{}][0]=old[0];c->vregs[{}][1]=old[1];\n",
-            op.vector, op.vector
-        );
+        out += "}\n";
+        for slot in 0..count {
+            let reg = (op.vector + slot) % 32;
+            out +=
+                &format!("c->vregs[{reg}][0]=old[{slot}][0];c->vregs[{reg}][1]=old[{slot}][1];\n");
+        }
     }
     if op.writeback != Writeback::None {
         out += &write(op.base, Width::X64, "updated_base");
     }
-    out += "}\n";
-    out
+    out + "}\n"
 }
 
 pub fn emit_interleaved(op: mkw_arm64::structures::Interleaved) -> String {

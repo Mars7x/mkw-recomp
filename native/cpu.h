@@ -2,7 +2,7 @@
 #define MKW_CPU_H
 #include <stdint.h>
 #include <stddef.h>
-#define MKW_CPU_ABI_VERSION 8u
+#define MKW_CPU_ABI_VERSION 9u
 #define MKW_CONVERT_FIXED_SCALE UINT32_C(0x10000)
 #define MKW_CONVERT_SCALE_SHIFT 8u
 /* Internal transfer request: dispatcher routes c->pc without changing LR. */
@@ -29,7 +29,7 @@ typedef int (*MkwOrderedMemory)(void*,uint32_t,int,uint64_t,uint64_t*,unsigned);
 typedef int (*MkwAtomicMemory)(void*,uint32_t,uint32_t,uint64_t,uint64_t,uint64_t,uint64_t*,unsigned);
 typedef int (*MkwCall)(void*,MkwCpu*,uint64_t,uint64_t*);
 typedef int (*MkwPAuth)(void*,uint32_t,uint32_t,uint64_t,uint64_t,uint64_t*);
-/* Memory callbacks transfer 1/2/4/8/16/24/32/48/64 little-endian bytes; buffer has ceil(bytes/8) words after full validation.
+/* Memory callbacks transfer 1/2/3/4/6/8/12/16/24/32/48/64 little-endian bytes; buffer has ceil(bytes/8) words after full validation.
  * Call callbacks share the budget and restore caller module_base. */
 typedef int (*MkwMemory)(void*,int,uint64_t,uint64_t*,unsigned);
 /* Thread registers are raw guest software values. Access requires explicit

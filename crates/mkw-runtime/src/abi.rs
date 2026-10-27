@@ -1,7 +1,7 @@
-//! ABI v8 mirrors native/cpu.h; integration tests compare its size and offsets
+//! ABI v9 mirrors native/cpu.h; integration tests compare its size and offsets
 //! against the C compiler before invoking generated native functions.
 use std::ffi::c_void;
-pub const CPU_ABI_VERSION: u32 = 8;
+pub const CPU_ABI_VERSION: u32 = 9;
 /// Internal dispatcher request, never a completed guest return.
 pub const EXIT_TAIL: i32 = 8;
 pub type Call = unsafe extern "C" fn(*mut c_void, *mut Cpu, u64, *mut u64) -> i32;

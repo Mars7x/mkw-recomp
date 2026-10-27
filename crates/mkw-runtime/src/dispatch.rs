@@ -15,7 +15,7 @@ pub struct NativeTarget<'code> {
 }
 impl<'code> NativeTarget<'code> {
     /// # Safety
-    /// The trusted symbol must implement native/cpu.h ABI v8, accept a live Cpu
+    /// The trusted symbol must implement native/cpu.h ABI v9, accept a live Cpu
     /// and shared budget, and never unwind into C or retain CPU/budget/context pointers past the call. No game compatibility is implied.
     /// The borrowed Library keeps the native code alive for all dispatch calls.
     pub unsafe fn load(

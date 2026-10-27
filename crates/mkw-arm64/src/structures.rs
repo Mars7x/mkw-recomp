@@ -9,6 +9,7 @@ pub enum Writeback {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Structure {
+    pub registers: u8,
     pub load: bool,
     pub bytes: u8,
     pub vector: u8,
@@ -83,13 +84,11 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let opcode = (w >> 13) & 7;
     let s = ((w >> 12) & 1) as u8;
     let size = ((w >> 10) & 3) as u8;
-    if w & (1 << 21) != 0 || opcode & 1 != 0 {
-        return invalid("unsupported multiple-register single structure");
-    }
+    let registers = 1 + (((opcode & 1) as u8) << 1) + (((w >> 21) & 1) as u8);
     if !post && rm != 0 {
         return invalid("reserved nonpost structure register");
     }
-    let (bytes, lane, replicate) = match opcode {
+    let (bytes, lane, replicate) = match opcode & 6 {
         0 => (1, q * 8 + s * 4 + size, 0),
         2 if size & 1 == 0 => (2, q * 4 + s * 2 + size / 2, 0),
         4 if size == 0 => (4, q * 2 + s, 0),
@@ -98,6 +97,7 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
         _ => return invalid("reserved single structure element/replication"),
     };
     Some(Ok(Op::Structure(Structure {
+        registers,
         load,
         bytes,
         lane,
@@ -107,7 +107,7 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
         writeback: if !post {
             Writeback::None
         } else if rm == 31 {
-            Writeback::Immediate(bytes)
+            Writeback::Immediate(bytes * registers)
         } else {
             Writeback::Register(reg(rm, false))
         },
@@ -133,10 +133,15 @@ mod tests {
             assert_eq!((v.bytes, v.lane, v.replicate), (bytes, lane, replicate));
         }
         for w in [
-            0x0d608020, 0x0d40a020, 0x0d408820, 0x0d409420, 0x0d404420, 0x0d40d020, 0x0d00c020,
-            0x0d418020,
+            0x0d408820, 0x0d409420, 0x0d404420, 0x0d40d020, 0x0d00c020, 0x0d418020,
         ] {
             assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
+        for (word, count) in [(0x0d608020, 2), (0x0d40a020, 3)] {
+            let Op::Structure(v) = crate::decode(word, 0).unwrap().op else {
+                panic!()
+            };
+            assert_eq!(v.registers, count);
         }
         let Op::Structure(v) = crate::decode(0x4ddf83ff, 0).unwrap().op else {
             panic!()
@@ -226,6 +231,36 @@ mod multiple_tests {
                     assert_eq!(
                         (v.registers, v.interleaved, v.writeback),
                         (count, interleaved, Writeback::Immediate((8 << q) * count))
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod multi_lane_tests {
+    use super::*;
+    #[test]
+    fn lane_and_replicated_counts_and_poststeps() {
+        for count in 1u32..=4 {
+            for q in 0..2 {
+                for size in 0..4 {
+                    let w = 0x0ddfc3ff
+                        | (q << 30)
+                        | (size << 10)
+                        | (((count - 1) & 1) << 21)
+                        | (((count - 1) >> 1) << 13);
+                    let Op::Structure(v) = crate::decode(w, 0).unwrap().op else {
+                        panic!()
+                    };
+                    assert_eq!(
+                        (v.registers, v.replicate, v.writeback),
+                        (
+                            count as u8,
+                            8 << q,
+                            Writeback::Immediate((1 << size) * count as u8)
+                        )
                     );
                 }
             }
