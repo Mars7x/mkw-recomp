@@ -4,103 +4,22 @@ use mkw_runtime::{
     floating::FloatingBackend,
     GuestAddr, Memory, Permissions,
 };
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::process::Command;
+#[path = "support/fp_native.rs"]
+mod fp_native;
 #[path = "../../mkw-codegen/tests/support/a64_reference.rs"]
 mod reference;
-fn generate(words: &[u32], name: &str) -> String {
-    let bytes: Vec<_> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
-    mkw_codegen::emit(&mkw_arm64::lift(&bytes, 0, 0).unwrap(), 0)
-        .unwrap()
-        .replace(mkw_codegen::HEADER, "")
-        .replace("mkw_guest", name)
-}
-fn folder(name: &str) -> PathBuf {
-    let p = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../private/testing")
-        .join(name);
-    std::fs::create_dir_all(&p).unwrap();
-    p
-}
-fn build(code: &str, path: &Path, opt: &str) -> libloading::Library {
-    let src = path.join("generated.c");
-    std::fs::write(&src,format!("{}\n{code}\nsize_t cpu_size(void){{return sizeof(MkwCpu);}}\nsize_t fp_offset(void){{return offsetof(MkwCpu,fpcr);}}\nsize_t barrier_offset(void){{return offsetof(MkwCpu,barrier);}}\nunsigned abi_version(void){{return MKW_CPU_ABI_VERSION;}}",mkw_codegen::HEADER)).unwrap();
-    let lib = path.join(format!("native{}.so", &opt[1..]));
-    let result = Command::new("cc")
-        .args([
-            "-std=c11",
-            opt,
-            "-Wall",
-            "-Wextra",
-            "-Werror",
-            "-shared",
-            "-fPIC",
-            "-fsanitize=undefined",
-            "-fno-sanitize-recover=undefined",
-        ])
-        .arg(&src)
-        .arg("-o")
-        .arg(&lib)
-        .output()
-        .unwrap();
-    assert!(
-        result.status.success(),
-        "{}",
-        String::from_utf8_lossy(&result.stderr)
-    );
-    // SAFETY: locally compiled synthetic ABI-v5 functions; check layout before calls.
-    unsafe {
-        let library = libloading::Library::new(lib).unwrap();
-        assert_eq!(
-            library
-                .get::<unsafe extern "C" fn() -> usize>(b"cpu_size\0")
-                .unwrap()(),
-            std::mem::size_of::<Cpu>()
-        );
-        assert_eq!(
-            library
-                .get::<unsafe extern "C" fn() -> usize>(b"fp_offset\0")
-                .unwrap()(),
-            std::mem::offset_of!(Cpu, fpcr)
-        );
-        assert_eq!(
-            library
-                .get::<unsafe extern "C" fn() -> usize>(b"barrier_offset\0")
-                .unwrap()(),
-            std::mem::offset_of!(Cpu, barrier)
-        );
-        assert_eq!(
-            library
-                .get::<unsafe extern "C" fn() -> u32>(b"abi_version\0")
-                .unwrap()(),
-            mkw_runtime::abi::CPU_ABI_VERSION
-        );
-        library
-    }
-}
-fn backend(path: &Path, opt: &str) -> libloading::Library {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let output = path.join(&opt[1..]);
-    let build = Command::new("python3")
-        .arg(root.join("tools/build_fp.py"))
-        .arg("--output")
-        .arg(&output)
-        .arg("--optimization")
-        .arg(&opt[1..])
-        .output()
-        .unwrap();
-    assert!(
-        build.status.success(),
-        "{}",
-        String::from_utf8_lossy(&build.stderr)
-    );
-    // SAFETY: built from the verified BSD subset and our exact callback adapter.
-    unsafe { libloading::Library::new(output.join("fp.so")).unwrap() }
-}
-type Entry = unsafe extern "C" fn(*mut Cpu, u64) -> i32;
+use fp_native::*;
 fn fp_word(bytes: u8, operation: u32, zero: bool) -> u32 {
+    if operation >= 7 {
+        return (match operation {
+            7 => 0x1e214000,
+            8 => 0x1e20c000,
+            9 => 0x1e21c000,
+            _ => unreachable!(),
+        }) | (if bytes == 8 { 1 << 22 } else { 0 })
+            | (1 << 5);
+    }
     let base = match operation {
         0 => 0x1e202800,
         1 => 0x1e203800,
@@ -326,7 +245,7 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
         }
         for rounding in 0..4 {
             for dn in 0..2 {
-                for operation in 0..7 {
+                for operation in 0..10 {
                     for (i, &(left, right)) in pairs.iter().enumerate() {
                         cases.push(reference::FloatingCase {
                             word: fp_word(bytes, operation, false),
@@ -401,22 +320,25 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
             }
         }
     }
-    let image = path.join("synthetic-aarch64");
-    std::fs::write(&image, reference::floating_elf(&cases)).unwrap();
+    let mut oracle = Vec::new();
     use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o700)).unwrap();
-    let qemu = Command::new("qemu-aarch64")
-        .args(["-cpu", "max"])
-        .arg(&image)
-        .output()
-        .unwrap();
-    assert!(
-        qemu.status.success(),
-        "QEMU {:?}: {}",
-        qemu.status.code(),
-        String::from_utf8_lossy(&qemu.stderr)
-    );
-    assert_eq!(qemu.stdout.len(), cases.len() * 32);
+    for (index, chunk) in cases.chunks(2500).enumerate() {
+        let image = path.join(format!("synthetic-aarch64-{index}"));
+        std::fs::write(&image, reference::floating_elf(chunk)).unwrap();
+        std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let qemu = Command::new("qemu-aarch64")
+            .args(["-cpu", "max"])
+            .arg(&image)
+            .output()
+            .unwrap();
+        assert!(
+            qemu.status.success(),
+            "{}",
+            String::from_utf8_lossy(&qemu.stderr)
+        );
+        oracle.extend(qemu.stdout);
+    }
+    assert_eq!(oracle.len(), cases.len() * 32);
     let words: std::collections::BTreeSet<_> = cases.iter().map(|c| c.word).collect();
     let mut code = String::new();
     for word in &words {
@@ -467,7 +389,7 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
             }
             assert_eq!(
                 actual,
-                &qemu.stdout[i * 32..(i + 1) * 32],
+                &oracle[i * 32..(i + 1) * 32],
                 "{opt} fixture {i} word {:08x} lhs {:016x} rhs {:016x} fpcr {:08x}",
                 case.word,
                 case.left,
@@ -481,7 +403,7 @@ fn scalar_fp_matches_qemu_rounding_nan_subnormal_and_exception_fixtures() {
         .output()
         .unwrap();
     let version = String::from_utf8(version.stdout).unwrap();
-    let receipt = serde_json::json!({"reference":version.lines().next(),"synthetic_cases":cases.len(),"operations":["fadd","fsub","fmul","fdiv","fcmp","fcmpe","fmadd","fcsel"],"widths":[32,64],"raw_select_widths":[16,32,64],"rounding_modes":4,"default_nan_modes":2,"flush_modes_supported":false,"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false});
+    let receipt = serde_json::json!({"reference":version.lines().next(),"synthetic_cases":cases.len(),"operations":["fadd","fsub","fmul","fdiv","fcmp","fcmpe","fmadd","fcsel","fneg","fabs","fsqrt"],"widths":[32,64],"raw_select_widths":[16,32,64],"rounding_modes":4,"default_nan_modes":2,"flush_modes_supported":false,"native_optimizations":["O0","O2"],"fatal_ubsan":true,"hardware_reference":false,"game_code_executed":false});
     std::fs::write(
         path.join("receipt.json"),
         serde_json::to_vec_pretty(&receipt).unwrap(),

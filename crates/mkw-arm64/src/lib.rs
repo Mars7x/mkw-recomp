@@ -38,6 +38,7 @@ pub enum MemoryOrder {
 pub enum Op {
     Nop,
     Floating(floating::Floating),
+    Convert(floating::Conversion),
     FloatSelect {
         bytes: u8,
         dst: u8,

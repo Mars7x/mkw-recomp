@@ -134,8 +134,15 @@ pub struct FloatingCase {
     pub fpsr: u32,
 }
 pub fn floating_elf(cases: &[FloatingCase]) -> Vec<u8> {
+    build_floating_elf(cases, false)
+}
+pub fn conversion_elf(cases: &[FloatingCase]) -> Vec<u8> {
+    build_floating_elf(cases, true)
+}
+fn build_floating_elf(cases: &[FloatingCase], conversion: bool) -> Vec<u8> {
     const BASE: u64 = 0x400000;
     const TEXT: usize = 4096;
+    let stride = if conversion { 48 } else { 32 };
     let mut code = Vec::new();
     immediate(&mut code, 28, 0);
     let mut loads = Vec::new();
@@ -152,18 +159,28 @@ pub fn floating_elf(cases: &[FloatingCase]) -> Vec<u8> {
         code.push(0xd51b443b); // MSR FPSR
         immediate(&mut code, 27, u64::from(case.nzcv));
         code.push(0xd51b421b);
+        if conversion {
+            loads.push((code.len(), i * 80 + 16, 0x58000001));
+            code.push(0); // X1 input
+            immediate(&mut code, 0, INITIAL_X[0]);
+        }
         code.push(case.word);
         code.push(0x3d800380); // Q0 result
         code.push(0xd53b443b);
         code.push(0xf9000b9b); // FPSR -> output+16
         code.push(0xd53b421b);
         code.push(0xf9000f9b); // NZCV -> output+24
-        code.push(0x9100839c);
+        if conversion {
+            code.push(0xf9001380);
+            code.push(0xd53b441b);
+            code.push(0xf900179b);
+        } // X0,+FPCR
+        code.push(0x9100039c | ((stride as u32) << 10));
     }
     let write_at = code.len();
     immediate(&mut code, 0, 1);
     immediate(&mut code, 1, 0);
-    immediate(&mut code, 2, cases.len() as u64 * 32);
+    immediate(&mut code, 2, cases.len() as u64 * stride as u64);
     immediate(&mut code, 8, 64);
     code.push(0xd4000001);
     immediate(&mut code, 0, 0);
@@ -183,7 +200,7 @@ pub fn floating_elf(cases: &[FloatingCase]) -> Vec<u8> {
         assert!(delta.abs() < 1024 * 1024);
         code[at] = op | (((delta / 4) as u32 & 0x7ffff) << 5);
     }
-    let mut bytes = vec![0u8; output + cases.len() * 32];
+    let mut bytes = vec![0u8; output + cases.len() * stride];
     bytes[..7].copy_from_slice(b"\x7fELF\x02\x01\x01");
     put16(&mut bytes, 16, 2);
     put16(&mut bytes, 18, 183);

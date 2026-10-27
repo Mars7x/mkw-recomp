@@ -40,6 +40,8 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("floating.rs"),
     include_str!("../../../native/cpu.h"),
     include_str!("../../../native/fp.c"),
+    include_str!("../../../native/convert.c"),
+    include_str!("../../../native/fp_environment.h"),
     include_str!("../../../native/softfloat/platform.h"),
     include_str!("../../../third_party/softfloat/PROVENANCE.json"),
 ];
@@ -98,7 +100,10 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
                 out+=&format!("{{uint64_t value=({})?c->vregs[{lhs}][0]:c->vregs[{rhs}][0];c->vregs[{dst}][0]=value&UINT64_C({mask});c->vregs[{dst}][1]=0;}}\n",condition::expression(condition)?);
                 out += &next;
             }
-            op @ (Op::Floating(_) | Op::SystemRegister { .. } | Op::Barrier { .. }) => {
+            op @ (Op::Floating(_)
+            | Op::Convert(_)
+            | Op::SystemRegister { .. }
+            | Op::Barrier { .. }) => {
                 out += &floating::emit(op);
                 out += &next;
             }

@@ -65,7 +65,7 @@ fn native_br_local_external_tail_chains_cycles_and_refusals() {
             "{}",
             String::from_utf8_lossy(&build.stderr)
         );
-        // SAFETY: locally compiled synthetic functions implement ABI v5. Library
+        // SAFETY: locally compiled synthetic functions implement ABI v6. Library
         // outlives every symbol/attachment and callbacks are installed by guards.
         unsafe {
             let library = libloading::Library::new(&output).unwrap();

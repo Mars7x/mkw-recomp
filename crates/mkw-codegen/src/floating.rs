@@ -2,6 +2,13 @@ use super::{r, write};
 use mkw_arm64::{floating::SystemReg, Op, Width};
 pub fn emit(op: Op) -> String {
     match op {
+        Op::Convert(op)=>{
+            let input=if op.operation<2{r(op.int_reg)}else{format!("c->vregs[{}][0]",op.vector)};
+            let bits=if op.int_width==Width::X64{64}else{32};
+            let mut out=format!("{{uint64_t result=0;uint32_t fpsr=c->fpsr;if(!c->convert){{c->fault_status=3;return 3;}}int status=c->convert({},{bits},{},c->fpcr,c->fpsr,{input},&result,&fpsr);if(status){{c->fault_status=status;return status;}}c->fpsr=fpsr;\n",op.operation,op.bytes);
+            if op.operation<2{out+=&format!("c->vregs[{}][0]=result;c->vregs[{}][1]=0;\n",op.vector,op.vector);}else{out+=&write(op.int_reg,op.int_width,"result");}
+            out+="}\n";out
+        }
         Op::Floating(op)=>{
             let accumulate=if op.operation==6{format!("c->vregs[{}][0]",op.accumulate)}else{"UINT64_C(0)".into()};
             let right=if op.zero{"UINT64_C(0)".into()}else{format!("c->vregs[{}][0]",op.rhs)};

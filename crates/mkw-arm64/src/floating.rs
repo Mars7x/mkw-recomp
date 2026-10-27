@@ -1,5 +1,5 @@
 //! Scalar FP operations retain explicit FPCR/FPSR and checked helper requirements.
-use super::{reg, Op};
+use super::{reg, Op, Reg, Width};
 use serde::Serialize;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum SystemReg {
@@ -17,7 +17,63 @@ pub struct Floating {
     pub accumulate: u8,
     pub zero: bool,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct Conversion {
+    pub operation: u8,
+    pub int_width: Width,
+    pub bytes: u8,
+    pub int_reg: Reg,
+    pub vector: u8,
+}
 pub fn decode(w: u32) -> Option<Result<Op, String>> {
+    if w & 0x7f20fc00 == 0x1e200000 {
+        let opcode = (w >> 16) & 7;
+        let rounding = (w >> 19) & 3;
+        let operation = match (opcode, rounding) {
+            (2 | 3, 0) => (opcode - 2) as u8,
+            (0 | 1, _) => 2 + (rounding * 2 + opcode) as u8,
+            (4 | 5, 0) => 10 + (opcode - 4) as u8,
+            _ => return None,
+        };
+        let bytes = match (w >> 22) & 3 {
+            0 => 4,
+            1 => 8,
+            _ => return Some(Err("unsupported conversion FP type".into())),
+        };
+        return Some(Ok(Op::Convert(Conversion {
+            operation,
+            int_width: if w >> 31 != 0 { Width::X64 } else { Width::W32 },
+            bytes,
+            int_reg: reg(if operation < 2 { (w >> 5) & 31 } else { w & 31 }, false),
+            vector: if operation < 2 {
+                (w & 31) as u8
+            } else {
+                ((w >> 5) & 31) as u8
+            },
+        })));
+    }
+    let unary = match w & 0xff3ffc00 {
+        0x1e214000 => Some(7),
+        0x1e20c000 => Some(8),
+        0x1e21c000 => Some(9),
+        _ => None,
+    };
+    if let Some(operation) = unary {
+        let bytes = match (w >> 22) & 3 {
+            0 => 4,
+            1 => 8,
+            _ => return Some(Err("unsupported unary FP type".into())),
+        };
+        return Some(Ok(Op::Floating(Floating {
+            bytes,
+            operation,
+            dst: (w & 31) as u8,
+            lhs: ((w >> 5) & 31) as u8,
+            rhs: 0,
+            accumulate: 0,
+            zero: false,
+        })));
+    }
     let system = match w & 0xffffffe0 {
         0xd53b4400 | 0xd51b4400 => Some(SystemReg::Fpcr),
         0xd53b4420 | 0xd51b4420 => Some(SystemReg::Fpsr),
@@ -144,6 +200,37 @@ mod tests {
             0x1e202001, 0x1f220c20, 0x1f028c20, 0x1fc20c20,
         ] {
             assert!(crate::decode(word, 0).is_err(), "{word:08x}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod conversion_tests {
+    use super::*;
+    #[test]
+    fn conversion_width_zero_register_and_reserved_forms() {
+        assert!(matches!(
+            crate::decode(0x9e6203ff, 0).unwrap().op,
+            Op::Convert(Conversion {
+                operation: 0,
+                int_width: Width::X64,
+                int_reg: Reg::Zero,
+                vector: 31,
+                ..
+            })
+        ));
+        assert!(matches!(
+            crate::decode(0x1e38003f, 0).unwrap().op,
+            Op::Convert(Conversion {
+                operation: 8,
+                int_width: Width::W32,
+                int_reg: Reg::Zero,
+                vector: 1,
+                ..
+            })
+        ));
+        for w in [0x1ee20020, 0x1ea20020, 0x1e2a0020, 0x1e2c0020, 0x1ee1c020] {
+            assert!(crate::decode(w, 0).is_err(), "{w:08x}");
         }
     }
 }

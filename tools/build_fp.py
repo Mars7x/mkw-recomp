@@ -23,10 +23,10 @@ def build(output, optimization='-O2'):
              '-I'+str(ROOT/'native/softfloat'), '-I'+str(vendor/'source/ARM-VFPv2'),
              '-I'+str(vendor/'source/include'), '-I'+str(ROOT/'native')]
     sources = [vendor/name for name in provenance['files'] if name.endswith('.c')]
-    sources.append(ROOT/'native/fp.c')
+    sources.extend([ROOT/'native/fp.c', ROOT/'native/convert.c'])
     for source in sources:
         target = output/(source.stem+'.o')
-        subprocess.run(['cc', *flags, *(['-Wall', '-Wextra', '-Werror'] if source.name == 'fp.c' else []), '-c', str(source), '-o', str(target)], check=True)
+        subprocess.run(['cc', *flags, *(['-Wall', '-Wextra', '-Werror'] if source.name in ['fp.c','convert.c'] else []), '-c', str(source), '-o', str(target)], check=True)
         objects.append(target)
     library = output/'fp.so'
     subprocess.run(['cc', '-shared', '-Wl,-z,defs', '-fsanitize=undefined',
@@ -34,7 +34,7 @@ def build(output, optimization='-O2'):
     receipt = {'vendor_revision': provenance['revision'], 'specialization': 'ARM-VFPv2',
                'compiler': subprocess.check_output(['cc', '--version'], text=True).splitlines()[0],
                'flags': flags, 'sources': {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
-                                         for path in [*sources, ROOT/'native/softfloat/platform.h', ROOT/'native/cpu.h']},
+                                         for path in [*sources, ROOT/'native/softfloat/platform.h', ROOT/'native/cpu.h', ROOT/'native/fp_environment.h']},
                'library_sha256': hashlib.sha256(library.read_bytes()).hexdigest(),
                'unsupported_profiles': ['flush', 'enabled FP traps', 'alternative/merge profiles'],
                'game_profile_verified': False}
