@@ -82,3 +82,20 @@ SHADD+SHSUB+UHADD produces **+11**, exactly the feasible package prediction: **2
 | CLZ + MLA + XPACI | 12 | 60–135 min | 4.80–9.60 |
 
 The expected return is now dramatically lower than prefetch's measured 311.62 extents/hour. These static wins do not bind runtime services or make the accepted extents runnable. The next package retains the same correctness/acceptance gates and explicit PAC configuration; original execution remains blocked before bootstrap.
+
+
+## Measured MLA/XPACI result
+
+The highest feasible package produces **+9**, exactly its prediction: **214,446 accepted extents**, with no previous acceptance lost. Four accepted extents contain MLA and five contain register pointer stripping. Feature-specific native sampling compiles the new register transport in every module where observed; all game-derived objects remain unexecuted.
+
+All **9,410 rejects / 4,558,560 bytes** are inventoried with zero omissions. Strict first-boundary failures rise from 8,548 to **8,550** as two removed ISA blockers reveal later edges. Diagnostic structural barriers stay **9,132**, and the feasible pure-ISA/nonstructural pool falls to **77**. This is direct evidence that first-failure category counts do not measure either complete blocker requirements or lost coverage.
+
+| Next feasible fix | Conditional predicted gain | Implementation estimate | Gain/hour including 15-minute validation |
+|---|---:|---:|---:|
+| 2S FRECPE | 15 | 90–180 min | 4.62–8.57 |
+| 2S FRECPE + CLZ | 18 | 110–225 min | 4.50–8.64 |
+| 2S FRECPE + FRSQRTE + FRSQRTS | 39 | 300–600 min | 3.80–7.43 |
+
+A 2S-only estimate prototype now passes privately, reusing the earlier reciprocal assessment; final implementation effort can be lower than the original from-scratch band. The source is not yet integrated and its gain still needs measurement. The original global 4S negative test is preserved.
+
+Halving commit `481eb98` measured **+11 / 29.14 wall minutes = 22.65 extents/hour**, including overlapping publication work and a 14.72-minute full gate. Prefetch's measured end-to-end rate was 311.62/hour. These times describe explicitly scoped wall intervals, not additive engineer-hours. The existing runtime ceiling and the observed PAC/TBI profile difference limit the practical value of chasing the last small static counts.

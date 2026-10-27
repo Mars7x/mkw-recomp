@@ -115,3 +115,12 @@ The diagnostic profile chooses no cache effect: hints consume their normal instr
 SHADD/SHSUB and UHADD support 8/16/32-bit lanes in 64/128-bit vectors. The decoder preserves scalar, 64-bit-lane and adjacent unsupported-family rejection. Original C lowering snapshots all sources, widens before arithmetic, explicitly floors signed halves and clears unused upper bits; it changes no QC/NZCV/FP state and requires no callback or ABI change.
 
 Independent byte/i128 expectations check 28,080 native cases per optimization across extrema, odd negative results, full-width differences, aliases and distinct lanes. All 18,720 synthetic QEMU cases match O0/O2 with fatal UBSan. Existing correctness tests and CPU ABI v9 remain unchanged; this supplies no target access-configuration or original execution evidence.
+
+
+## Integer multiply-accumulate and register pointer stripping
+
+MLA supports B/H/S vector registers and H/S indexed elements with modulo lane arithmetic and complete source/accumulator snapshots. Its decoder is separate from the legacy integer-family entry point, preserving that entry point's existing exclusion tests. Independent byte/u128 tests cover 46,800 native cases per optimization; 31,200 synthetic QEMU fixtures match at O0/O2 with fatal UBSan. Unused upper vector bits are cleared and flags are preserved.
+
+XPACI retains an explicit GPR/zero-register destination and zero modifier in PAC IR. Existing PAC hints retain their LR/SP operands. It calls the existing checked strip operation and refuses a missing backend/context; failures do not commit a register result. CPU ABI v9 and the attributed legacy 39-bit/no-TBI PAC helper are unchanged. Independent native state/budget/profile tests check 111,264 cases per optimization, plus callback/failure probes.
+
+The 1,280 QEMU XPACI comparisons use addresses shared by the diagnostic and QEMU profiles, including canonical top bytes. A separate synthetic test demonstrates QEMU retaining a noncanonical top tag byte while the no-TBI diagnostic helper strips it. This expected profile difference is asserted, not hidden by changing the backend. Actual game PAC/VA/TBI/access configuration remains unverified, and no original function executes.

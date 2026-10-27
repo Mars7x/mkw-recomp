@@ -105,6 +105,10 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
                 out += &vector_compare::emit(op);
                 out += &next;
             }
+            Op::MultiplyAccumulate(v) => {
+                out += &vector_integer::emit_mla(v);
+                out += &next;
+            }
             Op::HalvingInteger(v) => {
                 out += &vector_integer::emit_halving(v);
                 out += &next;
@@ -335,8 +339,17 @@ pub fn emit(ins: &[Instruction], entry: u64) -> Result<String, String> {
                 out += &write(dst, width, &r(src));
                 out += &next;
             }
-            Op::PointerAuth { key, operation } => {
-                out+=&format!("{{ uint64_t result=0; if(!c->pauth) {{c->fault_status=3;return 3;}} int status=c->pauth(c->pac_context,{operation},{key},c->x[30],c->sp,&result); if(status) {{c->fault_status=status;return status;}} c->x[30]=result; }}\n");
+            Op::PointerAuth {
+                register,
+                modifier,
+                key,
+                operation,
+            } => {
+                let pointer = r(register);
+                let modifier = r(modifier);
+                out+=&format!("{{ uint64_t result=0; if(!c->pauth) {{c->fault_status=3;return 3;}} int status=c->pauth(c->pac_context,{operation},{key},{pointer},{modifier},&result); if(status) {{c->fault_status=status;return status;}} ");
+                out += &write(register, Width::X64, "result");
+                out += "}\n";
                 out += &next;
             }
             Op::AuthReturn { key } => {

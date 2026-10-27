@@ -51,6 +51,7 @@ pub enum Op {
     VectorFp(vector_fp::VectorFp),
     VectorInteger(vector_integer::VectorInteger),
     HalvingInteger(vector_integer::Halving),
+    MultiplyAccumulate(vector_integer::MultiplyAccumulate),
     VectorCompare(vector_compare::Compare),
     Structure(structures::Structure),
     InterleavedStructure(structures::Interleaved),
@@ -217,6 +218,8 @@ pub enum Op {
     Memory(memory::Transfer),
     Prefetch(memory::Prefetch),
     PointerAuth {
+        register: Reg,
+        modifier: Reg,
         key: u8,
         operation: u8,
     },
@@ -294,6 +297,9 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
     } else if let Some(result) = simd_shift::decode(word) {
+        result
+            .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
+    } else if let Some(result) = vector_integer::decode_mla(word) {
         result
             .map_err(|error| format!("unsupported instruction {word:08x} ({error}) at {pc:#x}"))?
     } else if let Some(result) = vector_integer::decode(word) {
@@ -406,11 +412,20 @@ pub fn decode(word: u32, pc: u64) -> Result<Instruction, String> {
         Op::Call {
             target: target(pc, word & 0x3ffffff, 26),
         }
+    } else if word & 0xffffffe0 == 0xdac143e0 {
+        Op::PointerAuth {
+            register: reg(rd, false),
+            modifier: Reg::Zero,
+            key: 0,
+            operation: 2,
+        }
     } else if matches!(
         word,
         0xd503233f | 0xd503237f | 0xd50323bf | 0xd50323ff | 0xd50320ff
     ) {
         Op::PointerAuth {
+            register: Reg::Gpr(30),
+            modifier: Reg::Sp,
             key: if matches!(word, 0xd503237f | 0xd50323ff) {
                 1
             } else {
@@ -855,6 +870,40 @@ mod yield_tests {
         ));
         for word in [0xd503205f, 0xd503207f, 0xd503209f, 0xd50320bf] {
             assert!(super::decode(word, 0).is_err());
+        }
+    }
+}
+
+#[cfg(test)]
+mod xpaci_tests {
+    use super::*;
+    #[test]
+    fn xpaci_registers_zero_and_legacy_lr_modifier() {
+        for n in 0..32 {
+            assert!(
+                matches!(decode(0xdac143e0|n,0).unwrap().op,Op::PointerAuth{register,modifier:Reg::Zero,key:0,operation:2}if register==reg(n,false))
+            );
+        }
+        assert!(matches!(
+            decode(0xd50320ff, 0).unwrap().op,
+            Op::PointerAuth {
+                register: Reg::Gpr(30),
+                modifier: Reg::Sp,
+                key: 0,
+                operation: 2
+            }
+        ));
+    }
+    #[test]
+    fn adjacent_data_strip_and_other_pauth_forms_not_misdecoded() {
+        for w in [0xdac147e0, 0xdac143c0, 0xdac103e0, 0x5ac143e0] {
+            assert!(!matches!(
+                decode(w, 0),
+                Ok(Instruction {
+                    op: Op::PointerAuth { operation: 2, .. },
+                    ..
+                })
+            ));
         }
     }
 }

@@ -98,6 +98,15 @@ mod halving_tests {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct MultiplyAccumulate {
+    pub bytes: u8,
+    pub total: u8,
+    pub dst: u8,
+    pub lhs: u8,
+    pub rhs: u8,
+    pub rhs_lane: Option<u8>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum VectorInteger {
     MultiplyLow {
         bytes: u8,
@@ -1184,4 +1193,92 @@ mod multiply_low_tests {
         assert!(decode(0x5e229c20).is_none());
         assert!(decode(0x2e229c20).is_none());
     }
+}
+
+#[cfg(test)]
+mod mla_tests {
+    use super::*;
+    #[test]
+    fn mla_register_and_indexed_fields() {
+        for q in 0..2 {
+            for size in 0..3 {
+                let Op::MultiplyAccumulate(v) = crate::decode(
+                    0x0e209400 | (q << 30) | (size << 22) | (31 << 16) | (31 << 5) | 31,
+                    0,
+                )
+                .unwrap()
+                .op
+                else {
+                    panic!()
+                };
+                assert_eq!(
+                    (v.bytes, v.total, v.dst, v.lhs, v.rhs, v.rhs_lane),
+                    (1 << size, 8 << q, 31, 31, 31, None)
+                );
+            }
+        }
+        for q in 0..2 {
+            for size in [1, 2] {
+                for lane in 0..if size == 1 { 8 } else { 4 } {
+                    let index = if size == 1 {
+                        ((lane >> 2) << 11) | (((lane >> 1) & 1) << 21) | ((lane & 1) << 20)
+                    } else {
+                        ((lane >> 1) << 11) | ((lane & 1) << 21)
+                    };
+                    let Op::MultiplyAccumulate(v) = crate::decode(
+                        0x2f000000 | (q << 30) | (size << 22) | index | (15 << 16) | (31 << 5) | 31,
+                        0,
+                    )
+                    .unwrap()
+                    .op
+                    else {
+                        panic!()
+                    };
+                    assert_eq!((v.rhs, v.rhs_lane), (15, Some(lane as u8)));
+                }
+            }
+        }
+    }
+    #[test]
+    fn mla_reserved_width_and_scalar_forms_reject() {
+        for w in [
+            0x0ee29420, 0x4ee29420, 0x2f020020, 0x6fc20020, 0x5e229420, 0x7f420020,
+        ] {
+            assert!(crate::decode(w, 0).is_err(), "{w:x}");
+        }
+    }
+}
+
+pub fn decode_mla(w: u32) -> Option<Result<Op, String>> {
+    let q = w & (1 << 30) != 0;
+    let size = ((w >> 22) & 3) as u8;
+    let bytes = 1 << size;
+    let dst = (w & 31) as u8;
+    let lhs = ((w >> 5) & 31) as u8;
+    let mla_regular = w & 0xbf20fc00 == 0x0e209400;
+    let mla_indexed = w & 0xbf00f400 == 0x2f000000;
+    if mla_regular || mla_indexed {
+        if size == 3 || (mla_indexed && size == 0) {
+            return Some(Err("reserved MLA integer width".into()));
+        }
+        let rhs = ((w >> 16) & if mla_indexed && size == 1 { 15 } else { 31 }) as u8;
+        let rhs_lane = if mla_indexed {
+            Some(if size == 1 {
+                (((w >> 11) & 1) * 4 + ((w >> 21) & 1) * 2 + ((w >> 20) & 1)) as u8
+            } else {
+                (((w >> 11) & 1) * 2 + ((w >> 21) & 1)) as u8
+            })
+        } else {
+            None
+        };
+        return Some(Ok(Op::MultiplyAccumulate(MultiplyAccumulate {
+            bytes,
+            total: if q { 16 } else { 8 },
+            dst,
+            lhs,
+            rhs,
+            rhs_lane,
+        })));
+    }
+    None
 }

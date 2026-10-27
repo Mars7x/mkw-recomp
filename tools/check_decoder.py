@@ -323,6 +323,15 @@ for q in range(2):
    for rn in [0,1,31]:
     for rm in [0,2,31]:
      for rd in [0,1,31]:words.add(base|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+for rd in range(32):
+ for base in [0xdac143e0,0xdac147e0,0xdac143c0]:words.add(base|rd)
+for q in range(2):
+ for size in range(4):
+  for rn in [0,1,31]:
+   for rm in [0,2,15,31]:
+    for rd in [0,1,31]:
+     words.add(0x0e209400|(q<<30)|(size<<22)|(rm<<16)|(rn<<5)|rd)
+     for index in range(8):words.add(0x2f000000|(q<<30)|(size<<22)|((index>>2)<<11)|(((index>>1)&1)<<21)|((index&1)<<20)|(rm<<16)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -355,6 +364,15 @@ for row in rows:
   elif ins.mnemonic==name and ins.operands[-1].imm!=v['amount']:errors.append({'word':hex(word),'error':'SIMD shift amount differs','reference':ins.op_str})
  elif kind=='YieldHint':
   if word!=0xd503203f or ins.mnemonic!='yield':errors.append({'word':hex(word),'error':'YIELD exact hint differs'})
+ elif kind=='PointerAuth':
+  v=op['PointerAuth']
+  if word&0xffffffe0==0xdac143e0:
+   reg='xzr' if v['register']=='Zero' else 'x'+str(v['register']['Gpr'])
+   if (ins.mnemonic,ins.op_str)!=('xpaci',reg) or v['operation']!=2 or v['key']!=0 or v['modifier']!='Zero':errors.append({'word':hex(word),'error':'XPACI operands/profile differ','reference':ins.mnemonic+' '+ins.op_str})
+ elif kind=='MultiplyAccumulate':
+  v=op['MultiplyAccumulate'];b=v['bytes'];letters={1:'b',2:'h',4:'s'};reg=lambda n:'v'+str(n)+'.'+str(v['total']//b)+letters[b]
+  operands=reg(v['dst'])+', '+reg(v['lhs'])+', '+(reg(v['rhs']) if v['rhs_lane'] is None else 'v'+str(v['rhs'])+'.'+letters[b]+'['+str(v['rhs_lane'])+']')
+  if (ins.mnemonic,ins.op_str)!=('mla',operands):errors.append({'word':hex(word),'error':'MLA kind/operands differ','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='HalvingInteger':
   v=op['HalvingInteger'];letters={1:'b',2:'h',4:'s'};name=('s' if v['signed'] else 'u')+('hsub' if v['subtract'] else 'hadd');reg=lambda n:'v'+str(n)+'.'+str(v['total']//v['bytes'])+letters[v['bytes']]
   operands=', '.join(reg(v[k])for k in ['dst','lhs','rhs'])

@@ -450,3 +450,23 @@ pub fn emit_halving(op: mkw_arm64::vector_integer::Halving) -> String {
     format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned bit=lane*{bits},half=bit/64,shift=bit%64;uint64_t ua=(left[half]>>shift)&UINT64_C({mask}),ub=(right[half]>>shift)&UINT64_C({mask});{calculation}output[half]|=(value&UINT64_C({mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}
 ",total/bytes)
 }
+
+pub fn emit_mla(op: mkw_arm64::vector_integer::MultiplyAccumulate) -> String {
+    let mkw_arm64::vector_integer::MultiplyAccumulate {
+        bytes,
+        total,
+        dst,
+        lhs,
+        rhs,
+        rhs_lane,
+    } = op;
+    let bits = bytes * 8;
+    let mask = mask(bytes);
+    let right = if let Some(lane) = rhs_lane {
+        let offset = u32::from(lane) * u32::from(bits);
+        format!("(right[{}]>>{})", offset / 64, offset % 64)
+    } else {
+        "(right[half]>>shift)".into()
+    };
+    format!("{{uint64_t left[2]={{c->vregs[{lhs}][0],c->vregs[{lhs}][1]}},right[2]={{c->vregs[{rhs}][0],c->vregs[{rhs}][1]}},old[2]={{c->vregs[{dst}][0],c->vregs[{dst}][1]}},output[2]={{0,0}};for(unsigned lane=0;lane<{};lane++){{unsigned offset=lane*{bits},half=offset/64,shift=offset%64;uint64_t a=(left[half]>>shift)&UINT64_C({mask}),b={right}&UINT64_C({mask}),prior=(old[half]>>shift)&UINT64_C({mask});output[half]|=((prior+a*b)&UINT64_C({mask}))<<shift;}}c->vregs[{dst}][0]=output[0];c->vregs[{dst}][1]=output[1];}}\n",total/bytes)
+}

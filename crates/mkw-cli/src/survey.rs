@@ -127,6 +127,14 @@ pub fn run(root: &Path) -> Result<()> {
                             }
                             Op::ConditionalFloat { .. } => features.push("conditional_fp_compare"),
                             Op::VectorCompare(_) => features.push("simd_fp_comparison"),
+                            Op::PointerAuth {
+                                modifier: mkw_arm64::Reg::Zero,
+                                operation: 2,
+                                ..
+                            } => features.push("register_pointer_strip"),
+                            Op::MultiplyAccumulate(_) => {
+                                features.push("integer_multiply_accumulate")
+                            }
                             Op::HalvingInteger(_) => features.push("integer_halving"),
                             Op::VectorInteger(v) => {
                                 features.push("simd_integer_lanes_reduction");
