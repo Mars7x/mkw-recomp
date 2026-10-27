@@ -129,6 +129,23 @@ impl ExclusiveMemory {
             Ok(())
         }
     }
+    pub(crate) fn validate_owner(&self, owner: &Owner) -> Result<(), Error> {
+        self.owner(owner).map(|_| ())
+    }
+    pub(crate) fn read_into(&self, address: GuestAddr, bytes: &mut [u8]) -> Result<(), Error> {
+        self.memory.read_into(address, bytes).map_err(Error::Memory)
+    }
+    pub(crate) fn validate_access(
+        &self,
+        address: GuestAddr,
+        bytes: usize,
+        write: bool,
+    ) -> Result<(), Error> {
+        self.memory
+            .spans(address, bytes, write)
+            .map(|_| ())
+            .map_err(Error::Memory)
+    }
     pub fn read(&self, address: GuestAddr, width: Width) -> Result<u128, Error> {
         let mut bytes = [0; 16];
         self.memory

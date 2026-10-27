@@ -298,3 +298,8 @@ The runtime inventory is original static accounting over existing diagnostic rec
 ## Exclusive-memory primitive provenance and limits
 
 The reservation authority, opaque identity/quota handling and complete checked-memory integration are original Rust implementations. Synthetic load/store-exclusive and clear sequences use instruction facts from [Arm's A64 reference](https://documentation-service.arm.com/static/67e40f3398aa3c3b6eea6a85); no reference implementation was copied. Unit tests independently cover interference across configured granules, including same-value writes and multiple owners. QEMU corroborates only the specified single-process value/status sequences; it does not establish real target granules, weak-memory ordering, architectural trap effects, physical aliasing or MMIO behavior. No original instruction executes and no default decoder/native ABI contract changes.
+
+
+## Versioned native contract provenance
+
+The v10 frame/v1 table, owned callback attachment, coherent prefix routing and native C layout/fault tests are original implementations. Prefix memory/LSE/barrier semantics retain the existing project's contracts and arithmetic; independent byte/i128 expectations, unchanged v9 AOT leaves and actual-native-callback QEMU sequences check routing and data effects. No external implementation was copied and all existing third-party notices remain unchanged. Serialized normal-memory contention tests establish only that profile; target trap/granule, physical aliases/MMIO and hardware weak-memory behavior remain unverified. No default decoding or original-execution gate changes.

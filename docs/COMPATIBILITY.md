@@ -158,3 +158,6 @@ The remaining scoped arithmetic/PAC package adds six strict acceptances, with in
 
 
 The exclusive-memory backend primitive implements real checked conditional-store success/failure and per-owner/granule invalidation in serialized owned normal memory. Seven unit tests and 576 QEMU sequences pass in debug/release. It is not yet bound to native LL/SC instructions: default survey acceptance stays 214,521, CPU ABI v9 and all old tests/refusals remain unchanged. Target granule/trap, physical-alias/MMIO, scheduler and weak-memory behavior remain unverified. Original bootstrap stays gated.
+
+
+The coherent v10 native frame/table contract now routes plain, ordered, LSE, barrier and exclusive operations through one owned memory authority. Nine native C/AOT/QEMU/contention/fault tests pass in debug/release with O0/O2 fatal UBSan C builds. CPU-v9 layout, callback signatures, old tests and default acceptance remain unchanged; the old loader rejects v10 markers. Native v9 leaf interoperability uses the explicit v9 prefix. LL/SC instruction acceptance, cross-module v10 dispatch and real target profile validation remain pending; the default survey stays 214,521. No original guest execution occurs.

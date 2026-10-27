@@ -189,3 +189,12 @@ The next measured dependency now has a standalone Rust implementation: owned, ch
 **Strict gain is zero: 214,521 accepted extents remain the baseline.** Decoder/codegen/native-header sources are unchanged, and no LL/SC instruction is newly accepted. The 64 conditional monitor opportunities therefore remain predictions pending an actual versioned native binding and target profile. This distinction prevents a backend primitive from being reported as executable guest support. Existing correctness/acceptance gates remain intact; a release semantic check is additive.
 
 Commit `93f7bcf` measured **+6**, all 265 Rust tests passing, with a **41.99-minute scoped implementation-to-verified-push interval / 8.57 extents per hour**, including a **17.13-minute** full gate. Those overlapping intervals are not additive engineer-hours. Static ISA-only return has reached zero under the current complete diagnostic; concrete runtime contracts now drive useful progress.
+
+
+## Coherent native contract, unchanged default census
+
+The next native dependency is now implemented: an explicit v10 frame/v1 table with one owned authority for plain, ordered, LSE, barrier and exclusive callbacks. Nine native C/AOT/QEMU/fault/contention tests pass in debug/release, including same-value writes and CAS-mismatch distinctions. Existing v9 layout/signatures, all old tests and default decoding remain unchanged. A separate native marker prevents the legacy loader from calling a v10 entry with the v9 function type.
+
+**Default strict gain: +0, total 214,521.** The 64 exclusive-monitor opportunities remain conditional until capability-scoped LL/SC IR/emission and an appropriate native entry path are integrated and measured. New runtime code is not itself additional instruction acceptance. The current bounded diagnostics still have zero feasible pure ISA sets; runtime/CFG/target contracts dominate. No original function executes.
+
+Commit `4978215` published the reservation primitive with **+0** default strict gain, all **273 Rust tests** plus the release semantic suite passing. Its complete gate took **17.65 minutes**. That phase deliberately addressed the measured runtime dependency instead of inventing new survey gains.
