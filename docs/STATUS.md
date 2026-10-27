@@ -1,18 +1,19 @@
 # Status — October 27, 2026
 
-Ordinary SIMD multiplication, exact YIELD and source snapshot publication guards are implemented and tested; automatic source-only publication and periodic continuations remain active. **No game-derived function has executed. Mario Kart World has not booted, rendered or become playable.**
+AES transforms and coverage-driven complete blocker analysis are implemented and tested; automatic source-only publication and periodic continuations remain active. **No game-derived function has executed. Mario Kart World has not booted, rendered or become playable.**
 
 ## Latest implementation
 
-- Added B/H/S register MUL and H/S indexed-element MUL with raw modular products, complete source snapshots and upper clearing. Independent u128 byte-array expectations cover 46,800 native cases per optimization; 31,200 synthetic QEMU cases match O0/O2 with fatal UBSan.
-- Added exact typed YIELD with normal instruction-budget consumption and no diagnostic scheduling effect. Four native budget/state cases per optimization and 16 QEMU cases preserve CPU state; adjacent WFE/WFI/SEV/SEVL remain unsupported. This does not implement guest scheduling or original timing.
-- Hardened source-only publication: fingerprint file membership/content before validation and recheck after validation, before copying and against the copied checkout before staging/pushing. Four required synthetic Python tests reject source mutation, added/removed files and changed copies. Private prototype scripts also refuse default main-workspace application.
-- The survey accepts 22 further extents: 4 accepted extents contain ordinary SIMD multiplication and 18 contain YIELD (overlap). Four further representative objects compile. MUL and YIELD no longer appear among first blockers.
-- ABI v9 and complete multi-register lane/replication lists were validated and published as `571c012`. No new upstream sources were added. README, game inputs/generated code, credentials and private artifacts remain excluded from GitHub.
+- Added exact 128-bit AESE/AESD/AESMC/AESIMC with original byte/finite-field transforms and complete snapshots. Independent polynomial/byte expectations check 13,312 native cases per optimization; 6,656 synthetic QEMU cases match O0/O2 with fatal UBSan. Full synthetic AES-128 encryption/decryption also match the standard known answer. No new upstream implementation was copied.
+- The pre-existing AES work gains **16 accepted extents**, from 214,182 to 214,198, before changing work priorities. One additional representative object compiles. Accepted AES categories contain 16 mix and 13 round extents (overlap).
+- Added a separate all-blocker diagnostic: every rejected extent is examined through optimistic CFG continuation and full linear-span decoding. Its strict baseline exactly matches the original census; no acceptance rule or existing correctness gate changed. Ranking evaluates singles/pairs/triples with explicit effort bands and runtime/configuration exclusions.
+- [Coverage analysis](COVERAGE.md) finds PRFM predicts 225 newly accepted extents, or 228 with PRFUM. SHADD+SHSUB together predict 9 while either alone gains zero. XPACI predicts 5 despite seven first-error occurrences. Prefetch is the next priority.
+- **Runtime/CFG ceiling:** 8,548 of 9,658 strict rejections are CFG-boundary failures. Only 350 rejected extents currently have purely ISA/nonstructural requirement sets; prefetch accounts for 228. Further small ISA survey wins have sharply diminishing usefulness until runtime/configuration/boundary dependencies are addressed correctly.
+- Ordinary MUL/YIELD and checked publication snapshots were validated and published as `7dc5395`. README, game inputs/generated code, credentials and private artifacts remain excluded from GitHub.
 
 ## Supplied-binary evidence
 
-All **223,856 indexed CIE/FDE extents** validate. The survey lowers **214,182 indexed extents**, including **126,867 with PAC operations**, up from 214,160 under the same tail policy. **38 accepted extents contain contiguous LD1 lists and 61 contain LD3/LD4 interleaving** (categories overlap). **58,455 contain direct extent tails; 14,159 contain indirect BR** (categories overlap). Configuration/helpers/callees/targets remain incomplete or unbound; these are not runnable-function or full-module counts. **One hundred four representative game-derived samples compile into native objects, 68 with PAC; none execute.**
+All **223,856 indexed CIE/FDE extents** validate. The survey lowers **214,198 indexed extents**, including **126,874 with PAC operations**, up from 214,182 under the same tail policy. **38 accepted extents contain contiguous LD1 lists and 61 contain LD3/LD4 interleaving** (categories overlap). **58,456 contain direct extent tails; 14,159 contain indirect BR** (categories overlap). Configuration/helpers/callees/targets remain incomplete or unbound; these are not runnable-function or full-module counts. **One hundred five representative game-derived samples compile into native objects, 68 with PAC; none execute.**
 
 Native samples now have a 4,096-instruction representative limit. One oversized candidate is explicitly deferred; every observed feature still has a compiled representative in its module. Representative counts can decrease when newly accepted extents combine features previously selected separately. These object counts use the new sampling policy and are not directly comparable with prior first-feature selections.
 
@@ -20,7 +21,8 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 
 ## Validation
 
-- **195 Rust tests pass**, including extended memory capacity, multiple structures and stale-ABI refusal checks and earlier scaled conversion/rounding/integer SIMD/FP/memory semantics, plus all prior native thread-register, bit/carry, conversion, FP, SIMD, LSE, PAC and control-flow regressions.
+- **203 Rust tests pass**, including extended memory capacity, multiple structures and stale-ABI refusal checks and earlier scaled conversion/rounding/integer SIMD/FP/memory semantics, plus all prior native thread-register, bit/carry, conversion, FP, SIMD, LSE, PAC and control-flow regressions.
+- **6,656 AES fixtures** match QEMU at O0/O2; independent polynomial/byte expectations check 13,312 native cases per optimization. Two complete AES-128 standard encryption/decryption known answers also pass per optimization.
 - **31,200 ordinary SIMD MUL fixtures** match QEMU at O0/O2; independent u128 byte-array expectations check 46,800 native cases per optimization across register/indexed forms and aliases.
 - **16 YIELD fixtures** match QEMU at O0/O2; native shared-budget/state tests check exact accounting, rebased PC, zero memory callbacks and unchanged register/control state.
 - **4,080 multi-register lane/replication fixtures** match QEMU at O0/O2; independent byte-array checks cover 12,240 native success and 20,400 fault/permission cases per optimization. Exact 3/6/12-byte capacity, partial final words, stale-v8 refusal and canonical ordered-width negatives pass.
@@ -48,9 +50,10 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 - **86,304 SIMD numeric fixtures** match QEMU at O0/O2, covering lane selection/arrangements, overlapping sources/destinations, rounding/default-NaN controls and sticky FPSR.
 - **7,232 conversion fixtures** match QEMU 8.2.2 at native O0/O2 with fatal UBSan, checking vector/general-register results, FPSR, NZCV and FPCR across W/X and S/D, controls, integer boundaries, fractions, signed zeros, infinities and quiet/signaling NaNs.
 - The expanded **26,416 FP/selection fixtures** also match QEMU at O0/O2. Earlier **2,741 SIMD**, **160 LSE** and **4,096 QARMA5** software comparisons remain passing. QEMU shares broad SoftFloat lineage and is not a hardware oracle; optional unavailability is explicitly recorded.
-- **157,714 constructed encodings**, including **73,227 accepted encodings**, pass private Capstone family/width/immediate checks. This checks decoding, not runtime semantics or hardware behavior.
+- **157,906 constructed encodings**, including **73,263 accepted encodings**, pass private Capstone family/width/immediate checks. This checks decoding, not runtime semantics or hardware behavior.
 - Native semantic cases run at O0/O2 with fatal undefined-behavior instrumentation. Synthetic programs only are executed; native game sample objects are compilation evidence.
 - **4,096 independent QARMA5 comparisons pass** against privately compiled QEMU reference code. The game's PAC profile is still unverified. The legacy/QARMA5/39-bit/no-TBI backend remains diagnostic and selected only by synthetic tests.
+- Complete blocker diagnostics preserve the exact strict baseline across all 9,658 rejects / 4,969,840 bytes with zero omissions. Three diagnostic invariants and synthetic ranking checks pass; detailed effort/ranking artifacts remain private.
 - Four mandatory publication snapshot guard tests pass. Source file membership/content and copied checkout must match the snapshot that entered validation before commit/push.
 - Formatting, Clippy with warnings denied, exact ExeFS/segment hashes, changed-identity refusal and truncated-CFG refusal pass. Public artifact checks exclude original inputs and all generated/private data.
 - Reproduction: `python3 tools/validate.py --game base`. Actual outputs are in `private/testing/validation.json`. Optional `tools/classify_survey.py` uses private Capstone to classify first blockers per indexed function; those counts are not execution frequencies.
@@ -65,14 +68,29 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 |---|---|---|
 | 0 investigation | Partially implemented | Retail version/completeness, graphics/resource analysis |
 | 1 foundation | Partially implemented | Synthetic native/Rust bridges pass; ISA and runtime semantics incomplete |
-| 2 game CPU translation | Partially implemented | 214,182 subset-liftable indexed extents with possible unbound tails/profiles; 104 objects; no complete module |
+| 2 game CPU translation | Partially implemented | 214,198 subset-liftable indexed extents with possible unbound tails/profiles; 105 objects; no complete module |
 | 3 runtime bootstrap | Not started | Load-time linking passes; no actual game execution/startup |
 | 4–8 graphics through packaging | Not started | No genuine game frame, native input/audio or gameplay |
 
 ## Files changed this session
 
-Ordinary SIMD MUL and exact YIELD IR/decoder/emitter; independent native/QEMU/budget tests; publication snapshot fingerprint checks and required synthetic Python tests; survey/Capstone metadata; CPU/compatibility/research/status documentation. Twelve source changes were matched byte-for-byte against an isolated tested copy before the supplied-input survey. CPU ABI v9 and upstream sources are unchanged. Original inputs remain unchanged and all game-derived outputs stay private.
+AES IR/decoder/emitter and independent native/QEMU/standard-vector tests; diagnostic CFG/linear blocker census, ranking and effort estimates; diagnostic/ranking validation gates and elapsed-time receipts; survey/Capstone metadata; coverage/CPU/compatibility/research/status documentation. AES source matched the isolated tested copy before the supplied-input survey. CPU ABI v9, existing correctness tests and acceptance rules remain unchanged. Original inputs remain unchanged and all game-derived outputs stay private.
+
+## Measured commit gains
+
+| Commit | Accepted extents | Gain from predecessor |
+|---|---:|---:|
+| `85d077a` | 213,977 | +70 |
+| `2f15125` | 213,980 | +3 |
+| `bb397fa` | 214,058 | +78 |
+| `69f81a9` | 214,111 | +53 |
+| `77a8b2e` | 214,148 | +37 |
+| `571c012` | 214,160 | +12 |
+| `7dc5395` | 214,182 | +22 |
+| Current AES/analysis work | 214,198 | +16 |
+
+Future commits will report measured strict gain against the preceding commit and compare it with the blocker-set prediction. Earlier stages did not record comparable end-to-end effort timings; new validation receipts record gate durations.
 
 ## Next concrete dependencies
 
-The leading first blockers now include UDF (457 extents), undecoded (122), SVC (79), LDAXR (61), FRECPE (34), MRS (28), FRSQRTE (26), AESE (8), XPACI (7), AESD (5), SHA1C (5) and SHSUB (5). Counts are first blockers, not dynamic frequencies. Next add validated crypto/PAC and remaining arithmetic forms where semantics/profile ownership are established. Reciprocal estimates need exact architectural approximation/exception semantics. Exclusive monitors need a defined concurrency model; existing serialized memory support does not imply hardware transaction equivalence. UDF/undecoded words and unresolved CFG edges require investigation; SVC requires actual service ABI work. Target cache/counter/PAC/FP/address configuration, SP/access-trap policies, TLS templates/allocation, actual guest threading, indirect binding and bootstrap/services remain gates before original execution.
+Select work from the [complete blocker requirements and rankings](COVERAGE.md), not the first unsupported mnemonic. PRFM/PRFUM is the highest-value immediate work (225/228 conditional predicted gains); preserve its reserved neighboring encodings and use a defined diagnostic cache-hint profile. Re-run the exact strict survey and report measured gain after each commit. Beyond prefetch, runtime services, exclusive monitor/concurrency contracts, target counter/PAC/FP/access configuration and CFG boundaries dominate; no successful stubs, changed boundary policy or relaxed tests are used to inflate acceptance. Original execution/bootstrap remains gated.

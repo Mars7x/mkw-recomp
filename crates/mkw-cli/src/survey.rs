@@ -298,6 +298,21 @@ pub fn run(root: &Path) -> Result<()> {
                             Op::Atomic(_) => features.push("lse_atomic"),
                             Op::Simd(v) => {
                                 features.push("simd_register_bits");
+                                if let mkw_arm64::simd::Simd::Crypto { kind, .. } = v {
+                                    features.push("aes");
+                                    features.push(
+                                        if matches!(
+                                            kind,
+                                            mkw_arm64::simd::CryptoKind::EncryptRound
+                                                | mkw_arm64::simd::CryptoKind::DecryptRound
+                                        ) {
+                                            "aes_round"
+                                        } else {
+                                            "aes_mix"
+                                        },
+                                    );
+                                }
+
                                 if matches!(v, mkw_arm64::simd::Simd::Narrow { .. }) {
                                     features.push("simd_narrow");
                                 }

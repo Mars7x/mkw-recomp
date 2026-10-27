@@ -5,6 +5,7 @@ import json
 import pathlib
 import subprocess
 import sys
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -16,10 +17,11 @@ results = []
 
 
 def run(label, command, *, cwd=ROOT, required=True):
+    started = time.monotonic()
     result = subprocess.run(command, cwd=cwd, text=True, capture_output=True)
     record = {'check': label, 'command': list(map(str, command)),
               'return_code': result.returncode, 'stdout': result.stdout,
-              'stderr': result.stderr, 'required': required}
+              'stderr': result.stderr, 'required': required, 'elapsed_seconds': round(time.monotonic() - started, 3)}
     results.append(record)
     (output / 'validation.json').write_text(json.dumps(results, indent=2) + '\n')
     print(f'{label}: ' + ('PASS' if result.returncode == 0 else 'FAILED' if required else 'UNSUPPORTED (see private receipt)'), flush=True)
@@ -55,6 +57,9 @@ if args.game:
     results[-1]['expectation_met'] = True
     run('supplied FDE lifting and native object samples', [str(binary), 'cpu-survey', str(game)])
     run('bounded native sample evidence', [sys.executable, str(ROOT / 'tools/check_survey_samples.py')])
+    run('all rejected-extent blocker diagnostics', [str(binary), 'cpu-blockers', str(game)])
+    if (ROOT/'private/tools/python/capstone').is_dir():
+        run('all-blocker coverage prioritization', [sys.executable, str(ROOT/'tools/rank_blockers.py')])
     link = run('real module link diagnostic', [str(binary), 'link-check', str(game)])
     results[-1]['classification'] = 'implemented and tested' if link.returncode == 0 else 'blocked before guest execution'
     candidate = None
@@ -76,5 +81,6 @@ if (ROOT/'private/tools/qemu-pauth-reference.c').is_file():
 
 if (ROOT/'private/tools/python/capstone').is_dir():
     run('encoding reference cross-check', [sys.executable, str(ROOT/'tools/check_decoder.py')])
+run('blocker ranking synthetic checks', [sys.executable, str(ROOT/'tools/rank_blockers.py'), '--self-test'])
 run('publication source snapshot guards', [sys.executable, str(ROOT / 'tools/test_publish_snapshot.py')])
 run('public artifact guard', [sys.executable, str(ROOT/'tools/check_public_tree.py')])

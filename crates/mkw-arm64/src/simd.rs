@@ -19,7 +19,19 @@ pub enum TransformKind {
     ReverseElements(u8),
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum CryptoKind {
+    EncryptRound,
+    DecryptRound,
+    MixColumns,
+    InverseMixColumns,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Simd {
+    Crypto {
+        dst: u8,
+        src: u8,
+        kind: CryptoKind,
+    },
     Narrow {
         dst: u8,
         src: u8,
@@ -138,6 +150,17 @@ pub fn decode(w: u32) -> Option<Result<Op, String>> {
     let src = ((w >> 5) & 31) as u8;
     let q = w & (1 << 30) != 0;
     let vector_bytes = if q { 16 } else { 8 };
+    let crypto = match w & 0xfffffc00 {
+        0x4e284800 => Some(CryptoKind::EncryptRound),
+        0x4e285800 => Some(CryptoKind::DecryptRound),
+        0x4e286800 => Some(CryptoKind::MixColumns),
+        0x4e287800 => Some(CryptoKind::InverseMixColumns),
+        _ => None,
+    };
+    if let Some(kind) = crypto {
+        return Some(Ok(Op::Simd(Simd::Crypto { dst, src, kind })));
+    }
+
     if w & 0xbf3ffc00 == 0x0e212800 {
         let size = ((w >> 22) & 3) as u8;
         if size == 3 {
@@ -643,6 +666,33 @@ mod narrow_tests {
         }
         for w in [0x5e212820, 0x2e212820, 0x4e214820] {
             assert!(decode(w).is_none());
+        }
+    }
+}
+
+#[cfg(test)]
+mod aes_decode_tests {
+    use super::*;
+    #[test]
+    fn aes_round_and_column_forms_are_exact_128_bit_encodings() {
+        for (base, expected) in [
+            (0x4e284800, CryptoKind::EncryptRound),
+            (0x4e285800, CryptoKind::DecryptRound),
+            (0x4e286800, CryptoKind::MixColumns),
+            (0x4e287800, CryptoKind::InverseMixColumns),
+        ] {
+            let Op::Simd(Simd::Crypto { dst, src, kind }) =
+                crate::decode(base | 0x3ff, 0).unwrap().op
+            else {
+                panic!()
+            };
+            assert_eq!((dst, src, kind), (31, 31, expected));
+            for changed in [base ^ (1 << 30), base | (1 << 28), base | (1 << 22)] {
+                assert!(!matches!(
+                    crate::decode(changed, 0).map(|i| i.op),
+                    Ok(Op::Simd(Simd::Crypto { .. }))
+                ));
+            }
         }
     }
 }

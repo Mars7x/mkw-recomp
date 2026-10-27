@@ -1,10 +1,11 @@
 mod analysis;
+mod blockers;
 mod pipeline;
 mod survey;
 use mkw_formats::{Npdm, Nso};
 use std::{error::Error, path::Path};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-const USAGE:&str="usage: mkw-recomp {analyze|verify|link-check|cpu-survey} GAME_ROOT | inspect FILE | aot-demo | generate-slice GAME_ROOT MODULE ENTRY LENGTH";
+const USAGE:&str="usage: mkw-recomp {analyze|verify|link-check|cpu-survey|cpu-blockers} GAME_ROOT | inspect FILE | aot-demo | generate-slice GAME_ROOT MODULE ENTRY LENGTH";
 fn main() {
     if let Err(e) = run() {
         eprintln!("error: {e}");
@@ -38,6 +39,7 @@ fn run() -> Result<()> {
         }
         "aot-demo" => pipeline::demo()?,
         "cpu-survey" => survey::run(Path::new(argument(2)?))?,
+        "cpu-blockers" => blockers::run(Path::new(argument(2)?))?,
         "link-check" => pipeline::link_check(Path::new(argument(2)?))?,
         "generate-slice" => {
             pipeline::generate_slice(

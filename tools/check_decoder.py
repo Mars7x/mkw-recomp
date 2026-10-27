@@ -304,6 +304,11 @@ for scalar in range(2):
     for index in range(8):
      for rd,rn,rm in [(0,1,2),(0,0,0),(31,31,15)]:words.add(0x0f008000|(scalar<<28)|(q<<30)|(u<<29)|(size<<22)|((index>>2)<<11)|(((index>>1)&1)<<21)|((index&1)<<20)|(rm<<16)|(rn<<5)|rd)
 words.update([0xd503201f,0xd503203f,0xd503205f,0xd503207f,0xd503209f,0xd50320bf])
+for q in range(2):
+ for scalar in range(2):
+  for size in range(4):
+   for base in [0x0e284800,0x0e285800,0x0e286800,0x0e287800]:
+    for rd,rn in [(0,1),(0,0),(31,31)]:words.add(base|(q<<30)|(scalar<<28)|(size<<22)|(rn<<5)|rd)
 ordered=sorted(words)
 result=subprocess.run([str(root/'target/release/mkw-recomp'),'decode-words'],input=''.join(json.dumps({'word':w,'pc':0x1000})+'\n'for w in ordered),text=True,capture_output=True,check=True)
 rows=[json.loads(line)for line in result.stdout.splitlines()]
@@ -458,8 +463,11 @@ for row in rows:
   size=1 if ins.mnemonic.endswith('b')else 2 if ins.mnemonic.endswith('h')else 4 if register.startswith('w')else 8
   if size!=op['Atomic']['bytes']:errors.append({'word':hex(word),'error':'atomic width differs','reference':ins.mnemonic+' '+ins.op_str})
  elif kind=='Simd':
-  expected={'fmov','mov','movi','mvni','orr','bic','dup','umov','smov','and','orn','eor','bsl','bit','bif','ext','zip1','zip2','uzp1','uzp2','trn1','trn2','tbl','tbx','cnt','xtn','xtn2','mvn','not','rbit','rev16','rev32','rev64'}
+  expected={'fmov','mov','movi','mvni','orr','bic','dup','umov','smov','and','orn','eor','bsl','bit','bif','ext','zip1','zip2','uzp1','uzp2','trn1','trn2','tbl','tbx','cnt','xtn','xtn2','mvn','not','rbit','rev16','rev32','rev64','aese','aesd','aesmc','aesimc'}
   if ins.mnemonic not in expected:errors.append({'word':hex(word),'error':'SIMD family differs','reference':ins.mnemonic+' '+ins.op_str})
+  if isinstance(op['Simd'],dict) and 'Crypto' in op['Simd']:
+   v=op['Simd']['Crypto'];name={'EncryptRound':'aese','DecryptRound':'aesd','MixColumns':'aesmc','InverseMixColumns':'aesimc'}[v['kind']];operands='v'+str(v['dst'])+'.16b, v'+str(v['src'])+'.16b'
+   if(ins.mnemonic,ins.op_str)!=(name,operands):errors.append({'word':hex(word),'error':'AES operation/registers differ','reference':ins.mnemonic+' '+ins.op_str})
   if isinstance(op['Simd'],dict) and 'Narrow' in op['Simd']:
    v=op['Simd']['Narrow'];letters={1:'b',2:'h',4:'s',8:'d'};b=v['bytes'];name='xtn2' if v['upper'] else 'xtn'
    operands='v'+str(v['dst'])+'.'+str((16 if v['upper'] else 8)//b)+letters[b]+', v'+str(v['src'])+'.'+str(8//b)+letters[b*2]
