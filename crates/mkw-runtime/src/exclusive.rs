@@ -158,6 +158,13 @@ impl ExclusiveMemory {
     pub(crate) fn authority(&self) -> Arc<()> {
         self.authority.clone()
     }
+    pub(crate) fn catalog_entries(
+        &self,
+        space: crate::process_regions::Span,
+        declarations: &[crate::memory_catalog::Declaration],
+    ) -> Option<Vec<crate::memory_catalog::Entry>> {
+        self.memory.catalog_entries(space, declarations)
+    }
     pub(crate) fn page_accounting(&self) -> Option<(u64, u64)> {
         self.memory.page_accounting()
     }
