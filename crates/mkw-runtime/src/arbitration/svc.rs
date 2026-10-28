@@ -1,5 +1,6 @@
 //! Explicit owned-actor SVC reference profile. Handler construction has no effects;
 //! typed admission/completion owns state->memory ordering, never a public callback.
+pub mod condition;
 use super::{Actor, Arbitration, Error, Node, Phase, Policy, State, WAITERS};
 use crate::{
     exclusive::{ExclusiveMemory, Width},
@@ -29,6 +30,7 @@ struct Binding {
 }
 #[derive(Clone, Copy)]
 enum Action {
+    Condition(condition::Action),
     Lock {
         handle: u32,
         address: GuestAddr,
@@ -137,6 +139,7 @@ impl Binding {
                 let result = match result {
                     Ok(()) => 0,
                     Err(Error::Memory) => INVALID_CURRENT_MEMORY,
+                    Err(Error::InvalidState) => condition::INVALID_STATE,
                     _ => return Err(HostFault::unsupported()),
                 };
                 let mut m = self.domain.memory.lock().map_err(refuse)?;
@@ -172,6 +175,9 @@ impl Intent {
         context: &Context,
         registers: &mut [u64; 31],
     ) -> Result<i32, HostFault> {
+        if let Action::Condition(action) = self.action {
+            return action.execute(&self.binding, context, registers);
+        }
         let binding = &self.binding;
         let d = &binding.domain;
         let mut s = d.state.lock().map_err(refuse)?;
@@ -182,6 +188,7 @@ impl Intent {
         }
         let address = match self.action {
             Action::Lock { address, .. } | Action::Unlock { address } => address,
+            Action::Condition(_) => unreachable!("delegated condition intent"),
         };
         // This explicit reference subset makes no kernel/high-VA or shadow-stack
         // address-policy claim. Refuse outside the selected ordinary guest window.
@@ -192,6 +199,7 @@ impl Intent {
             return Binding::finish(&mut m, context, registers, INVALID_ADDRESS);
         }
         match self.action {
+            Action::Condition(_) => unreachable!("delegated condition intent"),
             Action::Lock {
                 handle,
                 address,

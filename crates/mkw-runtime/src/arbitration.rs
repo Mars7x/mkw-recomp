@@ -33,6 +33,7 @@ pub enum Error {
     Namespace,
     Stale,
     InvalidThread,
+    InvalidState,
     Duplicate,
     Capacity,
     Exhausted,

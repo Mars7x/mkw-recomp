@@ -52,9 +52,9 @@ Its mutable tree-iterator broadcast order also requires separate analysis when
 donations reinsert remaining condition waiters. The host policy here is explicit;
 it is not claimed to reproduce that iterator behavior.
 
-SVC 0x1c/0x1d remain unsupported. A future binding must preserve their exact
-registers, handled-error ordering and admitted lifecycle states. Positive waits
-also need a shared guest counter/deadline model. The supplied finite-wait helper
+[Explicit bounded SVC 0x1c/0x1d bindings](CONDITION_SERVICES.md) now preserve
+reference register/error ordering for a narrower admitted lifecycle/order subset.
+Positive waits also need a shared guest counter/deadline model. The supplied finite-wait helper
 reads currently unsupported CNTPCT_EL0; implementing host sleep alone would not
 close that dependency. No original function or library has executed/loaded.
 

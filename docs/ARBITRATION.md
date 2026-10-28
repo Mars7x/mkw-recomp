@@ -84,4 +84,5 @@ remain higher-value dependencies than pursuing complete instruction coverage.
 
 [Owned host condition waits](CONDITION_WAITS.md) add an explicit priority-only
 release/register/reacquire backend. Their stronger host failure atomicity is not
-the SVC 0x1c/0x1d error contract; those bindings remain unsupported.
+the SVC 0x1c/0x1d error contract. [Explicit bounded bindings](CONDITION_SERVICES.md)
+handle that separate contract for zero/infinite waits and restricted signal graphs.
