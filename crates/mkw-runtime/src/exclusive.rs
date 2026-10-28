@@ -158,6 +158,9 @@ impl ExclusiveMemory {
     pub(crate) fn authority(&self) -> Arc<()> {
         self.authority.clone()
     }
+    pub(crate) fn page_accounting(&self) -> Option<(u64, u64)> {
+        self.memory.page_accounting()
+    }
     pub(crate) fn has_authority(&self, authority: &Arc<()>) -> bool {
         Arc::ptr_eq(&self.authority, authority)
     }

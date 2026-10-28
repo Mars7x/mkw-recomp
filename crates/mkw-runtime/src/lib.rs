@@ -19,6 +19,7 @@ pub mod host_call;
 pub mod kernel_handles;
 mod linker;
 pub mod owned_events;
+pub mod owned_memory_budget;
 pub mod pauth;
 pub mod process_entropy;
 #[cfg(target_os = "linux")]
