@@ -17,3 +17,7 @@ The inspected upstream source is [LAS main.c](https://github.com/peiikai/LASReco
 ## Local source evidence foundation
 
 [TERMINAL_PROOFS.md](TERMINAL_PROOFS.md) adds immutable local control evidence and certifies 21 existing closed bodies without changing lifting or adding runtime guards. The measured startup roots still reject under current admission. Import/cross-image assumptions are explicitly unsupported by this first verifier; the much larger private terminal-call candidate count remains counterfactual, not accepted coverage. This proof foundation precedes any compiler or bootstrap change.
+
+## Same-image conditional source follow-up
+
+[CONDITIONAL_PROOFS.md](CONDITIONAL_PROOFS.md) establishes explicit source theorems for the actual Start and random-manager roots under ten/four self-SDK import requirements respectively. The constructor still may return normally on success. Every requirement remains undischarged; neither root becomes accepted or runnable under existing compiler/runtime profiles. The smaller four-obligation constructor dependency set now defines the next bounded guarded-contract work, preserving the retail phase/callback/TLS sequence.

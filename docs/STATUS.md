@@ -4,6 +4,12 @@ Immutable source-scoped terminal control evidence, measured process entropy and 
 
 ## Latest implementation
 
+- Added [opaque same-image conditional source theorems](CONDITIONAL_PROOFS.md). Every import remains an explicit undischarged thunk/slot/provider premise; transitive source/DAG ownership is retained and contradictory slot targets refuse. The new type cannot mint unconditional `NoReturn` or deserialize assumptions. Source bounds, 1,024 effects, 64 requirements and depth 128 are checked. Analysis/decoder fingerprints bind conditional derivations; native/codegen/build/target authentication remains separate.
+- New required `conditional-proof-check` evaluates all **9,335 strict rejects** and re-derives the 21 unconditional seeds. It establishes **38 conditional SDK aliases /213 conditional control facts /4,085 conditionally closed SDK graphs**; all retain undischarged premises. Same-image scope yields zero elsewhere. Actual Start has ten premises and conditional no-normal-return; the random-manager constructor has four premises and may return on success. These are source theorems, not newly accepted or runnable functions.
+- **Seven new tests**, combined **363 Rust tests**: six source tests include **1,000 graph-equivalence cases** against unchanged local analysis, provenance/conflict/limits and transitive/bypass checks. Native O0/O2 fatal-UBSan fixtures check **26 exact loop budget/PC/register traces** and two real normal returns after slot mutation. The existing router intentionally remains unguarded: violating a premise changes behavior. All 83 previous test/support files, embedded tails and native ABI headers remain byte-identical; existing QEMU checks and acceptance rules stay required.
+- **Measured gain +0 strict /+0 conditional**: default 214,521; v1/v2 214,585; v3 214,664. No existing compiler/runtime consumes conditional evidence; no new game code generation, execution, fake return, guard or bootstrap replacement. The next bounded root is five source bodies plus four import fragments (**588 bytes**) with zero ISA decode issues in the four rejects, followed by source/compiler/native identity and actual routed-target/contradictory-return guards. This dependency set excludes ordinary-callee/configuration readiness.
+- Private all-blocker/Rust-witness ranking retains every previous 7,286 counterfactual candidate plus eight SDK bodies (**7,294**), with 51 distinct dynamic import obligations. Best single/pair/triple guard sets predict 20/35/336 source closures; a five-edge union predicts 2,233. The four-obligation actual constructor set predicts 2,005 and has higher bounded first-execution value. All require common proof/lowering/identity/guard infrastructure; no delivery times or runtime gain are inferred from those counts.
+- Import witness commit **`32351c8`** passed **356 Rust tests /35 checks** in **18.53 minutes**, verified public push October 28 at 01:33:19 UTC, with +0 strict/+0 conditional gain.
 - Added bounded [exact import source witnesses](TERMINAL_PROOFS.md#exact-import-source-witnesses): owned source for up to eight direct veneers and the canonical x16/x17 four-word thunk, with fixed bits/registers, signed addresses, equal load/add offsets, bounds, cycles and overflow checked. Source recognition reads no slot and creates no terminal fact. Names, relocation metadata and initial targets cannot impersonate immutable source or loaded native code.
 - Supplied diagnostic relocation correlation checks **11,074 source forms /11,070 zero-addend JUMP_SLOT correlations /11,064 selected providers**. Six correlated bindings are weak-null; four source forms lack the selected relocation. Exact symbol/binding/readback disagreements fail. Detailed source/binding records stay private. Initial diagnostic binding/layout is not runtime target attestation.
 - **Five new tests**, combined **356 Rust tests**: four source tests include 3,584 signed-page/offset combinations, all fixed-bit mutations and 4,096 load immediates; the native O0/O2 fatal-UBSan test compares **18 synthetic QEMU cases**, **648 exact budget/register/PC traces** and **36 unregistered-target refusals**. Mutating one real slot repeatedly switches returning targets while its immutable source witness remains unchanged. All 81 prior test/support paths, embedded test tails and native ABI headers remain byte-identical; required source/release checks are additive.
@@ -176,7 +182,7 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 
 ## Files changed this session
 
-Exact immutable import-thunk source witnesses, five tests, an additive supplied relocation correlation check and extended release gates/documentation. All 81 previous test/support files, embedded test tails and existing ABI/native headers remain byte-identical. Prior correctness, acceptance and privacy rules remain required. No original function executes.
+Opaque same-image conditional source theorems, seven tests, an additive supplied source-obligation check and extended release gates/documentation. All 83 previous test/support files, embedded test tails and existing ABI/native headers remain byte-identical. Prior correctness, acceptance and privacy rules remain required. No original function executes.
 
 ## Measured commit gains
 
@@ -212,7 +218,8 @@ Exact immutable import-thunk source witnesses, five tests, an additive supplied 
 | `f35e94b` | 214,521 | +0 default; +0 conditional |
 | `f9f5a3b` | 214,521 | +0 default; +0 conditional |
 | `4585dfd` | 214,521 | +0 default; +0 conditional |
-| Current import source witnesses | 214,521 | +0 default; +0 conditional |
+| `32351c8` | 214,521 | +0 default; +0 conditional |
+| Current conditional source evidence | 214,521 | +0 default; +0 conditional |
 
 Future commits will report measured strict gain against the preceding commit and compare it with the blocker-set prediction. Earlier stages did not record comparable end-to-end effort timings; new validation receipts record gate durations.
 
