@@ -21,6 +21,13 @@ struct Alias {
     provider: u64,
 }
 pub fn run(root: &Path) -> Result<(), String> {
+    run_mode(root, false)
+}
+pub fn run_guarded(root: &Path) -> Result<(), String> {
+    run_mode(root, true)
+}
+fn run_mode(root: &Path, guarded: bool) -> Result<(), String> {
+    let mut guarded_report = guarded.then(super::guarded_survey::Report::new);
     super::terminal_proofs::run(root)?;
     let seeds: serde_json::Value = serde_json::from_slice(
         &fs::read("private/analysis/terminal-source-proof-details.json")
@@ -197,6 +204,9 @@ pub fn run(root: &Path) -> Result<(), String> {
                 break;
             }
         }
+        if let Some(report) = &mut guarded_report {
+            report.module(module, &image, &facts, &final_closed)?;
+        }
         let aliases_count = facts
             .values()
             .filter(|f| f.kind() == mkw_arm64::terminal::conditional::Kind::Import)
@@ -208,20 +218,27 @@ pub fn run(root: &Path) -> Result<(), String> {
         details.extend(final_closed.into_values());
     }
     let out = Path::new("private/analysis");
-    for (name, value) in [
-        ("conditional-source-details.json", json!(details)),
-        ("conditional-source-facts.json", json!(fact_details)),
-        (
-            "conditional-source-summary.json",
-            json!({"classification":"same-image source theorems under explicit UNDISCHARGED runtime premises, not compiler admission or runnable coverage","model_fingerprint":mkw_formats::hex(&model_fingerprint()),"modules":reports,"compiler_acceptance_changed":false,"game_code_generated":false,"game_code_executed":false,"runtime_guards_installed":false,"target_profile_verified":false,"runtime_premises_discharged":false,"cross_image_imports_supported":false}),
-        ),
-    ] {
-        fs::write(
-            out.join(name),
-            serde_json::to_vec_pretty(&value).map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
+    if !guarded {
+        for (name, value) in [
+            ("conditional-source-details.json", json!(details)),
+            ("conditional-source-facts.json", json!(fact_details)),
+            (
+                "conditional-source-summary.json",
+                json!({"classification":"same-image source theorems under explicit UNDISCHARGED runtime premises, not compiler admission or runnable coverage","model_fingerprint":mkw_formats::hex(&model_fingerprint()),"modules":reports,"compiler_acceptance_changed":false,"game_code_generated":false,"game_code_executed":false,"runtime_guards_installed":false,"target_profile_verified":false,"runtime_premises_discharged":false,"cross_image_imports_supported":false}),
+            ),
+        ] {
+            fs::write(
+                out.join(name),
+                serde_json::to_vec_pretty(&value).map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+        }
     }
-    println!("Same-image conditional source evidence checked; every runtime premise remains undischarged; no admission change or original execution.");
+    if let Some(report) = guarded_report {
+        report.finish()?;
+    }
+    if !guarded {
+        println!("Same-image conditional source evidence checked; every runtime premise remains undischarged; no admission change or original execution.");
+    }
     Ok(())
 }

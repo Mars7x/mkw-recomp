@@ -34,9 +34,9 @@ def run(label, command, *, cwd=ROOT, required=True):
 run('format', ['cargo', 'fmt', '--all', '--', '--check'])
 run('lint', ['cargo', 'clippy', '--workspace', '--all-targets', '--offline', '--locked', '--', '-D', 'warnings'])
 run('unit and native semantic tests', ['cargo', 'test', '--workspace', '--offline', '--locked'])
-run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks', '--test', 'thread_runner', '--test', 'services', '--test', 'events', '--test', 'event_services', '--test', 'event_poll', '--test', 'service_permissions', '--test', 'kernel_handles', '--test', 'kernel_handles_native', '--test', 'process_entropy', '--test', 'table_event_services', '--test', 'terminal_proofs', '--test', 'import_thunks', '--test', 'conditional_proofs'])
+run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks', '--test', 'thread_runner', '--test', 'services', '--test', 'events', '--test', 'event_services', '--test', 'event_poll', '--test', 'service_permissions', '--test', 'kernel_handles', '--test', 'kernel_handles_native', '--test', 'process_entropy', '--test', 'table_event_services', '--test', 'terminal_proofs', '--test', 'import_thunks', '--test', 'conditional_proofs', '--test', 'guarded'])
 run('kernel capability facts release tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-formats', '--test', 'capabilities'])
-run('immutable terminal proof release tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-arm64', '--test', 'terminal_proofs', '--test', 'import_thunks', '--test', 'conditional_proofs'])
+run('immutable terminal proof release tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-arm64', '--test', 'terminal_proofs', '--test', 'import_thunks', '--test', 'conditional_proofs', '--test', 'guarded_contracts'])
 run('native synthetic demo', ['cargo', 'run', '--release', '--offline', '--locked', '--', 'aot-demo'])
 binary = ROOT / 'target/release/mkw-recomp'
 header = run('native ELF header', ['readelf', '-h', str(ROOT / 'private/builds/synthetic/aot-demo')])
@@ -131,6 +131,20 @@ if args.game:
                    or m['additional_compiled_objects'] + m['additional_deferred'] != m['services_v3_conditional_additional']
                    for m in service['modules'])):
         raise SystemExit('Service-v3 survey changed strict baseline, prior profile, counts or execution/configuration gates')
+    run('guarded-v4 compiler survey and bounded native objects', [str(binary), 'guarded-compile-check', str(game)])
+    guarded = json.loads((ROOT / 'private/analysis/guarded-v4/summary.json').read_text())
+    plain_v4 = {m['module']: m['plain_services_eligible'] for m in guarded['modules']}
+    prior_v3 = {m['module']: m['default_accepted'] + m['services_v3_conditional_additional'] for m in service['modules']}
+    if (plain_v4 != prior_v3
+            or {m['module']: m['additional_guarded_eligible'] for m in guarded['modules']}
+                != {'main': 0, 'rtld': 0, 'sdk': 4085, 'subsdk0': 0}
+            or sum(m['guarded_eligible_total'] for m in guarded['modules']) != 218749
+            or guarded['native_sample_objects'] != 9 or guarded['native_sample_source_bytes'] != 588
+            or not guarded['game_code_generated']
+            or any(guarded[k] for k in ['existing_acceptance_changed', 'original_code_executed',
+                 'runtime_routes_registered', 'target_configuration_verified',
+                 'cross_image_no_return_supported', 'guarded_veneers_supported'])):
+        raise SystemExit('Guarded-v4 survey changed legacy acceptance, lost bounded evidence or crossed original-execution gates')
     run('all rejected-extent blocker diagnostics', [str(binary), 'cpu-blockers', str(game)])
     if (ROOT/'private/tools/python/capstone').is_dir():
         run('all-blocker coverage prioritization', [sys.executable, str(ROOT/'tools/rank_blockers.py')])

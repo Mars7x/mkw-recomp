@@ -21,3 +21,7 @@ The inspected upstream source is [LAS main.c](https://github.com/peiikai/LASReco
 ## Same-image conditional source follow-up
 
 [CONDITIONAL_PROOFS.md](CONDITIONAL_PROOFS.md) establishes explicit source theorems for the actual Start and random-manager roots under ten/four self-SDK import requirements respectively. The constructor still may return normally on success. Every requirement remains undischarged; neither root becomes accepted or runnable under existing compiler/runtime profiles. The smaller four-obligation constructor dependency set now defines the next bounded guarded-contract work, preserving the retail phase/callback/TLS sequence.
+
+## Bounded guarded compiler/runtime integration
+
+[GUARDED_RUNTIME.md](GUARDED_RUNTIME.md) implements the separate v4 contract and compiles the constructor's nine-fragment/588-byte source proof closure into private objects. Dynamic target/normal-return guards are tested synthetically. The actual game routes, ordinary callees and target/TLS/PAC/FP configuration remain unbound; no original constructor or bootstrap function executes. Existing phases/callbacks remain intact.

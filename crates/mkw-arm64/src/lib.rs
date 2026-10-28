@@ -19,6 +19,7 @@ pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("terminal.rs"),
     include_str!("terminal/import.rs"),
     include_str!("terminal/conditional.rs"),
+    include_str!("terminal/contract.rs"),
     include_str!("memory.rs"),
     include_str!("bitops.rs"),
     include_str!("integer.rs"),

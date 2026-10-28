@@ -2,6 +2,7 @@
 //! no existing lifter, CFG admission, emitter, runtime or original-execution gate
 //! consumes these facts. There is no name/ABI whitelist or import/GOT assumption.
 pub mod conditional;
+pub mod contract;
 pub mod import;
 use crate::{decode, Instruction, Op};
 use serde::Serialize;

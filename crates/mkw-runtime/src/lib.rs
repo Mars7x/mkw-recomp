@@ -11,6 +11,7 @@ pub mod exclusive_calls;
 pub mod exclusive_entry;
 pub mod exclusive_native;
 pub mod floating;
+pub mod guarded;
 pub mod host_call;
 pub mod kernel_handles;
 mod linker;

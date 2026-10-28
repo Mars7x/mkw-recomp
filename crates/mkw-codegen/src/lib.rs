@@ -5,6 +5,7 @@ mod bitops;
 mod condition;
 mod exclusive;
 mod floating;
+pub mod guarded;
 mod integer;
 mod memory;
 mod simd;
@@ -36,6 +37,8 @@ fn write(reg: Reg, w: Width, expr: &str) -> String {
 /// All semantic and ABI inputs used by the incremental generation identity.
 pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("lib.rs"),
+    include_str!("guarded.rs"),
+    include_str!("../../../native/guarded_v4.h"),
     include_str!("arithmetic.rs"),
     include_str!("condition.rs"),
     include_str!("memory.rs"),
@@ -83,6 +86,16 @@ fn emit_profile(
     calls_v2: bool,
     services_v3: bool,
 ) -> Result<String, String> {
+    emit_internal(ins, entry, exclusive_v10, calls_v2, services_v3, None)
+}
+fn emit_internal(
+    ins: &[Instruction],
+    entry: u64,
+    exclusive_v10: bool,
+    calls_v2: bool,
+    services_v3: bool,
+    guarded: Option<&guarded::Config<'_>>,
+) -> Result<String, String> {
     if ins.is_empty() {
         return Err("empty translation".into());
     }
@@ -105,6 +118,13 @@ fn emit_profile(
                 edges.push(target);
                 edges.push(i.pc + 4)
             }
+            Op::Call { .. }
+                if guarded.is_some_and(|g| {
+                    g.contract
+                        .terminal_sites()
+                        .iter()
+                        .any(|s| s.pc == i.pc && s.kind == mkw_arm64::terminal::SiteKind::Call)
+                }) => {}
             _ => edges.push(i.pc + 4),
         }
         for e in edges {
@@ -114,14 +134,18 @@ fn emit_profile(
         }
     }
     let mut out = if exclusive_v10 {
-        let header = if services_v3 {
+        let header = if guarded.is_some() {
+            include_str!("../../../native/guarded_v4.h")
+        } else if services_v3 {
             include_str!("../../../native/services_v3.h")
         } else if calls_v2 {
             include_str!("../../../native/calls_v2.h")
         } else {
             include_str!("../../../native/exclusive_v10.h")
         };
-        let check = if services_v3 {
+        let check = if guarded.is_some() {
+            "mkw_guarded_v4_valid"
+        } else if services_v3 {
             "mkw_services_v3_valid"
         } else if calls_v2 {
             "mkw_calls_v2_valid"
@@ -135,18 +159,33 @@ fn emit_profile(
         } else {
             ""
         };
-        format!("{HEADER}\n{header}\n{marker}unsigned mkw_guest_v10_budget_abi_version(void){{return MKW_CPU_V10_ABI_VERSION;}}\nint mkw_guest_v10_budget(MkwCpuV10 *frame,uint64_t *budget){{if(!{check}(frame))return 3;MkwCpu *c=&frame->base;\n goto L_{entry:x};\n")
+        if let Some(g) = guarded {
+            let name = g.name;
+            let values = g
+                .origin
+                .iter()
+                .map(u8::to_string)
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("{HEADER}\n{header}\nstatic const uint8_t {name}_origin_bytes[32]={{{values}}};\nvoid {name}_origin_v4(uint8_t *out){{for(unsigned i=0;i<32;++i)out[i]={name}_origin_bytes[i];}}\nunsigned {name}_abi_version(void){{return 10;}}\nunsigned {name}_exclusive_version(void){{return 4;}}\nint {name}(MkwCpuV10 *frame,uint64_t *budget){{if(!budget)return 3;int preflight=mkw_preflight_v4(frame,{name}_origin_bytes,UINT64_C({entry}));if(preflight)return preflight;MkwCpu *c=&frame->base;goto L_{entry:x};\n")
+        } else {
+            format!("{HEADER}\n{header}\n{marker}unsigned mkw_guest_v10_budget_abi_version(void){{return MKW_CPU_V10_ABI_VERSION;}}\nint mkw_guest_v10_budget(MkwCpuV10 *frame,uint64_t *budget){{if(!{check}(frame))return 3;MkwCpu *c=&frame->base;\n goto L_{entry:x};\n")
+        }
     } else {
         format!(
         "{HEADER}\nunsigned mkw_guest_budget_abi_version(void){{return MKW_CPU_ABI_VERSION;}}\nint mkw_guest_budget(MkwCpu *c, uint64_t *budget) {{\n goto L_{entry:x};\n"
     )
     };
-    let call_check = if services_v3 {
+    let call_check = if guarded.is_some() {
+        "mkw_guarded_v4_valid"
+    } else if services_v3 {
         "mkw_services_v3_valid"
     } else {
         "mkw_calls_v2_valid"
     };
-    let call_function = if services_v3 {
+    let call_function = if guarded.is_some() {
+        "mkw_call_guarded_v4"
+    } else if services_v3 {
         "mkw_call_services_v10"
     } else {
         "mkw_call_v10"
@@ -159,9 +198,13 @@ fn emit_profile(
                 if !services_v3 {
                     return Err("SVC IR requires explicit service-table-v3 profile".into());
                 }
-                out += &format!(
-                    "{{int status=mkw_svc_v10(frame,{immediate});if(status)return status;}}\n"
-                );
+                let svc = if guarded.is_some() {
+                    "mkw_svc_guarded_v4"
+                } else {
+                    "mkw_svc_v10"
+                };
+                out +=
+                    &format!("{{int status={svc}(frame,{immediate});if(status)return status;}}\n");
                 out += &next;
             }
             Op::Exclusive(op) => {
@@ -403,6 +446,13 @@ fn emit_profile(
                 out += &format!("c->pc=c->module_base+UINT64_C({target});c->fault_address=c->pc;return MKW_EXIT_TAIL;\n");
             }
             Op::IndirectBranch { target } => {
+                if guarded.is_some_and(|g| g.contract.alias_next().is_some()) {
+                    out += &format!(
+                        "c->pc={};c->fault_address=c->pc;return MKW_EXIT_TAIL;\n",
+                        r(target)
+                    );
+                    continue;
+                }
                 out += &format!("{{uint64_t target={};c->fault_address=target;\n", r(target));
                 out += "switch(target-c->module_base){\n";
                 for pc in &pcs {
@@ -474,6 +524,15 @@ fn emit_profile(
                 out += &next;
             }
             Op::Call { target } => {
+                if guarded.is_some_and(|g| {
+                    g.contract
+                        .terminal_sites()
+                        .iter()
+                        .any(|s| s.pc == i.pc && s.kind == mkw_arm64::terminal::SiteKind::Call)
+                }) {
+                    out+=&format!("c->x[30]=c->module_base+UINT64_C({});c->fault_address=c->module_base+UINT64_C({target});{{int status=mkw_call_guarded_v4(frame,c->fault_address,budget);if(status)return status;c->fault_status=6;return 6;}}\n",i.pc+4);
+                    continue;
+                }
                 if calls_v2 {
                     let target_expression = format!("c->module_base+UINT64_C({target})");
                     out += &format!("{{uint64_t target={target_expression};c->fault_address=target;if(!{call_check}(frame)){{c->fault_status=3;return 3;}}c->x[30]=c->module_base+UINT64_C({});uint64_t caller_base=c->module_base;int status={call_function}(frame,target,budget);if(status)return status;if(c->module_base!=caller_base||c->pc!=caller_base+UINT64_C({})){{c->fault_status=6;return 6;}}}}\n",i.pc+4,i.pc+4);

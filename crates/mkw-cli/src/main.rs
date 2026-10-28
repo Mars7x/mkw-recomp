@@ -2,6 +2,7 @@ mod analysis;
 mod blockers;
 mod conditional_proofs;
 mod exclusive_survey;
+mod guarded_survey;
 mod import_witnesses;
 mod pipeline;
 #[cfg(target_os = "linux")]
@@ -12,7 +13,7 @@ mod terminal_proofs;
 use mkw_formats::{Npdm, Nso};
 use std::{error::Error, path::Path};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-const USAGE:&str="usage: mkw-recomp {analyze|verify|link-check|cpu-survey|cpu-survey-exclusive-v10|cpu-survey-exclusive-v2|cpu-survey-services-v3|romfs-hle-check|runtime-metadata-check|terminal-proof-check|import-witness-check|conditional-proof-check|cpu-blockers} GAME_ROOT | inspect FILE | aot-demo | generate-slice GAME_ROOT MODULE ENTRY LENGTH";
+const USAGE:&str="usage: mkw-recomp {analyze|verify|link-check|cpu-survey|cpu-survey-exclusive-v10|cpu-survey-exclusive-v2|cpu-survey-services-v3|romfs-hle-check|runtime-metadata-check|terminal-proof-check|import-witness-check|conditional-proof-check|guarded-compile-check|cpu-blockers} GAME_ROOT | inspect FILE | aot-demo | generate-slice GAME_ROOT MODULE ENTRY LENGTH";
 fn main() {
     if let Err(e) = run() {
         eprintln!("error: {e}");
@@ -55,6 +56,7 @@ fn run() -> Result<()> {
         "terminal-proof-check" => terminal_proofs::run(Path::new(argument(2)?))?,
         "import-witness-check" => import_witnesses::run(Path::new(argument(2)?))?,
         "conditional-proof-check" => conditional_proofs::run(Path::new(argument(2)?))?,
+        "guarded-compile-check" => conditional_proofs::run_guarded(Path::new(argument(2)?))?,
         "cpu-blockers" => blockers::run(Path::new(argument(2)?))?,
         "link-check" => pipeline::link_check(Path::new(argument(2)?))?,
         "generate-slice" => {

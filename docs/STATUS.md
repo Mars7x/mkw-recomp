@@ -4,6 +4,12 @@ Immutable source-scoped terminal control evidence, measured process entropy and 
 
 ## Latest implementation
 
+- Added [explicit guarded native execution, table v4](GUARDED_RUNTIME.md): opaque source contracts and codegen artifacts retain exact proof dependencies, source/model/producer commitments and library lifetimes. A separate router validates registered providers and the active origin before guest work. Actual dynamic thunk/provider targets are checked after loads; changed slots cannot invoke unproved providers. Contradictory normal return refuses before a pruned continuation. Self-reported queries detect mismatches, not malicious machine-code authenticity; trusted build/helper obligations remain explicit.
+- The new guarded emitter consumes terminal effects only from typed source contracts. All thunk `BR` transfers pass through the router, even internal targets, closing a bypass found by mutation tests. The constructor's real returning branch remains present. All previous native headers, profiles, tests and acceptance rules remain unchanged; no fake RET, success stub, bootstrap replacement or phase omission.
+- **Measured compiler gain: +0 strict /+0 existing v1/v2/v3; +4,085 under the new explicit v4 capability.** The supplied survey passes all counted entries through source-contract/emitter checks: **218,749 eligible translations** (main 177,434; rtld 30; SDK 36,491; subsdk0 4,794). Existing totals remain 214,521 strict /214,585 v1/v2 /214,664 v3. Native compilation is sampled; eligibility is not runnable-function coverage or verified retail compatibility.
+- The actual random-manager constructor proof closure (**nine fragments /588 source bytes**) compiles into private native objects. Every original-derived source/object/hash/binding stays private. No game route is registered, target configuration authorized or original function executed. The selected ordinary-callee/service closure and real TLS/main-thread/PAC/FP/lifecycle gates now outrank further broad survey work.
+- **Eight new tests**, combined **371 Rust tests**: three source-contract and five native integration tests pass debug/release, with O0/O2 fatal UBSan. Evidence includes **588 direct-call/tail budget/register/PC traces**, four transitive import guards (98 budget/eight changed-slot/ten normal-return traces), in-flight nested-service mutation and origin recovery, C/Rust layout and malformed producer/source/profile/dependency/prefix refusals. Two Linux/QEMU monitor cases verify LL/SC/SVC transport; existing QEMU suites remain required. Fault-injected dishonest metadata/body cases demonstrate contradiction refusal, not native authentication.
+- Conditional source proof commit **`d831d6f`** passed **363 Rust tests /36 checks** in **18.68 minutes**, verified public push October 28 at 02:04:05 UTC, with +0 strict/+0 conditional compiler gain.
 - Added [opaque same-image conditional source theorems](CONDITIONAL_PROOFS.md). Every import remains an explicit undischarged thunk/slot/provider premise; transitive source/DAG ownership is retained and contradictory slot targets refuse. The new type cannot mint unconditional `NoReturn` or deserialize assumptions. Source bounds, 1,024 effects, 64 requirements and depth 128 are checked. Analysis/decoder fingerprints bind conditional derivations; native/codegen/build/target authentication remains separate.
 - New required `conditional-proof-check` evaluates all **9,335 strict rejects** and re-derives the 21 unconditional seeds. It establishes **38 conditional SDK aliases /213 conditional control facts /4,085 conditionally closed SDK graphs**; all retain undischarged premises. Same-image scope yields zero elsewhere. Actual Start has ten premises and conditional no-normal-return; the random-manager constructor has four premises and may return on success. These are source theorems, not newly accepted or runnable functions.
 - **Seven new tests**, combined **363 Rust tests**: six source tests include **1,000 graph-equivalence cases** against unchanged local analysis, provenance/conflict/limits and transitive/bypass checks. Native O0/O2 fatal-UBSan fixtures check **26 exact loop budget/PC/register traces** and two real normal returns after slot mutation. The existing router intentionally remains unguarded: violating a premise changes behavior. All 83 previous test/support files, embedded tails and native ABI headers remain byte-identical; existing QEMU checks and acceptance rules stay required.
@@ -182,7 +188,7 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 
 ## Files changed this session
 
-Opaque same-image conditional source theorems, seven tests, an additive supplied source-obligation check and extended release gates/documentation. All 83 previous test/support files, embedded test tails and existing ABI/native headers remain byte-identical. Prior correctness, acceptance and privacy rules remain required. No original function executes.
+Explicit guarded-v4 source/build contracts, emitter/runtime integration, eight tests and an additive supplied compiler/object survey. All 85 previous test/support files, embedded test tails and existing ABI/native headers remain byte-identical. Prior correctness, acceptance and privacy rules remain required. No original function executes.
 
 ## Measured commit gains
 
@@ -219,7 +225,8 @@ Opaque same-image conditional source theorems, seven tests, an additive supplied
 | `f9f5a3b` | 214,521 | +0 default; +0 conditional |
 | `4585dfd` | 214,521 | +0 default; +0 conditional |
 | `32351c8` | 214,521 | +0 default; +0 conditional |
-| Current conditional source evidence | 214,521 | +0 default; +0 conditional |
+| `d831d6f` | 214,521 | +0 default; +0 conditional |
+| Current guarded-v4 capability | 214,521 | +0 existing profiles; +4,085 v4 eligible |
 
 Future commits will report measured strict gain against the preceding commit and compare it with the blocker-set prediction. Earlier stages did not record comparable end-to-end effort timings; new validation receipts record gate durations.
 

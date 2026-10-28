@@ -69,6 +69,9 @@ impl Effect {
         )
         .unwrap()
     }
+    pub fn belongs_to(&self, image: &Image) -> bool {
+        Arc::ptr_eq(&self.node.image.data, &image.data)
+    }
     pub fn source(&self) -> SourceStamp {
         self.node.source
     }
