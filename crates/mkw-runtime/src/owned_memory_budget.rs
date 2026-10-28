@@ -29,6 +29,14 @@ pub struct OwnedMemoryBudget {
     allowance: u64,
 }
 impl OwnedMemoryBudget {
+    pub(crate) fn matches_binding(
+        &self,
+        memory: &Arc<Mutex<ExclusiveMemory>>,
+        authority: &Arc<()>,
+    ) -> bool {
+        Arc::ptr_eq(&self.memory, memory) && Arc::ptr_eq(&self.authority, authority)
+    }
+
     pub(crate) fn matches_call(&self, call: &crate::services::Call<'_>) -> bool {
         call.matches_memory(&self.memory, &self.authority)
     }

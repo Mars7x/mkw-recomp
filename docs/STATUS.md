@@ -4,6 +4,11 @@ Immutable source-scoped terminal control evidence, measured process entropy and 
 
 ## Latest implementation
 
+- Added [scoped process-region queries](REGION_QUERIES.md): eight GetInfo types expose explicit alias, heap, enclosing ASLR and stack reservations through the existing process query handler. Catalog/accounting must share memory identity and generation. Default handlers and duplicate-registration rejection remain unchanged; remote-region types 29/30 remain unsupported.
+- Four additive focused tests cover native register widths, subtype/error ordering, budget and monitor completion, wrapper faults, missing/foreign/stale/restricted bindings and ASLR containment. **80 native request/budget traces and 32 wrapper/fault traces** run at O0/O2 with fatal UBSan. Full publication validation remains required; **expected survey gain +0 across all profiles**.
+- These eight types occur among ten distinct queries in three bounded supplied startup helpers. Remote semantics and actual target layout remain unresolved, so this does not complete initialization or authorize original execution. Runtime closure remains more useful than additional survey coverage.
+- Process-region catalog commit **`6c441e9`** passed **478 Rust tests /37 checks** in **19.25 minutes**, verified public push October 28 at 14:56:52 UTC; **measured survey gain +0 across all profiles**.
+
 
 - Added [explicit process region reservations](PROCESS_REGIONS.md), tied to a sealed owned-memory generation. Checked page-aligned, disjoint reservations distinguish virtual bounds from committed pages; heap bounds must match their capability, fixed mappings must fit code or RW stack, and alias/remote ranges remain uncommitted. This is a synthetic host layout contract, not discovered Switch 2 configuration or an activated query handler.
 - Six additive focused tests pass in debug and release: **18 native O0/O2 heap request/budget cases** with fatal UBSan, **2,048 concurrent snapshots during 1,024 resizes**, invalid ranges/mappings, foreign capabilities and stale/poisoned memory. Existing tests, native headers and acceptance rules remain unchanged. Full publication validation remains required; **expected survey gain +0 in every profile**.

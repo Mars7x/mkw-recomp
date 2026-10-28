@@ -17,7 +17,7 @@ impl Span {
             .then(|| self.base.0.checked_add(self.size))
             .flatten()
     }
-    fn contains(self, other: Self) -> bool {
+    pub(crate) fn contains(self, other: Self) -> bool {
         match (self.end(), other.end()) {
             (Some(end), Some(other_end)) => self.base <= other.base && other_end <= end,
             _ => false,
@@ -59,6 +59,16 @@ pub struct ProcessRegions {
     layout: Layout,
 }
 impl ProcessRegions {
+    pub(crate) fn matches_budget(
+        &self,
+        budget: &crate::owned_memory_budget::OwnedMemoryBudget,
+    ) -> bool {
+        budget.matches_binding(&self.memory, &self.authority)
+    }
+    pub(crate) fn matches_call(&self, call: &crate::services::Call<'_>) -> bool {
+        call.matches_memory(&self.memory, &self.authority)
+    }
+
     /// All five reservations are explicit, nonempty, page-exact and disjoint.
     /// Heap must equal its existing capability's full reserved range. Every
     /// fixed mapping must fit code or stack; stack mappings must be RW. Alias

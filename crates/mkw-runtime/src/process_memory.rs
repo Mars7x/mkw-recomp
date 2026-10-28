@@ -3,6 +3,7 @@ use crate::{
     host_call::HostFault,
     owned_memory_budget::OwnedMemoryBudget,
     process_entropy::{ProcessEntropy, GET_INFO, INVALID_COMBINATION, RANDOM_ENTROPY},
+    process_regions::{Error as RegionError, ProcessRegions, Span},
     services::{Call, Outputs, Reply, Service, Services},
 };
 use std::sync::Arc;
@@ -20,6 +21,7 @@ pub enum Abi {
 #[derive(Clone)]
 pub struct ProcessMemory {
     budget: OwnedMemoryBudget,
+    regions: Option<(ProcessRegions, Span)>,
 }
 struct Handler {
     memory: ProcessMemory,
@@ -27,7 +29,38 @@ struct Handler {
 }
 impl ProcessMemory {
     pub fn new(_abi: Abi, budget: OwnedMemoryBudget) -> Self {
-        Self { budget }
+        Self {
+            budget,
+            regions: None,
+        }
+    }
+    /// Add the NX reference region queries under the same GetInfo handler.
+    /// ASLR is an explicit enclosing domain, not the code reservation. All five
+    /// host reservations must fit it. Remote queries remain unsupported.
+    pub fn with_regions(
+        mut self,
+        regions: ProcessRegions,
+        aslr: Span,
+    ) -> Result<Self, RegionError> {
+        if !regions.matches_budget(&self.budget) {
+            return Err(RegionError::Configuration);
+        }
+        let layout = regions.snapshot()?;
+        if !layout.address_space.contains(aslr)
+            || ![
+                layout.code,
+                layout.heap,
+                layout.stack,
+                layout.alias,
+                layout.remote,
+            ]
+            .into_iter()
+            .all(|r| aslr.contains(r))
+        {
+            return Err(RegionError::Configuration);
+        }
+        self.regions = Some((regions, aslr));
+        Ok(self)
     }
     pub fn registry(&self) -> Services {
         self.registry_with(None)
@@ -53,6 +86,14 @@ impl Service for Handler {
         if !self.memory.budget.matches_call(call) {
             return Err(HostFault::unsupported());
         }
+        if self
+            .memory
+            .regions
+            .as_ref()
+            .is_some_and(|(r, _)| !r.matches_call(call))
+        {
+            return Err(HostFault::unsupported());
+        }
         let args = call.arguments();
         match args[1] as u32 {
             RANDOM_ENTROPY => self
@@ -60,7 +101,29 @@ impl Service for Handler {
                 .as_ref()
                 .ok_or_else(HostFault::unsupported)?
                 .invoke(call),
-            TOTAL_NON_SYSTEM | USED_NON_SYSTEM => {
+            2..=5 | 12..=15 | TOTAL_NON_SYSTEM | USED_NON_SYSTEM => {
+                let region_value = match args[1] as u32 {
+                    2..=5 | 12..=15 => {
+                        let (regions, aslr) = self
+                            .memory
+                            .regions
+                            .as_ref()
+                            .ok_or_else(HostFault::unsupported)?;
+                        let l = regions.snapshot().map_err(|_| HostFault::unsupported())?;
+                        Some(match args[1] as u32 {
+                            2 => l.alias.base.0,
+                            3 => l.alias.size,
+                            4 => l.heap.base.0,
+                            5 => l.heap.size,
+                            12 => aslr.base.0,
+                            13 => aslr.size,
+                            14 => l.stack.base.0,
+                            15 => l.stack.size,
+                            _ => unreachable!(),
+                        })
+                    }
+                    _ => None,
+                };
                 // Process queries validate subtype before handle lookup. Errors
                 // preserve unspecified X1, without asserting retail output bits.
                 if args[3] != 0 {
@@ -71,6 +134,11 @@ impl Service for Handler {
                 if args[2] as u32 != CURRENT_PROCESS {
                     // No real/debug process handle model is supplied here.
                     return Err(HostFault::unsupported());
+                }
+                if let Some(value) = region_value {
+                    return Ok(Reply::Return(
+                        Outputs::default().write_w(0, 0)?.write_x(1, value)?,
+                    ));
                 }
                 let snapshot = self
                     .memory
