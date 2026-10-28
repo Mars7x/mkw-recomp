@@ -34,9 +34,9 @@ def run(label, command, *, cwd=ROOT, required=True):
 run('format', ['cargo', 'fmt', '--all', '--', '--check'])
 run('lint', ['cargo', 'clippy', '--workspace', '--all-targets', '--offline', '--locked', '--', '-D', 'warnings'])
 run('unit and native semantic tests', ['cargo', 'test', '--workspace', '--offline', '--locked'])
-run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks', '--test', 'thread_runner', '--test', 'services', '--test', 'events', '--test', 'event_services', '--test', 'event_poll', '--test', 'service_permissions', '--test', 'kernel_handles', '--test', 'kernel_handles_native', '--test', 'process_entropy', '--test', 'table_event_services', '--test', 'terminal_proofs'])
+run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks', '--test', 'thread_runner', '--test', 'services', '--test', 'events', '--test', 'event_services', '--test', 'event_poll', '--test', 'service_permissions', '--test', 'kernel_handles', '--test', 'kernel_handles_native', '--test', 'process_entropy', '--test', 'table_event_services', '--test', 'terminal_proofs', '--test', 'import_thunks'])
 run('kernel capability facts release tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-formats', '--test', 'capabilities'])
-run('immutable terminal proof release tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-arm64', '--test', 'terminal_proofs'])
+run('immutable terminal proof release tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-arm64', '--test', 'terminal_proofs', '--test', 'import_thunks'])
 run('native synthetic demo', ['cargo', 'run', '--release', '--offline', '--locked', '--', 'aot-demo'])
 binary = ROOT / 'target/release/mkw-recomp'
 header = run('native ELF header', ['readelf', '-h', str(ROOT / 'private/builds/synthetic/aot-demo')])
@@ -77,6 +77,19 @@ if args.game:
             or any(m['checked_return_free_candidates'] != m['certified_local_closed_control']
                    for m in source_proofs['modules'])):
         raise SystemExit('Source proof checks changed admission/generation/execution or left candidates unverified')
+    run('immutable import source witnesses', [str(binary), 'import-witness-check', str(game)])
+    imports = json.loads((ROOT / 'private/analysis/import-witness-summary.json').read_text())
+    expected_imports = {'main': (1210, 1209, 1203), 'rtld': (2, 1, 1),
+                        'sdk': (9638, 9637, 9637), 'subsdk0': (224, 223, 223)}
+    if ({m['module']: (m['canonical_thunks'], m['zero_addend_jump_slot_correlations'],
+                      m['diagnostic_selected_providers']) for m in imports['modules']} != expected_imports
+            or any(imports[k] for k in ['compiler_acceptance_changed', 'game_code_generated',
+            'game_code_executed', 'runtime_guards_installed', 'target_profile_verified',
+            'terminal_import_facts_supported'])
+            or any(m['diagnostic_selected_providers'] > m['zero_addend_jump_slot_correlations']
+                   or m['zero_addend_jump_slot_correlations'] > m['canonical_thunks']
+                   for m in imports['modules'])):
+        raise SystemExit('Import source witness crossed source/diagnostic boundaries')
     run('explicit exclusive-v10 conditional compiler survey', [str(binary), 'cpu-survey-exclusive-v10', str(game)])
     explicit = json.loads((ROOT / 'private/analysis/cpu-exclusive-v10/summary.json').read_text())
     strict = json.loads((ROOT / 'private/analysis/cpu-survey-summary.json').read_text())

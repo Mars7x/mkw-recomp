@@ -1,6 +1,7 @@
 //! Immutable, image-scoped normal-return control evidence. This is analysis only:
 //! no existing lifter, CFG admission, emitter, runtime or original-execution gate
 //! consumes these facts. There is no name/ABI whitelist or import/GOT assumption.
+pub mod import;
 use crate::{decode, Instruction, Op};
 use serde::Serialize;
 use sha2::{Digest, Sha256};

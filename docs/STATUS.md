@@ -4,6 +4,11 @@ Immutable source-scoped terminal control evidence, measured process entropy and 
 
 ## Latest implementation
 
+- Added bounded [exact import source witnesses](TERMINAL_PROOFS.md#exact-import-source-witnesses): owned source for up to eight direct veneers and the canonical x16/x17 four-word thunk, with fixed bits/registers, signed addresses, equal load/add offsets, bounds, cycles and overflow checked. Source recognition reads no slot and creates no terminal fact. Names, relocation metadata and initial targets cannot impersonate immutable source or loaded native code.
+- Supplied diagnostic relocation correlation checks **11,074 source forms /11,070 zero-addend JUMP_SLOT correlations /11,064 selected providers**. Six correlated bindings are weak-null; four source forms lack the selected relocation. Exact symbol/binding/readback disagreements fail. Detailed source/binding records stay private. Initial diagnostic binding/layout is not runtime target attestation.
+- **Five new tests**, combined **356 Rust tests**: four source tests include 3,584 signed-page/offset combinations, all fixed-bit mutations and 4,096 load immediates; the native O0/O2 fatal-UBSan test compares **18 synthetic QEMU cases**, **648 exact budget/register/PC traces** and **36 unregistered-target refusals**. Mutating one real slot repeatedly switches returning targets while its immutable source witness remains unchanged. All 81 prior test/support paths, embedded test tails and native ABI headers remain byte-identical; required source/release checks are additive.
+- **Measured gain +0 strict /+0 conditional**: default 214,521; v1/v2 214,585; v3 214,664. Local-only public-verifier propagation reaches 23 facts from 21 seeds but closes zero additional rejected extents. Checked conditional import effects, compiler/source identity and guards on the actual routed target chain now have priority; an initial GOT check alone has a mutation gap. No runtime guard, terminal-call lowering, acceptance change, bootstrap replacement or original execution is added.
+- Source proof commit **`4585dfd`** passed **351 Rust tests /34 checks** in **18.51 minutes**, verified public push October 28 at 01:07:45 UTC, with +0 strict/+0 conditional gain.
 - Added [immutable source-scoped terminal control evidence](TERMINAL_PROOFS.md). Opaque facts derive only from complete reachable control analysis of owned, hashed bytes and prior exact local facts; ordinary calls still may return. All decode/edge issues remain visible. Names/booleans cannot mint facts; foreign namespaces, duplicate/direct-self assumptions, returns and dynamic tail escapes cannot establish a terminal fact. Derivation hashes retain supporting evidence and source ownership, not native/process authentication.
 - **Seven new tests** pass debug/release: six source-analysis tests and one native test at O0/O2 with fatal UBSan. Native evidence includes **260 exact budget/register/PC/memory traces** and two fault traces, including integer wrap. Conditional bypasses and unsupported bytes remain blocked; unchanged strict lifting still rejects truncated callers. All 79 prior test/support files, embedded test tails and ABI/native headers remain byte-identical. Combined Rust test count: **351**. Existing native/QEMU checks remain required; finite execution is not presented as a proof of non-return.
 - New additive `terminal-proof-check` verifies supplied identities and unchanged default lifting, then certifies **21 already accepted return/escape-free bodies** (nine main, seven SDK, five subsdk0). These are not new accepted or runnable functions; no original code is generated or executed. Required release/source checks are additive. The pinned SHA-256 crate is reused; dependency versions and third-party notices remain unchanged.
@@ -171,7 +176,7 @@ The existing exact-version diagnostic still applies and reads back **309,844 rel
 
 ## Files changed this session
 
-Immutable local terminal-control evidence, seven tests, an additive supplied source check and release gates/documentation. All 79 previous test/support files, embedded test tails and existing ABI/native headers remain byte-identical. Prior correctness, acceptance and privacy rules remain required. No original function executes.
+Exact immutable import-thunk source witnesses, five tests, an additive supplied relocation correlation check and extended release gates/documentation. All 81 previous test/support files, embedded test tails and existing ABI/native headers remain byte-identical. Prior correctness, acceptance and privacy rules remain required. No original function executes.
 
 ## Measured commit gains
 
@@ -206,7 +211,8 @@ Immutable local terminal-control evidence, seven tests, an additive supplied sou
 | `0379784` | 214,521 | +0 default; +0 conditional |
 | `f35e94b` | 214,521 | +0 default; +0 conditional |
 | `f9f5a3b` | 214,521 | +0 default; +0 conditional |
-| Current local terminal control evidence | 214,521 | +0 default; +0 conditional |
+| `4585dfd` | 214,521 | +0 default; +0 conditional |
+| Current import source witnesses | 214,521 | +0 default; +0 conditional |
 
 Future commits will report measured strict gain against the preceding commit and compare it with the blocker-set prediction. Earlier stages did not record comparable end-to-end effort timings; new validation receipts record gate durations.
 
