@@ -18,6 +18,7 @@ pub mod heap_services;
 pub mod host_call;
 pub mod kernel_handles;
 mod linker;
+pub mod module_pages;
 pub mod owned_events;
 pub mod owned_memory_budget;
 pub mod pauth;
