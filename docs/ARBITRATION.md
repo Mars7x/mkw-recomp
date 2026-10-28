@@ -81,3 +81,7 @@ required. QEMU is an ISA cross-check, not a Horizon scheduling oracle.
 No original function executes. Survey gain is expected to be zero; actual
 startup synchronization, target/PAC configuration and TLS/argument provenance
 remain higher-value dependencies than pursuing complete instruction coverage.
+
+[Owned host condition waits](CONDITION_WAITS.md) add an explicit priority-only
+release/register/reacquire backend. Their stronger host failure atomicity is not
+the SVC 0x1c/0x1d error contract; those bindings remain unsupported.

@@ -1,6 +1,6 @@
 //! Explicit owned-actor SVC reference profile. Handler construction has no effects;
 //! typed admission/completion owns state->memory ordering, never a public callback.
-use super::{Actor, Arbitration, Error, Node, Policy, State, WAITERS};
+use super::{Actor, Arbitration, Error, Node, Phase, Policy, State, WAITERS};
 use crate::{
     exclusive::{ExclusiveMemory, Width},
     exclusive_native::Context,
@@ -159,7 +159,9 @@ impl Drop for Pending {
         if let Some(n) = s.nodes.remove(&self.sequence) {
             s.remove_order(self.sequence);
             if n.result.is_none() {
-                s.restore_priority(n.owner);
+                if let Some(owner) = n.owner() {
+                    s.restore_priority(owner);
+                }
             }
         }
     }
@@ -236,7 +238,10 @@ impl Intent {
                         .values()
                         .find(|n| n.caller == at && n.result.is_none())
                     {
-                        Some(n) => at = n.owner,
+                        Some(n) => match n.owner() {
+                            Some(owner) => at = owner,
+                            None => break,
+                        },
                         None => break,
                     }
                 }
@@ -248,7 +253,7 @@ impl Intent {
                     sequence,
                     Node {
                         caller: binding.actor,
-                        owner,
+                        phase: Phase::Mutex(owner),
                         address,
                         result: None,
                     },
@@ -271,7 +276,9 @@ impl Intent {
                     .nodes
                     .values()
                     .filter(|n| {
-                        n.owner == binding.actor && n.address == address && n.result.is_none()
+                        n.owner() == Some(binding.actor)
+                            && n.address == address
+                            && n.result.is_none()
                     })
                     .count();
                 let next = if let Some((_, id)) = selected {
@@ -290,8 +297,11 @@ impl Intent {
                 };
                 if let Some((sequence, id)) = selected {
                     for n in s.nodes.values_mut() {
-                        if n.owner == binding.actor && n.address == address && n.result.is_none() {
-                            n.owner = id;
+                        if n.owner() == Some(binding.actor)
+                            && n.address == address
+                            && n.result.is_none()
+                        {
+                            n.phase = Phase::Mutex(id);
                         }
                     }
                     s.nodes.get_mut(&sequence).unwrap().result = Some(if result == 0 {

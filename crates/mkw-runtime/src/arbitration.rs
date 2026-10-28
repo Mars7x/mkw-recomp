@@ -1,5 +1,6 @@
 //! Explicit host arbitration over coherent memory. Not a Horizon SVC, host
 //! scheduler or target configuration. Priority inheritance requires opt-in.
+mod condition;
 mod priority;
 pub mod svc;
 use crate::{
@@ -45,18 +46,34 @@ pub enum Error {
     Shutdown,
     Poisoned,
 }
+#[derive(Clone)]
 struct Identity {
     priorities: Priorities,
     owner: Owner,
     thread: Arc<ThreadIdentity>,
     tag: u32,
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Mutex(u64),
+    Condition(GuestAddr),
+}
+#[derive(Clone)]
 struct Node {
     caller: u64,
-    owner: u64,
+    phase: Phase,
     address: GuestAddr,
     result: Option<Result<(), Error>>,
 }
+impl Node {
+    fn owner(&self) -> Option<u64> {
+        match self.phase {
+            Phase::Mutex(owner) => Some(owner),
+            Phase::Condition(_) => None,
+        }
+    }
+}
+#[derive(Clone)]
 struct State {
     policy: Policy,
     order: Vec<u64>,
@@ -103,9 +120,11 @@ impl Cancellation {
             return Ok(false);
         }
         n.result = Some(Err(Error::Cancelled));
-        let owner = n.owner;
+        let owner = n.owner();
         s.remove_order(self.sequence);
-        s.restore_priority(owner);
+        if let Some(owner) = owner {
+            s.restore_priority(owner);
+        }
         self.domain.changed.notify_all();
         Ok(true)
     }
@@ -347,7 +366,10 @@ impl Actor {
                 .values()
                 .find(|n| n.caller == at && n.result.is_none())
             {
-                Some(n) => at = n.owner,
+                Some(n) => match n.owner() {
+                    Some(owner) => at = owner,
+                    None => break,
+                },
                 None => break,
             }
         }
@@ -359,7 +381,7 @@ impl Actor {
             sequence,
             Node {
                 caller: self.id,
-                owner: owner.id,
+                phase: Phase::Mutex(owner.id),
                 address,
                 result: None,
             },
@@ -395,7 +417,7 @@ impl Actor {
         let count = s
             .nodes
             .values()
-            .filter(|n| n.owner == self.id && n.address == address && n.result.is_none())
+            .filter(|n| n.owner() == Some(self.id) && n.address == address && n.result.is_none())
             .count();
         let next = if let Some((_, id)) = selected {
             d.validate(&s, &m, id)?;
@@ -407,8 +429,8 @@ impl Actor {
             .map_err(|_| Error::Memory)?;
         if let Some((seq, id)) = selected {
             for n in s.nodes.values_mut() {
-                if n.owner == self.id && n.address == address && n.result.is_none() {
-                    n.owner = id;
+                if n.owner() == Some(self.id) && n.address == address && n.result.is_none() {
+                    n.phase = Phase::Mutex(id);
                 }
             }
             s.nodes.get_mut(&seq).unwrap().result = Some(Ok(()));
@@ -429,16 +451,16 @@ impl Drop for Actor {
         let mut affected = Vec::new();
         let mut removed = Vec::new();
         for (&seq, n) in &mut s.nodes {
-            if n.result.is_none() && (n.owner == self.id || n.caller == self.id) {
+            if n.result.is_none() && (n.owner() == Some(self.id) || n.caller == self.id) {
                 n.result = Some(Err(Error::OwnerGone));
-                affected.push(n.owner);
+                affected.push(n.owner());
                 removed.push(seq);
             }
         }
         for seq in removed {
             s.remove_order(seq);
         }
-        for owner in affected {
+        for owner in affected.into_iter().flatten() {
             s.restore_priority(owner);
         }
         self.domain.changed.notify_all();
@@ -480,7 +502,9 @@ impl Drop for Wait<'_> {
         if let Some(n) = s.nodes.remove(&self.sequence) {
             s.remove_order(self.sequence);
             if n.result.is_none() {
-                s.restore_priority(n.owner);
+                if let Some(owner) = n.owner() {
+                    s.restore_priority(owner);
+                }
             }
         }
     }

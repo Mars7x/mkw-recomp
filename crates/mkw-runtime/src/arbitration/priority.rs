@@ -15,7 +15,7 @@ impl State {
                 for node in self
                     .nodes
                     .values()
-                    .filter(|n| n.owner == actor && n.result.is_none())
+                    .filter(|n| n.owner() == Some(actor) && n.result.is_none())
                 {
                     effective = effective.min(self.actors[&node.caller].priorities.effective);
                 }
@@ -30,7 +30,7 @@ impl State {
                 .nodes
                 .iter()
                 .find(|(_, n)| n.caller == actor && n.result.is_none())
-                .map(|(&s, n)| (s, n.owner));
+                .map(|(&s, n)| (s, n.owner()));
             let Some((sequence, owner)) = outgoing else {
                 return;
             };
@@ -39,6 +39,7 @@ impl State {
             }
             self.remove_order(sequence);
             self.order.push(sequence);
+            let Some(owner) = owner else { return };
             actor = owner;
             // prepare_wait rejects cycles; each actor has at most one outgoing
             // edge, so this loop is bounded by the configured actor capacity.
@@ -49,7 +50,9 @@ impl State {
             return self
                 .nodes
                 .iter()
-                .find(|(_, n)| n.owner == owner && n.address == address && n.result.is_none())
+                .find(|(_, n)| {
+                    n.owner() == Some(owner) && n.address == address && n.result.is_none()
+                })
                 .map(|(&s, n)| (s, n.caller));
         }
         // Iterator order breaks equal-priority ties; do not use the immutable
@@ -58,7 +61,7 @@ impl State {
             .iter()
             .filter_map(|&sequence| {
                 let n = &self.nodes[&sequence];
-                (n.owner == owner && n.address == address && n.result.is_none())
+                (n.owner() == Some(owner) && n.address == address && n.result.is_none())
                     .then_some((sequence, n.caller))
             })
             .min_by_key(|&(_, caller)| self.actors[&caller].priorities.effective)
