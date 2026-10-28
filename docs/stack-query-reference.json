@@ -1,0 +1,27 @@
+{
+  "repository": "Atmosphere-NX/Atmosphere",
+  "revision": "6b0c077b4c608a3a2ee712b8dc35fee87ceb62e8",
+  "sources": [
+    {
+      "path": "libraries/libmesosphere/source/svc/kern_svc_query_memory.cpp",
+      "sha256": "e8ffa31e13aeb51de726aaffb95c4e1133d6fd11bdac1bab18d0d5bb22acf684",
+      "bytes": 4717
+    },
+    {
+      "path": "libraries/libmesosphere/source/kern_k_page_table_base.cpp",
+      "sha256": "aea9660255586e28af4e1ab0a957341fd8240bd95a073d7919533ad279cde5fc",
+      "bytes": 253470
+    },
+    {
+      "path": "libraries/libvapours/include/vapours/svc/svc_types_base.hpp",
+      "sha256": "bf13f96e61fe5dd6a98e9f43a7a6a45c2431246b93801be66ba7bda13b7afb20"
+    },
+    {
+      "path": "libraries/libvapours/include/vapours/svc/svc_types_common.hpp",
+      "sha256": "2aa0c563c15f25aa3eb6522ce4b7d113428282e8a92ccd1d74cb80fb73db8144"
+    }
+  ],
+  "source_license": "GPL-2.0; private semantic reference only",
+  "implementation_copied_or_linked": false,
+  "actual_switch2_compatibility_verified": false
+}

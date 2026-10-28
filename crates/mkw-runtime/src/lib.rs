@@ -24,6 +24,7 @@ pub mod romfs_hle;
 #[cfg(target_os = "linux")]
 pub mod romfs_hooks;
 pub mod services;
+pub mod stack_query;
 pub mod table_event_services;
 pub mod thread_queries;
 pub mod thread_runner;
@@ -69,6 +70,11 @@ pub struct Memory {
     sealed: bool,
 }
 impl Memory {
+    pub(crate) fn exact_rw_region(&self, base: GuestAddr, size: usize) -> bool {
+        self.regions
+            .get(&base)
+            .is_some_and(|r| r.bytes.len() == size && r.permissions == Permissions::RW)
+    }
     pub fn map(
         &mut self,
         base: GuestAddr,

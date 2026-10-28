@@ -75,6 +75,14 @@ pub struct ExclusiveMemory {
     next_id: u64,
 }
 impl ExclusiveMemory {
+    pub(crate) fn stack_authority(&self, base: GuestAddr, size: usize) -> Option<Arc<()>> {
+        self.memory
+            .exact_rw_region(base, size)
+            .then(|| self.authority.clone())
+    }
+    pub(crate) fn has_authority(&self, authority: &Arc<()>) -> bool {
+        Arc::ptr_eq(&self.authority, authority)
+    }
     pub fn new(mut memory: Memory, config: Config) -> Result<Self, Error> {
         if config.granule < 16 || !config.granule.is_power_of_two() || config.max_owners == 0 {
             return Err(Error::Configuration);
