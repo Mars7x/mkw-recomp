@@ -50,6 +50,15 @@ pub struct Call<'a> {
     args: [u64; 8],
 }
 impl Call<'_> {
+    pub(crate) fn matches_owner(
+        &self,
+        memory: &Arc<std::sync::Mutex<crate::exclusive::ExclusiveMemory>>,
+        owner: &crate::exclusive::Owner,
+    ) -> bool {
+        Arc::ptr_eq(memory, &self.context.memory)
+            && self.context.owner.same_identity(owner)
+            && memory.lock().is_ok_and(|m| m.validate_owner(owner).is_ok())
+    }
     pub(crate) fn matches_memory(
         &self,
         memory: &Arc<std::sync::Mutex<crate::exclusive::ExclusiveMemory>>,

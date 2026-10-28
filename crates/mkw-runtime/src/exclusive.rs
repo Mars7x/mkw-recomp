@@ -59,6 +59,11 @@ pub struct Owner {
     authority: Arc<()>,
     id: u64,
 }
+impl Owner {
+    pub(crate) fn same_identity(&self, other: &Self) -> bool {
+        self.id == other.id && Arc::ptr_eq(&self.authority, &other.authority)
+    }
+}
 #[derive(Clone, Copy, Debug)]
 struct Reservation {
     address: GuestAddr,

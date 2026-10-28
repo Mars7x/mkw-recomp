@@ -61,15 +61,52 @@ pub struct ThreadQueries {
 struct Handler {
     table: Arc<Table>,
     number: u16,
+    current: Option<Arc<Current>>,
+}
+struct Current {
+    memory: Arc<std::sync::Mutex<crate::exclusive::ExclusiveMemory>>,
+    owner: crate::exclusive::Owner,
+    thread: Arc<ThreadIdentity>,
 }
 impl ThreadQueries {
     /// This fixed initial-priority reference profile is not a scheduler or
-    /// Switch 2 target authorization. Only explicit real table handles work;
-    /// current-thread/current-process pseudo resolution remains unsupported.
+    /// Switch 2 target authorization. The default registry resolves only real
+    /// table handles; current-thread resolution requires an explicit bridge
+    /// binding. Current-process pseudo resolution remains unsupported.
     pub fn new(_abi: Abi, table: Arc<Table>) -> Self {
         Self { table }
     }
     pub fn registry(&self) -> Services {
+        self.registry_with(None)
+    }
+    /// Pin a real registered thread to this bridge's live execution identity.
+    /// Only the current-thread pseudo handle gains resolution. Closing its
+    /// real handle does not destroy this pin. Dropping the bridge invalidates
+    /// it; a later bridge cannot inherit it, even over the same memory.
+    /// No host scheduling, SDK TLS initialization or entry arguments are set.
+    pub fn registry_for_current_thread(
+        &self,
+        bridge: &crate::exclusive_native::Bridge,
+        handle: Handle,
+    ) -> Result<Services, String> {
+        let thread = self
+            .table
+            .get::<ThreadIdentity>(handle)
+            .map_err(|e| format!("current thread handle: {e:?}"))?;
+        let context = bridge.context();
+        context
+            .memory
+            .lock()
+            .map_err(|_| "current thread memory poisoned")?
+            .validate_owner(&context.owner)
+            .map_err(|e| format!("current thread owner: {e:?}"))?;
+        Ok(self.registry_with(Some(Arc::new(Current {
+            memory: context.memory.clone(),
+            owner: context.owner.clone(),
+            thread,
+        }))))
+    }
+    fn registry_with(&self, current: Option<Arc<Current>>) -> Services {
         Services::new(
             [GET_PRIORITY, GET_ID]
                 .into_iter()
@@ -79,6 +116,7 @@ impl ThreadQueries {
                         Arc::new(Handler {
                             table: self.table.clone(),
                             number,
+                            current: current.clone(),
                         }) as Arc<dyn Service>,
                     )
                 })
@@ -90,20 +128,28 @@ impl ThreadQueries {
 impl Service for Handler {
     fn invoke(&self, call: &Call<'_>) -> Result<Reply, HostFault> {
         let handle = call.arguments()[1] as u32;
-        if matches!(handle, 0xffff8000 | 0xffff8001) {
+        if handle == 0xffff8001 {
             return Err(HostFault::unsupported());
         }
-        let object = match self.table.get::<ThreadIdentity>(Handle::from_raw(handle)) {
-            Ok(object) => object,
-            Err(Error::InvalidHandle | Error::WrongType) => {
-                // Explicit reference ABI: invalid handle clears the value output.
-                return Ok(Reply::Return(
-                    Outputs::default()
-                        .write_w(0, INVALID_HANDLE)?
-                        .write_x(1, 0)?,
-                ));
+        let object = if handle == 0xffff8000 {
+            let current = self.current.as_ref().ok_or_else(HostFault::unsupported)?;
+            if !call.matches_owner(&current.memory, &current.owner) {
+                return Err(HostFault::unsupported());
             }
-            Err(_) => return Err(HostFault::unsupported()),
+            current.thread.clone()
+        } else {
+            match self.table.get::<ThreadIdentity>(Handle::from_raw(handle)) {
+                Ok(object) => object,
+                Err(Error::InvalidHandle | Error::WrongType) => {
+                    // Explicit reference ABI: invalid handle clears the value output.
+                    return Ok(Reply::Return(
+                        Outputs::default()
+                            .write_w(0, INVALID_HANDLE)?
+                            .write_x(1, 0)?,
+                    ));
+                }
+                Err(_) => return Err(HostFault::unsupported()),
+            }
         };
         let output = Outputs::default().write_w(0, 0)?;
         let output = match self.number {

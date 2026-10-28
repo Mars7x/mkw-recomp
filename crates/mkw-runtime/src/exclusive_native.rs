@@ -44,6 +44,9 @@ pub struct Bridge {
     context: Box<Context>,
 }
 impl Bridge {
+    pub(crate) fn context(&self) -> &Context {
+        &self.context
+    }
     pub fn new(memory: Arc<Mutex<ExclusiveMemory>>) -> Result<Self, String> {
         let owner = memory
             .lock()
