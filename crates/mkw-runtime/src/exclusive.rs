@@ -66,6 +66,9 @@ pub struct Heap {
     spec: HeapSpec,
 }
 impl Heap {
+    pub(crate) fn authority(&self) -> &Arc<()> {
+        &self.authority
+    }
     pub fn spec(&self) -> HeapSpec {
         self.spec
     }

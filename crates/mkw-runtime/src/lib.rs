@@ -13,6 +13,7 @@ pub mod exclusive_native;
 pub mod floating;
 pub mod guarded;
 pub mod guarded_entry;
+pub mod heap_services;
 pub mod host_call;
 pub mod kernel_handles;
 mod linker;

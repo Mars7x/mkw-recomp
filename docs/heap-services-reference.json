@@ -1,0 +1,59 @@
+{
+  "repository": "Atmosphere-NX/Atmosphere",
+  "revision": "6b0c077b4c608a3a2ee712b8dc35fee87ceb62e8",
+  "sources": [
+    {
+      "path": "libraries/libmesosphere/include/mesosphere/board/nintendo/nx/kern_k_memory_layout.hpp",
+      "sha256": "45faca950384f2d8cb759ed0a4d55dadd5159aac0a0d6875d3bb098894ed1c21"
+    },
+    {
+      "path": "libraries/libmesosphere/include/mesosphere/kern_k_memory_layout.hpp",
+      "sha256": "a643b62d160642ac2ac62e60e691c6fb7a911c2d1ef6217f3d6557332727aa07"
+    },
+    {
+      "path": "libraries/libmesosphere/source/svc/kern_svc_physical_memory.cpp",
+      "sha256": "971c1ed96e38696ef1aa17ce447a279518378f7d658aaa6d736a5c5c6518d057"
+    },
+    {
+      "path": "libraries/libvapours/include/vapours/svc/codegen/impl/svc_codegen_impl_kernel_svc_wrapper.hpp",
+      "sha256": "65f67595f0da4d70b6e677f0dc2a148339a7d8b2f5626de00808db06b1b2d790"
+    },
+    {
+      "path": "libraries/libvapours/include/vapours/svc/codegen/impl/svc_codegen_impl_code_generator.hpp",
+      "sha256": "9ca8e8f76322a0cfcd7194a558034e9af0c680d1d5fdb36b5d51b3a35e59d043"
+    },
+    {
+      "path": "libraries/libvapours/include/vapours/svc/svc_definitions.hpp",
+      "sha256": "8f5c3156926788a9f52f673ecb354ed8de3647a721e1d54c8c60e41cebc6774a"
+    },
+    {
+      "path": "libraries/libvapours/include/vapours/svc/codegen/impl/svc_codegen_impl_layout_conversion.hpp",
+      "sha256": "467cc2a542a923eb2f70f17397547f21b024c05d346e26690376ddff03b83515"
+    },
+    {
+      "path": "libraries/libmesosphere/source/kern_k_page_table_base.cpp",
+      "sha256": "aea9660255586e28af4e1ab0a957341fd8240bd95a073d7919533ad279cde5fc",
+      "bytes": 253470
+    },
+    {
+      "path": "libraries/libvapours/include/vapours/svc/svc_types_common.hpp",
+      "sha256": "2aa0c563c15f25aa3eb6522ce4b7d113428282e8a92ccd1d74cb80fb73db8144"
+    },
+    {
+      "path": "libraries/libvapours/include/vapours/results/svc_results.hpp",
+      "blob": "7a01b56990875616ff428f9046866f951abd7709",
+      "sha256": "c12650fcee37730f6039da87b3f412714db850fb33c1ae6efe59da9eb4d8fa4f"
+    }
+  ],
+  "license": "GPL-2.0; private semantic reference only",
+  "copied_or_linked_implementation": false,
+  "register_error_reference": {
+    "repository": "seedds/nxnative",
+    "revision": "c8ab8166f68296dc712a4ec13b892535d9d790c6",
+    "path": "dm/host/hle_svc.c",
+    "sha256": "32749c27b438ff6b2eef9269b083e2001965d139c70a8ec287d1388283c4eb25",
+    "license": "MIT",
+    "role": "SVC 1 input X1 and error X1 preservation"
+  },
+  "actual_switch2_compatibility_verified": false
+}

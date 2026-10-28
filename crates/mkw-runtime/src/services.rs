@@ -7,13 +7,31 @@ use crate::{
 use std::{collections::BTreeMap, sync::Arc};
 pub const EXIT_THREAD: i32 = 9;
 const MAX_BYTES: usize = 1024 * 1024;
+struct HeapResize {
+    memory: Arc<std::sync::Mutex<crate::exclusive::ExclusiveMemory>>,
+    heap: crate::exclusive::Heap,
+    size: usize,
+}
 #[derive(Default)]
 pub struct Outputs {
     registers: [Option<u64>; 8],
     writes: Vec<(GuestAddr, Vec<u8>)>,
     bytes: usize,
+    heap_resize: Option<HeapResize>,
 }
 impl Outputs {
+    pub(crate) fn resize_heap(
+        mut self,
+        memory: Arc<std::sync::Mutex<crate::exclusive::ExclusiveMemory>>,
+        heap: crate::exclusive::Heap,
+        size: usize,
+    ) -> Result<Self, HostFault> {
+        if self.heap_resize.is_some() || !self.writes.is_empty() {
+            return Err(HostFault::unsupported());
+        }
+        self.heap_resize = Some(HeapResize { memory, heap, size });
+        Ok(self)
+    }
     pub fn write_x(mut self, index: usize, value: u64) -> Result<Self, HostFault> {
         let slot = self
             .registers
@@ -33,7 +51,7 @@ impl Outputs {
             .bytes
             .checked_add(bytes.len())
             .ok_or_else(HostFault::unsupported)?;
-        if self.writes.len() >= 32 || total > MAX_BYTES {
+        if self.heap_resize.is_some() || self.writes.len() >= 32 || total > MAX_BYTES {
             return Err(HostFault::unsupported());
         }
         self.bytes = total;
@@ -189,6 +207,16 @@ impl Services {
                     status: 5,
                     address: *address,
                 })?;
+        }
+        if let Some(effect) = &outputs.heap_resize {
+            // Resize and memory-output packets are disjoint. Validate namespace
+            // and capability before mutation; no later output range can fault.
+            if !writes.is_empty() || !Arc::ptr_eq(&effect.memory, &context.memory) {
+                return Err(HostFault::unsupported());
+            }
+            memory
+                .resize_heap(&effect.heap, effect.size)
+                .map_err(|_| HostFault::unsupported())?;
         }
         memory
             .write_batch(&writes)
