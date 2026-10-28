@@ -161,6 +161,13 @@ impl ExclusiveMemory {
     pub(crate) fn page_accounting(&self) -> Option<(u64, u64)> {
         self.memory.page_accounting()
     }
+    pub(crate) fn validate_region_layout(
+        &self,
+        layout: &crate::process_regions::Layout,
+        heap: &Heap,
+    ) -> bool {
+        self.heap_size(heap).is_ok() && self.memory.validate_region_layout(layout, heap.spec())
+    }
     pub(crate) fn has_authority(&self, authority: &Arc<()>) -> bool {
         Arc::ptr_eq(&self.authority, authority)
     }
