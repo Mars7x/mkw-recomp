@@ -95,6 +95,10 @@ pub struct Router<'code> {
     max_depth: u16,
 }
 impl<'code> Router<'code> {
+    pub fn module_base(&self, address: GuestAddr) -> Option<u64> {
+        self.targets.get(&address).map(|target| target.base)
+    }
+
     pub fn new(targets: Vec<Target<'code>>, max_depth: u16) -> Result<Self, String> {
         if !(1..=128).contains(&max_depth) {
             return Err("guarded depth must be1..128".into());
