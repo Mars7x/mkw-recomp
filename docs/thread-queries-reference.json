@@ -1,0 +1,32 @@
+{
+  "purpose": "semantic reference facts only; original Rust implementation; no copied/linked upstream implementation",
+  "references": [
+    {
+      "repository": "https://github.com/Atmosphere-NX/Atmosphere",
+      "revision": "6b0c077b4c608a3a2ee712b8dc35fee87ceb62e8",
+      "path": "libraries/libmesosphere/source/svc/kern_svc_thread.cpp",
+      "sha256": "f0e917d52bf184e9109fac52a92a000df45afb10fc85ebbc9599f8d11ee08a11",
+      "source_license": "GPL-2.0; retained privately; semantic facts only",
+      "implementation_copied_or_linked": false,
+      "actual_switch2_behavior_verified": false
+    },
+    {
+      "repository": "https://github.com/seedds/nxnative",
+      "revision": "c8ab8166f68296dc712a4ec13b892535d9d790c6",
+      "path": "dm/host/hle_thread.c",
+      "sha256": "89dc9c47e4aa21352e633f0bf8748ec276f512808b630455d128494ae05c7bcb",
+      "source_license": "MIT",
+      "role": "query register transport and zero value output on invalid handles"
+    },
+    {
+      "repository": "https://github.com/Atmosphere-NX/Atmosphere",
+      "revision": "6b0c077b4c608a3a2ee712b8dc35fee87ceb62e8",
+      "path": "libraries/libvapours/include/vapours/svc/svc_types_common.hpp",
+      "sha256": "2aa0c563c15f25aa3eb6522ce4b7d113428282e8a92ccd1d74cb80fb73db8144",
+      "source_license": "GPL-2.0; retained privately",
+      "role": "priority range 0..63"
+    }
+  ],
+  "actual_switch2_behavior_verified": false,
+  "implementation_copied_or_linked": false
+}

@@ -25,6 +25,7 @@ pub mod romfs_hle;
 pub mod romfs_hooks;
 pub mod services;
 pub mod table_event_services;
+pub mod thread_queries;
 pub mod thread_runner;
 pub use linker::LinkScopes;
 use mkw_formats::{Nso, Result};
