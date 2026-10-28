@@ -1,9 +1,11 @@
-# Owned FIFO arbitration backend
+# Owned arbitration backend
 
 `arbitration::Arbitration` supplies a bounded host API for blocking on tagged
-mutex words in the existing coherent memory authority. It is a prerequisite for
+mutex words in the existing coherent memory authority. FIFO remains the default;
+[logical priority inheritance](PRIORITY_ARBITRATION.md) is an explicit optional
+policy. It is a prerequisite for
 measured SDK critical-section slow paths, not a Horizon SVC implementation,
-scheduler, priority-inheritance model or verified Switch 2 runtime.
+scheduler or verified Switch 2 runtime.
 
 ## Explicit ownership and operations
 
@@ -20,7 +22,7 @@ Tickets block on a predicate using a condition variable, with the memory mutex
 released. Notifications before blocking cannot be lost. One actor cannot have
 multiple pending waits; dependency cycles reject before mutation.
 
-`unlock` chooses the earliest registered pending waiter belonging to this owner
+Under the default FIFO policy, `unlock` chooses the earliest registered pending waiter belonging to this owner
 and address. It writes the new owner's real tag, retains the waiter bit if needed,
 and transfers the remaining same-address waiters to that owner. All changes
 commit while both locks remain held. A foreign tag, invalid address, stale memory
@@ -52,9 +54,9 @@ is useful MIT reference material, but its direct host-pointer atomics, global
 wait queue and Darwin scheduling/context code cannot be transplanted into our
 checked x86-64 Linux memory authority. The pinned
 [kernel ownership semantics](https://github.com/Atmosphere-NX/Atmosphere/blob/6b0c077b4c608a3a2ee712b8dc35fee87ceb62e8/libraries/libmesosphere/source/kern_k_condition_variable.cpp)
-select waiters belonging to the current owner. Kernel priority inheritance,
+select waiters belonging to the current owner. Kernel scheduling integration,
 termination handling, address policy, write-failure delivery and SVC transaction
-integration require additional work. This backend explicitly chooses FIFO and
+integration require additional work. The default backend explicitly chooses FIFO and
 strong failure atomicity; it must not be registered as a full kernel service.
 Condition variables, guest clocks and deadlines are also outside its scope.
 

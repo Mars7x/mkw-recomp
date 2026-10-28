@@ -1,0 +1,33 @@
+{
+  "repository": "Atmosphere-NX/Atmosphere",
+  "revision": "6b0c077b4c608a3a2ee712b8dc35fee87ceb62e8",
+  "sources": [
+    {
+      "path": "libraries/libmesosphere/source/kern_k_thread.cpp",
+      "blob": "b2ec763027363e8388bd17b8d77d8c5f9bbb7a1f",
+      "sha256": "7ef3e82b3febeae55be135247dcf8c7afcd4a610207c7fcf7406c6254296696c",
+      "license": "GPL-2.0; private semantic reference only"
+    },
+    {
+      "path": "libraries/libmesosphere/include/mesosphere/kern_k_thread.hpp",
+      "blob": "429af04ec3785bdd19629a6b816da5edaaf7d5e2",
+      "sha256": "58888e7e1a95dc027e461d60c1ef21b541aabfb437669bd9f827659f528d9462",
+      "license": "GPL-2.0; private semantic reference only"
+    },
+    {
+      "path": "libraries/libvapours/include/vapours/util/util_intrusive_red_black_tree.hpp",
+      "blob": "0476fc9cc2caaada26f3ecbaabf615d43ad2922a",
+      "sha256": "e6af2cf05840db4dba25d4096a1c1c3dcddc7c5f66bfccef93af3f9063f47646",
+      "license": "GPL-2.0; private semantic reference only"
+    },
+    {
+      "path": "libraries/libvapours/include/vapours/freebsd/tree.hpp",
+      "blob": "cf0c3f452c75959720a01824aa61dba2ece10a62",
+      "sha256": "f9da09c052096fbe8d0c56dd0d5142a4e27d2a600a81194b0ab4e436daefe133",
+      "license": "BSD-2-Clause; Niels Provos 2002 notice retained privately"
+    }
+  ],
+  "purpose": "priority donation, restoration and equal-priority insertion semantic facts; source retained privately",
+  "implementation_copied_or_linked": false,
+  "actual_switch2_compatibility_verified": false
+}

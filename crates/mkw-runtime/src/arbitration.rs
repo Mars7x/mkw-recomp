@@ -1,5 +1,6 @@
-//! Explicit host FIFO arbitration over coherent memory. Not a Horizon SVC,
-//! scheduler, priority inheritance implementation or target configuration.
+//! Explicit host arbitration over coherent memory. Not a Horizon SVC, host
+//! scheduler or target configuration. Priority inheritance requires opt-in.
+mod priority;
 use crate::{
     exclusive::{ExclusiveMemory, Owner, Width},
     exclusive_native::{Attachment, Bridge, CpuV10},
@@ -13,6 +14,17 @@ use std::{
 };
 
 pub const WAITERS: u32 = 0x4000_0000;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Policy {
+    Fifo,
+    /// Logical priority donation and ordering only; no host scheduling changes.
+    InheritedPriority,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Priorities {
+    pub base: u8,
+    pub effective: u8,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
     Configuration,
@@ -33,6 +45,7 @@ pub enum Error {
     Poisoned,
 }
 struct Identity {
+    priorities: Priorities,
     owner: Owner,
     thread: Arc<ThreadIdentity>,
     tag: u32,
@@ -44,6 +57,8 @@ struct Node {
     result: Option<Result<(), Error>>,
 }
 struct State {
+    policy: Policy,
+    order: Vec<u64>,
     closed: bool,
     next: u64,
     actors: BTreeMap<u64, Identity>,
@@ -87,6 +102,9 @@ impl Cancellation {
             return Ok(false);
         }
         n.result = Some(Err(Error::Cancelled));
+        let owner = n.owner;
+        s.remove_order(self.sequence);
+        s.restore_priority(owner);
         self.domain.changed.notify_all();
         Ok(true)
     }
@@ -106,6 +124,13 @@ impl State {
 }
 impl Arbitration {
     pub fn new(memory: Arc<Mutex<ExclusiveMemory>>, limit: usize) -> Result<Arc<Self>, Error> {
+        Self::with_policy(memory, limit, Policy::Fifo)
+    }
+    pub fn with_policy(
+        memory: Arc<Mutex<ExclusiveMemory>>,
+        limit: usize,
+        policy: Policy,
+    ) -> Result<Arc<Self>, Error> {
         if limit == 0 || limit > 1024 {
             return Err(Error::Configuration);
         }
@@ -115,6 +140,8 @@ impl Arbitration {
             generation,
             limit,
             state: Mutex::new(State {
+                policy,
+                order: Vec::new(),
                 closed: false,
                 next: 1,
                 actors: BTreeMap::new(),
@@ -161,6 +188,10 @@ impl Arbitration {
         state.actors.insert(
             id,
             Identity {
+                priorities: Priorities {
+                    base: thread.initial_priority(),
+                    effective: thread.initial_priority(),
+                },
                 owner: context.owner.clone(),
                 thread,
                 tag: handle.raw(),
@@ -184,6 +215,10 @@ impl Arbitration {
             if n.result.is_none() {
                 n.result = Some(Err(Error::Shutdown));
             }
+        }
+        s.order.clear();
+        for a in s.actors.values_mut() {
+            a.priorities.effective = a.priorities.base;
         }
         self.changed.notify_all();
         Ok(())
@@ -210,6 +245,26 @@ impl Arbitration {
     }
 }
 impl Actor {
+    /// Domain-local logical values, independent of the initial query registry.
+    pub fn priorities(&self) -> Result<Priorities, Error> {
+        let s = self.domain.state.lock().map_err(|_| Error::Poisoned)?;
+        let m = self.domain.memory.lock().map_err(|_| Error::Poisoned)?;
+        self.domain.validate(&s, &m, self.id)?;
+        Ok(s.actors[&self.id].priorities)
+    }
+    /// Explicit host control, including for a blocked actor. No guest scheduling
+    /// permission, termination/pinning policy or host OS priority is inferred.
+    pub fn set_base_priority(&self, priority: u8) -> Result<(), Error> {
+        if priority > 63 {
+            return Err(Error::Configuration);
+        }
+        let mut s = self.domain.state.lock().map_err(|_| Error::Poisoned)?;
+        let m = self.domain.memory.lock().map_err(|_| Error::Poisoned)?;
+        self.domain.validate(&s, &m, self.id)?;
+        s.actors.get_mut(&self.id).unwrap().priorities.base = priority;
+        s.restore_priority(self.id);
+        Ok(())
+    }
     pub fn tag(&self) -> u32 {
         self.tag
     }
@@ -236,7 +291,7 @@ impl Actor {
     }
     /// Check and register under state->memory locks. Native atomics cannot race
     /// between the predicate read and queue insertion. A changed tag needs no wait.
-    /// This host profile uses real actor tags, FIFO, no deadlines and no PI.
+    /// Uses real actor tags and the explicitly selected ordering policy; no deadlines.
     pub fn prepare_wait(
         &self,
         owner: &Actor,
@@ -287,6 +342,10 @@ impl Actor {
                 result: None,
             },
         );
+        if s.policy == Policy::InheritedPriority {
+            s.order.push(sequence);
+        }
+        s.restore_priority(owner.id);
         Ok(Some(Wait {
             actor: self,
             sequence,
@@ -310,11 +369,7 @@ impl Actor {
         if word & !WAITERS != self.tag {
             return Err(Error::Ownership);
         }
-        let selected = s
-            .nodes
-            .iter()
-            .find(|(_, n)| n.owner == self.id && n.address == address && n.result.is_none())
-            .map(|(&seq, n)| (seq, n.caller));
+        let selected = s.select(self.id, address);
         let count = s
             .nodes
             .values()
@@ -335,6 +390,9 @@ impl Actor {
                 }
             }
             s.nodes.get_mut(&seq).unwrap().result = Some(Ok(()));
+            s.remove_order(seq);
+            s.restore_priority(self.id);
+            s.restore_priority(id);
         }
         d.changed.notify_all();
         Ok(())
@@ -346,10 +404,20 @@ impl Drop for Actor {
         // memory or resume successful work through a poisoned domain.
         let mut s = self.domain.state.lock().unwrap_or_else(|e| e.into_inner());
         s.actors.remove(&self.id);
-        for n in s.nodes.values_mut() {
+        let mut affected = Vec::new();
+        let mut removed = Vec::new();
+        for (&seq, n) in &mut s.nodes {
             if n.result.is_none() && (n.owner == self.id || n.caller == self.id) {
                 n.result = Some(Err(Error::OwnerGone));
+                affected.push(n.owner);
+                removed.push(seq);
             }
+        }
+        for seq in removed {
+            s.remove_order(seq);
+        }
+        for owner in affected {
+            s.restore_priority(owner);
         }
         self.domain.changed.notify_all();
     }
@@ -387,7 +455,12 @@ impl Drop for Wait<'_> {
             .state
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        s.nodes.remove(&self.sequence);
+        if let Some(n) = s.nodes.remove(&self.sequence) {
+            s.remove_order(self.sequence);
+            if n.result.is_none() {
+                s.restore_priority(n.owner);
+            }
+        }
     }
 }
 
