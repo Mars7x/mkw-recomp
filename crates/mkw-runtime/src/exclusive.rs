@@ -53,6 +53,23 @@ pub struct Config {
     pub granule: u64,
     pub max_owners: usize,
 }
+/// Explicit fixed address/capacity; no target address-space defaults are inferred.
+#[derive(Clone, Copy, Debug)]
+pub struct HeapSpec {
+    pub base: GuestAddr,
+    pub capacity: usize,
+}
+/// Capability for one owned heap reservation in one memory generation.
+#[derive(Clone)]
+pub struct Heap {
+    authority: Arc<()>,
+    spec: HeapSpec,
+}
+impl Heap {
+    pub fn spec(&self) -> HeapSpec {
+        self.spec
+    }
+}
 /// Identity is private and scoped to one authority, including after release/recreation.
 #[derive(Clone, Debug)]
 pub struct Owner {
@@ -80,6 +97,56 @@ pub struct ExclusiveMemory {
     next_id: u64,
 }
 impl ExclusiveMemory {
+    /// Reserve zeroed backing storage before sealing. Initially no heap bytes
+    /// are accessible. Ordinary mappings remain sealed; only this capability
+    /// can resize the reserved prefix. Capacity remains bounded by MAX_IMAGE.
+    pub fn with_heap(
+        mut memory: Memory,
+        config: Config,
+        spec: HeapSpec,
+    ) -> Result<(Self, Heap), Error> {
+        if config.granule < 16 || !config.granule.is_power_of_two() || config.max_owners == 0 {
+            return Err(Error::Configuration);
+        }
+        memory
+            .reserve_heap(spec.base, spec.capacity)
+            .map_err(Error::Memory)?;
+        let owned = Self::new(memory, config)?;
+        let heap = Heap {
+            authority: owned.authority.clone(),
+            spec,
+        };
+        Ok((owned, heap))
+    }
+    /// Grow/shrink only the explicit heap prefix under the coherent memory lock.
+    /// Retained bytes survive; changed bytes are zeroed. Reservations whose
+    /// granules overlap the changed span are invalidated, including ABA regrowth.
+    /// No SVC result, process policy or virtual-address layout is inferred.
+    pub fn resize_heap(&mut self, heap: &Heap, size: usize) -> Result<(), Error> {
+        if !Arc::ptr_eq(&self.authority, &heap.authority) {
+            return Err(Error::Owner);
+        }
+        let old = self
+            .memory
+            .resize_heap(heap.spec.base, heap.spec.capacity, size)
+            .map_err(Error::Memory)?;
+        if old != size {
+            let first = heap.spec.base.0 + old.min(size) as u64;
+            let last = heap.spec.base.0 + old.max(size) as u64 - 1;
+            let mask = self.config.granule - 1;
+            self.reservations
+                .retain(|_, r| last < r.granule || first > (r.granule | mask));
+        }
+        Ok(())
+    }
+    pub fn heap_size(&self, heap: &Heap) -> Result<usize, Error> {
+        if !Arc::ptr_eq(&self.authority, &heap.authority) {
+            return Err(Error::Owner);
+        }
+        self.memory
+            .heap_size(heap.spec.base, heap.spec.capacity)
+            .map_err(Error::Memory)
+    }
     pub(crate) fn stack_authority(&self, base: GuestAddr, size: usize) -> Option<Arc<()>> {
         self.memory
             .exact_rw_region(base, size)

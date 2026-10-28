@@ -9,7 +9,8 @@ The handler binds both the shared memory container and its private generation
 identity. Replacing the entire memory object inside the same mutex invalidates
 that binding. The existing service packet commit checks the call owner's identity
 again under the memory lock; replacement during a call cannot commit old-owner
-outputs into a new memory authority. Sealed mappings have no remap/resize API.
+outputs into a new memory authority. Fixed mappings remain sealed. The opt-in mutable heap capability cannot qualify
+as an immutable stack mapping, even when its current size matches.
 
 For X2 inside that stack, the handler writes a 40-byte little-endian MemoryInfo at
 X0: actual base/size, reference Stack state 11, attributes 0, RW permission 3,

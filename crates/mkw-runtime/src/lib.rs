@@ -63,6 +63,12 @@ struct Region {
     bytes: Vec<u8>,
     permissions: Permissions,
     name: String,
+    heap_visible: Option<usize>,
+}
+impl Region {
+    fn visible_len(&self) -> usize {
+        self.heap_visible.unwrap_or(self.bytes.len())
+    }
 }
 #[derive(Debug, Default)]
 pub struct Memory {
@@ -71,9 +77,9 @@ pub struct Memory {
 }
 impl Memory {
     pub(crate) fn exact_rw_region(&self, base: GuestAddr, size: usize) -> bool {
-        self.regions
-            .get(&base)
-            .is_some_and(|r| r.bytes.len() == size && r.permissions == Permissions::RW)
+        self.regions.get(&base).is_some_and(|r| {
+            r.heap_visible.is_none() && r.bytes.len() == size && r.permissions == Permissions::RW
+        })
     }
     pub fn map(
         &mut self,
@@ -107,6 +113,7 @@ impl Memory {
                 bytes,
                 permissions,
                 name: name.into(),
+                heap_visible: None,
             },
         );
         Ok(())
@@ -118,7 +125,7 @@ impl Memory {
             .next_back()
             .ok_or_else(|| format!("unmapped guest address {:#x}", at.0))?;
         let off = usize::try_from(at.0 - r.base.0).map_err(|_| "address offset overflow")?;
-        if off.checked_add(n).ok_or("access overflow")? > r.bytes.len() {
+        if off.checked_add(n).ok_or("access overflow")? > r.visible_len() {
             return Err(format!(
                 "guest access {:#x}+{n:#x} crosses {}",
                 at.0, r.name
@@ -163,7 +170,7 @@ impl Memory {
             } {
                 return Err("guest transfer permission violation".into());
             }
-            let count = (len - offset).min(r.bytes.len() - start);
+            let count = (len - offset).min(r.visible_len() - start);
             spans.push((r.base, start, count));
             offset += count;
         }
@@ -205,10 +212,71 @@ impl Memory {
         Ok(u64::from_le_bytes(self.read(at, 8)?.try_into().unwrap()))
     }
     pub fn mapped_bytes(&self) -> usize {
-        self.regions.values().map(|r| r.bytes.len()).sum()
+        self.regions.values().map(Region::visible_len).sum()
     }
     pub fn region_count(&self) -> usize {
-        self.regions.len()
+        self.regions
+            .values()
+            .filter(|r| r.visible_len() != 0)
+            .count()
+    }
+    pub(crate) fn reserve_heap(&mut self, base: GuestAddr, capacity: usize) -> Result<()> {
+        if self.sealed
+            || capacity == 0
+            || capacity > mkw_formats::MAX_IMAGE
+            || capacity % 4096 != 0
+            || base.0 % 4096 != 0
+        {
+            return Err("invalid explicit heap reservation".into());
+        }
+        let end = base.0.checked_add(capacity as u64).ok_or("heap overflow")?;
+        if self
+            .regions
+            .values()
+            .any(|r| base.0 < r.base.0 + r.bytes.len() as u64 && r.base.0 < end)
+        {
+            return Err("heap reservation overlaps owned memory".into());
+        }
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(capacity)
+            .map_err(|e| format!("heap reservation: {e}"))?;
+        bytes.resize(capacity, 0);
+        self.map(base, bytes, Permissions::RW, "explicit bounded heap")?;
+        self.regions
+            .get_mut(&base)
+            .expect("new reserved region")
+            .heap_visible = Some(0);
+        Ok(())
+    }
+    pub(crate) fn heap_size(&self, base: GuestAddr, capacity: usize) -> Result<usize> {
+        let r = self.regions.get(&base).ok_or("missing heap reservation")?;
+        if r.bytes.len() != capacity {
+            return Err("heap capacity mismatch".into());
+        }
+        r.heap_visible
+            .ok_or_else(|| "not a heap reservation".into())
+    }
+    pub(crate) fn resize_heap(
+        &mut self,
+        base: GuestAddr,
+        capacity: usize,
+        size: usize,
+    ) -> Result<usize> {
+        if size > capacity || size % 4096 != 0 {
+            return Err("heap size exceeds capacity or page alignment".into());
+        }
+        let r = self
+            .regions
+            .get_mut(&base)
+            .ok_or("missing heap reservation")?;
+        let old = r.heap_visible.ok_or("not a heap reservation")?;
+        if r.bytes.len() != capacity {
+            return Err("heap capacity mismatch".into());
+        }
+        r.bytes[old.min(size)..old.max(size)].fill(0);
+        r.heap_visible = Some(size);
+        Ok(old)
     }
 }
 #[derive(Debug)]
