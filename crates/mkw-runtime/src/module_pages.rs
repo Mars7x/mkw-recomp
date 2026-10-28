@@ -87,6 +87,34 @@ impl<'a> Plan<'a> {
         Ok(Self { mappings, bytes })
     }
 
+    /// Check that each planned module mapping still has its exact initial bytes,
+    /// zero BSS/padding, permissions and allocation extent. Additional mappings
+    /// (for example a stack) are allowed. This is a read-only, point-in-time
+    /// content check, not proof of load history, identity or execution authority.
+    /// In particular, recheck under the same ownership/lock as startup use.
+    pub fn verify_pristine(&self, memory: &Memory) -> Result<()> {
+        for mapping in &self.mappings {
+            let region = memory
+                .regions
+                .get(&mapping.base)
+                .ok_or("initial module mapping missing")?;
+            if region.heap_visible.is_some()
+                || region.bytes.len() != mapping.size
+                || region.permissions != mapping.permissions
+            {
+                return Err("initial module mapping extent or permissions differ".into());
+            }
+            if region.bytes[..mapping.payload.len()] != *mapping.payload
+                || region.bytes[mapping.payload.len()..]
+                    .iter()
+                    .any(|&b| b != 0)
+            {
+                return Err("module image differs from initial payload or zero fill".into());
+            }
+        }
+        Ok(())
+    }
+
     pub fn mapped_bytes(&self) -> u64 {
         self.bytes
     }
