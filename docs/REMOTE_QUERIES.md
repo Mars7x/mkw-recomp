@@ -1,0 +1,13 @@
+# Opt-in observed remote-region success protocol
+
+`ProcessMemory::with_observed_remote_region` enables GetInfo 29/30 only after a region profile has been explicitly configured. The combined process-query constructor exposes the same choice through `Nx64PrivateOwnedProcessWithObservedRemote64K`. All existing default profiles continue to refuse these queries.
+
+This is a bounded host adaptation of an observed successful consumer protocol. Fresh supplied static evidence shows a helper issuing 29, 29 and 30 with current-process handle and subtype zero, then constructing an allocator from the first address and the second address plus size, with 64 KiB alignment. It establishes how successful replies are consumed. It does not establish retail kernel bounds, negative-case behavior or full Switch 2 compatibility.
+
+The selected host profile requires a nonzero remote reservation whose base and size are multiples of 64 KiB. Existing region validation already requires a nonempty, disjoint span contained in the declared address space; combined process construction also checks the catalog, memory identity and enclosing ASLR domain. Opting in allocates no remote pages. Replacing the region configuration disables the selection and requires another explicit opt-in.
+
+Only low-32-bit InfoType 29/30, low-32-bit current-process handle and full-width subtype zero succeed. They return W0=0 and the configured base/size in full X1. Unknown handle/subtype cases remain host-unsupported without invented kernel result codes or zero fallback. Namespace, generation and live-owner checks apply before replies. Normal service completion and budget/monitor rules remain unchanged. A subsequent wrapper store can still fault after the query completes.
+
+Five additive tests pass in debug and release, using O0/O2 native compilation with fatal UBSan. They cover 64 request/refusal/budget traces, 32 wrapper/fault traces, default/reconfigured/foreign/stale/restricted profiles, zero or misaligned reservations and explicit combined-profile selection. Heap resizing leaves remote bounds fixed; accounting and optional entropy retain their existing behavior.
+
+A private synthetic native probe runs the observed 29/29/30 query sequence over four supplied page-mapped modules with explicitly configured host reservations. Together with existing catalog queries it completes 18 synthetic cases, retaining payload/zero-fill and relocation verification. No original function is executed or registered as a runtime target. This removes a host query dependency for the observed success path, but does not demonstrate initialization, boot or a frame. Actual target identity, launch/TLS/PAC configuration and further runtime dependencies remain unresolved.

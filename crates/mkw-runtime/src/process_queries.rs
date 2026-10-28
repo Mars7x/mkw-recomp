@@ -13,13 +13,17 @@ pub enum Abi {
     /// Private-page accounting and catalog queries with explicit reservations.
     /// Uses checked host output faults, not retail kernel error ordering.
     Nx64PrivateOwnedProcess,
+    /// Explicit host success protocol for remote GetInfo29/30. Requires a
+    /// nonzero 64KiB-aligned reservation; no retail error/bounds claim.
+    Nx64PrivateOwnedProcessWithObservedRemote64K,
 }
 /// Build GetInfo and QueryMemory together only when their capabilities refer to
 /// the same container/generation, address space and declared stack role. ASLR
 /// remains an explicit enclosing domain. This grants no execution authority and
-/// does not add remote-region queries, thread identity or a kernel resource model.
+/// adds remote queries only under the explicit observed-success variant. No
+/// thread identity or kernel resource model is supplied.
 pub fn registry(
-    _abi: Abi,
+    abi: Abi,
     budget: OwnedMemoryBudget,
     regions: ProcessRegions,
     catalog: MemoryCatalog,
@@ -41,6 +45,12 @@ pub fn registry(
     let info = ProcessMemory::new(process_memory::Abi::Nx64IsolatedPrivatePages, budget)
         .with_regions(regions, aslr)
         .map_err(|e| format!("process region configuration: {e:?}"))?;
+    let info = match abi {
+        Abi::Nx64PrivateOwnedProcess => info,
+        Abi::Nx64PrivateOwnedProcessWithObservedRemote64K => info
+            .with_observed_remote_region()
+            .map_err(|e| format!("observed remote region configuration: {e:?}"))?,
+    };
     let info = match entropy {
         Some(e) => info.registry_with_entropy(e),
         None => info.registry(),

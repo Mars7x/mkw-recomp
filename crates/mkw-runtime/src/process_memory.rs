@@ -22,6 +22,7 @@ pub enum Abi {
 pub struct ProcessMemory {
     budget: OwnedMemoryBudget,
     regions: Option<(ProcessRegions, Span)>,
+    observed_remote: bool,
 }
 struct Handler {
     memory: ProcessMemory,
@@ -32,11 +33,12 @@ impl ProcessMemory {
         Self {
             budget,
             regions: None,
+            observed_remote: false,
         }
     }
     /// Add the NX reference region queries under the same GetInfo handler.
     /// ASLR is an explicit enclosing domain, not the code reservation. All five
-    /// host reservations must fit it. Remote queries remain unsupported.
+    /// host reservations must fit it. Remote queries require a separate explicit opt-in.
     pub fn with_regions(
         mut self,
         regions: ProcessRegions,
@@ -60,6 +62,20 @@ impl ProcessMemory {
             return Err(RegionError::Configuration);
         }
         self.regions = Some((regions, aslr));
+        self.observed_remote = false;
+        Ok(self)
+    }
+    /// Opt into the supplied consumer's remote-address/size success protocol.
+    /// This is host configuration, not retail bounds/error semantics. Only
+    /// current-process/subtype-zero queries are supported. Replacing regions
+    /// disables this selection and requires a fresh explicit opt-in.
+    pub fn with_observed_remote_region(mut self) -> Result<Self, RegionError> {
+        let (regions, _) = self.regions.as_ref().ok_or(RegionError::Configuration)?;
+        let remote = regions.snapshot()?.remote;
+        if remote.base.0 == 0 || remote.base.0 % 65536 != 0 || remote.size % 65536 != 0 {
+            return Err(RegionError::Configuration);
+        }
+        self.observed_remote = true;
         Ok(self)
     }
     pub fn registry(&self) -> Services {
@@ -101,6 +117,30 @@ impl Service for Handler {
                 .as_ref()
                 .ok_or_else(HostFault::unsupported)?
                 .invoke(call),
+            29 | 30 => {
+                // No unverified kernel error codes or generic zero fallback.
+                if !self.memory.observed_remote || args[2] as u32 != CURRENT_PROCESS || args[3] != 0
+                {
+                    return Err(HostFault::unsupported());
+                }
+                let (regions, _) = self
+                    .memory
+                    .regions
+                    .as_ref()
+                    .ok_or_else(HostFault::unsupported)?;
+                let remote = regions
+                    .snapshot()
+                    .map_err(|_| HostFault::unsupported())?
+                    .remote;
+                let value = if args[1] as u32 == 29 {
+                    remote.base.0
+                } else {
+                    remote.size
+                };
+                Ok(Reply::Return(
+                    Outputs::default().write_w(0, 0)?.write_x(1, value)?,
+                ))
+            }
             2..=5 | 12..=15 | TOTAL_NON_SYSTEM | USED_NON_SYSTEM => {
                 let region_value = match args[1] as u32 {
                     2..=5 | 12..=15 => {
