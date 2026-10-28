@@ -39,7 +39,26 @@ impl Drop for WriteEnd {
         let _ = self.backend.close(self.handle);
     }
 }
+#[derive(Debug, PartialEq, Eq)]
+pub enum PollError {
+    Configuration,
+    MixedAuthorities,
+    Event(events::Error),
+}
 impl ReadEnd {
+    /// All entries must already be pinned and typed. A common event authority
+    /// supplies one atomic first-ready snapshot; independent authorities refuse.
+    pub fn poll_same_authority(reads: &[Arc<Self>]) -> Result<Option<usize>, PollError> {
+        if reads.is_empty() || reads.len() > 64 {
+            return Err(PollError::Configuration);
+        }
+        let first = &reads[0].backend;
+        if reads.iter().any(|r| !Arc::ptr_eq(first, &r.backend)) {
+            return Err(PollError::MixedAuthorities);
+        }
+        let handles = reads.iter().map(|r| r.handle).collect::<Vec<_>>();
+        first.poll(&handles).map_err(PollError::Event)
+    }
     pub fn reset(&self) -> Result<(), events::Error> {
         self.backend.reset(self.handle)
     }
@@ -58,6 +77,7 @@ impl WriteEnd {
         self.backend.clear(self.handle)
     }
 }
+#[derive(Clone)]
 pub struct Factory {
     backend: Arc<Events>,
 }

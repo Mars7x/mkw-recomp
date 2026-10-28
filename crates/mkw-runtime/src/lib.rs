@@ -15,11 +15,13 @@ pub mod host_call;
 pub mod kernel_handles;
 mod linker;
 pub mod owned_events;
+pub mod process_entropy;
 #[cfg(target_os = "linux")]
 pub mod romfs_hle;
 #[cfg(target_os = "linux")]
 pub mod romfs_hooks;
 pub mod services;
+pub mod table_event_services;
 pub mod thread_runner;
 pub use linker::LinkScopes;
 use mkw_formats::{Nso, Result};

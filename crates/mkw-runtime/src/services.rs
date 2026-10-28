@@ -105,6 +105,18 @@ impl Services {
         }
         Ok(Self { handlers })
     }
+    /// Combine explicitly configured registries without overriding any handler.
+    /// Duplicate numbers or the existing 256-handler quota reject the entire
+    /// result. Compose first, then apply the final process allowlist separately.
+    pub fn combined(&self, other: &Self) -> Result<Self, String> {
+        Self::new(
+            self.handlers
+                .iter()
+                .chain(other.handlers.iter())
+                .map(|(&number, handler)| (number, handler.clone()))
+                .collect(),
+        )
+    }
     /// Return a view containing only already registered handlers whose numbers
     /// are explicitly allowed. This can remove capabilities, never add them.
     /// The caller must separately authenticate/authorize any target policy.

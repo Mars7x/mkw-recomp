@@ -1,0 +1,38 @@
+{
+  "repository": "https://github.com/Atmosphere-NX/Atmosphere",
+  "revision": "6b0c077b4c608a3a2ee712b8dc35fee87ceb62e8",
+  "purpose": "semantic facts only; no implementation adoption",
+  "sources": {
+    "libraries/libmesosphere/source/svc/kern_svc_info.cpp": {
+      "blob": "8b51c7fba5bff77f4c8b88c45ddb59507f3678e6",
+      "sha256": "aeac97ae4b7dcbf5a895338f0f2cc6838c3b2e2c80912c0d6c89d10011e624ae"
+    },
+    "libraries/libvapours/include/vapours/svc/svc_types_base.hpp": {
+      "blob": "0fee6810271b23735391a53830eb9911439c510f",
+      "sha256": "bf13f96e61fe5dd6a98e9f43a7a6a45c2431246b93801be66ba7bda13b7afb20"
+    },
+    "libraries/libvapours/include/vapours/svc/svc_types_common.hpp": {
+      "blob": "52e105ed37ea4456c1f10ed059fa32ed1eb14d01",
+      "sha256": "2aa0c563c15f25aa3eb6522ce4b7d113428282e8a92ccd1d74cb80fb73db8144"
+    },
+    "libraries/libmesosphere/include/mesosphere/kern_k_process.hpp": {
+      "blob": "dcc66f7d5698586481a2b6c0955292445e452930",
+      "sha256": "377bf202a7a92588b43d1d99c73e629f2f0b7d38c807fe571c6cc6270af9d27b"
+    },
+    "libraries/libmesosphere/source/kern_k_process.cpp": {
+      "blob": "35648a37ac9a1ba2675dc1f994b7559e210593f2",
+      "sha256": "27aac55af2aa1b4ae86d6d91ab8af7a997396910ea762b329f2a1b36ed60f6bc"
+    },
+    "libraries/libvapours/include/vapours/results/svc_results.hpp": {
+      "blob": "7a01b56990875616ff428f9046866f951abd7709",
+      "sha256": "c12650fcee37730f6039da87b3f412714db850fb33c1ae6efe59da9eb4d8fa4f"
+    },
+    "libraries/libvapours/include/vapours/svc/svc_common.hpp": {
+      "blob": "0227e9bfcb9052e01b75459fdb41f2f939693acc",
+      "sha256": "c3f03b33dc88df48aed295a215320977d9e287f611d71a744977b689061a4881"
+    }
+  },
+  "reference_source_license": "GPL-2.0; retained privately",
+  "implementation_copied_or_linked": false,
+  "actual_switch2_behavior_verified": false
+}
