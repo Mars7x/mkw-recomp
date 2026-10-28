@@ -29,6 +29,9 @@ pub struct OwnedMemoryBudget {
     allowance: u64,
 }
 impl OwnedMemoryBudget {
+    pub(crate) fn matches_call(&self, call: &crate::services::Call<'_>) -> bool {
+        call.matches_memory(&self.memory, &self.authority)
+    }
     /// Bind to one sealed memory generation. All mappings must have page-exact
     /// bases and sizes; no guessed rounding, alias deduplication or external
     /// resource consumption is modeled. Reserve enough allowance for the full
