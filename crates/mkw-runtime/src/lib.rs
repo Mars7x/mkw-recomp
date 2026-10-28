@@ -19,6 +19,7 @@ pub mod host_call;
 pub mod kernel_handles;
 mod linker;
 pub mod memory_catalog;
+pub mod memory_query;
 pub mod module_pages;
 pub mod owned_events;
 pub mod owned_memory_budget;

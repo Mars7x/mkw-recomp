@@ -45,6 +45,13 @@ pub struct MemoryCatalog {
     declarations: Vec<Declaration>,
 }
 impl MemoryCatalog {
+    pub(crate) fn address_space(&self) -> Span {
+        self.address_space
+    }
+    pub(crate) fn matches_call(&self, call: &crate::services::Call<'_>) -> bool {
+        call.matches_memory(&self.memory, &self.authority)
+    }
+
     /// Every fixed mapping must have one exact declaration. Hidden heap backing
     /// reserves addresses but is Free until committed. The declared address
     /// space must contain all backing, including the entire heap capacity.
