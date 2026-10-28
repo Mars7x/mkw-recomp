@@ -39,6 +39,29 @@ Four new tests pass focused debug/release checks with O0/O2 fatal UBSan:
   QEMU has its own PAC keys/profile; this is transport evidence, not a Horizon
   TLS initialization or Switch 2 compatibility oracle.
 
+## Entry with an existing arbitration actor
+
+`Actor::run_guarded` uses the same entry/storage validation, frame setup, scoped
+PAC/router attachments and return checks with the actor's existing bridge and
+memory. It does not allocate another monitor owner. Actor attachment rechecks
+liveness, generation and pending-wait state before entering native code. A mutable
+actor borrow prevents concurrent entry through the same actor.
+
+This allows an actor-bound arbitration service registry to compose with guarded
+entry. Foreign actor registries still refuse. Return, fault, budget exhaustion
+and preflight rejection retain the actor and its owner; dropping the actor remains
+responsible for its lifetime. The default `guarded_entry::run` still creates and
+releases a fresh bridge. Neither path initializes SDK TLS or grants original-code
+execution authority. Storage ownership across concurrent actors remains the
+caller's responsibility.
+
+Three additive tests cover ten O0/O2 blocking PAC/SVC budget combinations,
+36 storage/entry preflight refusals, repeated successful entry with the owner
+quota full, foreign service identity, shutdown/stale generation, and completed
+service effects surviving budget exhaustion or wrong return. Synthetic C uses
+fatal UBSan. Existing entry tests, including QEMU PAC/thread-register transport,
+remain unchanged and required.
+
 ## Measured remaining boundary
 
 A private all-instruction audit of the 16 previously compiled normal/proof

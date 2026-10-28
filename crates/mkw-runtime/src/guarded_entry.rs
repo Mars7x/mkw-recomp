@@ -39,6 +39,28 @@ pub fn run(
     pac: &Backend<'_>,
     worker: Worker,
 ) -> Result<Outcome, String> {
+    run_with(memory, None, router, services, pac, worker)
+}
+
+pub(crate) fn run_actor(
+    memory: Arc<Mutex<ExclusiveMemory>>,
+    actor: &mut crate::arbitration::Actor,
+    router: &Router<'_>,
+    services: &Services,
+    pac: &Backend<'_>,
+    worker: Worker,
+) -> Result<Outcome, String> {
+    run_with(memory, Some(actor), router, services, pac, worker)
+}
+
+fn run_with(
+    memory: Arc<Mutex<ExclusiveMemory>>,
+    actor: Option<&mut crate::arbitration::Actor>,
+    router: &Router<'_>,
+    services: &Services,
+    pac: &Backend<'_>,
+    worker: Worker,
+) -> Result<Outcome, String> {
     let module_base = router
         .module_base(worker.entry)
         .ok_or("unregistered guarded entry")?;
@@ -76,7 +98,13 @@ pub fn run(
             }
         }
     }
-    let mut bridge = Bridge::new(memory)?;
+    // Actor entries retain their existing owner. Fresh entries still reserve
+    // exactly one owner, only after all entry/storage validation succeeds.
+    let mut bridge = if actor.is_none() {
+        Some(Bridge::new(memory)?)
+    } else {
+        None
+    };
     let mut cpu = CpuV10::default();
     cpu.base.x[..8].copy_from_slice(&worker.arguments);
     cpu.base.x[30] = worker.return_pc.0;
@@ -87,7 +115,10 @@ pub fn run(
     let mut budget = worker.budget;
     let status = {
         let mut auth = pac.attach(&mut cpu);
-        let mut attachment = bridge.attach(auth.cpu_mut())?;
+        let mut attachment = match actor {
+            Some(actor) => actor.attach(auth.cpu_mut())?,
+            None => bridge.as_mut().unwrap().attach(auth.cpu_mut())?,
+        };
         let mut routed = Routed::attach(&mut attachment, router, services)?;
         routed.run(worker.entry, &mut budget)?
     };

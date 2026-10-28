@@ -266,6 +266,27 @@ impl Actor {
         s.restore_priority(self.id);
         Ok(())
     }
+    /// Run a registered trusted synthetic guarded entry using this actor's
+    /// existing bridge owner and memory. Reuses guarded entry's storage, PAC,
+    /// routing and return checks; no SDK initialization or original-execution
+    /// authority is supplied. Completed effects survive faults/budget exits.
+    /// The actor remains live afterward, including after a refused entry.
+    pub fn run_guarded(
+        &mut self,
+        router: &crate::guarded::Router<'_>,
+        services: &crate::services::Services,
+        pac: &crate::pauth::Backend<'_>,
+        worker: crate::thread_runner::Worker,
+    ) -> Result<crate::thread_runner::Outcome, String> {
+        crate::guarded_entry::run_actor(
+            self.domain.memory.clone(),
+            self,
+            router,
+            services,
+            pac,
+            worker,
+        )
+    }
     pub fn tag(&self) -> u32 {
         self.tag
     }
