@@ -17,22 +17,40 @@ pub struct Outputs {
     registers: [Option<u64>; 8],
     writes: Vec<(GuestAddr, Vec<u8>)>,
     bytes: usize,
-    heap_resize: Option<HeapResize>,
+    heap_resize: Option<Box<HeapResize>>,
+    arbitration: Option<Box<crate::arbitration::svc::Intent>>,
 }
 impl Outputs {
+    pub(crate) fn arbitrate(
+        mut self,
+        intent: crate::arbitration::svc::Intent,
+    ) -> Result<Self, HostFault> {
+        if self.arbitration.is_some()
+            || self.heap_resize.is_some()
+            || !self.writes.is_empty()
+            || self.registers.iter().any(Option::is_some)
+        {
+            return Err(HostFault::unsupported());
+        }
+        self.arbitration = Some(Box::new(intent));
+        Ok(self)
+    }
     pub(crate) fn resize_heap(
         mut self,
         memory: Arc<std::sync::Mutex<crate::exclusive::ExclusiveMemory>>,
         heap: crate::exclusive::Heap,
         size: usize,
     ) -> Result<Self, HostFault> {
-        if self.heap_resize.is_some() || !self.writes.is_empty() {
+        if self.arbitration.is_some() || self.heap_resize.is_some() || !self.writes.is_empty() {
             return Err(HostFault::unsupported());
         }
-        self.heap_resize = Some(HeapResize { memory, heap, size });
+        self.heap_resize = Some(Box::new(HeapResize { memory, heap, size }));
         Ok(self)
     }
     pub fn write_x(mut self, index: usize, value: u64) -> Result<Self, HostFault> {
+        if self.arbitration.is_some() {
+            return Err(HostFault::unsupported());
+        }
         let slot = self
             .registers
             .get_mut(index)
@@ -51,7 +69,11 @@ impl Outputs {
             .bytes
             .checked_add(bytes.len())
             .ok_or_else(HostFault::unsupported)?;
-        if self.heap_resize.is_some() || self.writes.len() >= 32 || total > MAX_BYTES {
+        if self.arbitration.is_some()
+            || self.heap_resize.is_some()
+            || self.writes.len() >= 32
+            || total > MAX_BYTES
+        {
             return Err(HostFault::unsupported());
         }
         self.bytes = total;
@@ -188,6 +210,17 @@ impl Services {
             Reply::Return(o) => o,
             Reply::ThreadExit => &empty,
         };
+        if let Some(intent) = &outputs.arbitration {
+            // This typed commit owns state->memory lock ordering and may wait
+            // with memory released. Never call it under the ordinary memory guard.
+            if outputs.heap_resize.is_some()
+                || !outputs.writes.is_empty()
+                || outputs.registers.iter().any(Option::is_some)
+            {
+                return Err(HostFault::unsupported());
+            }
+            return intent.execute(context, registers);
+        }
         let writes: Vec<_> = outputs
             .writes
             .iter()

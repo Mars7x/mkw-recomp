@@ -1,6 +1,7 @@
 //! Explicit host arbitration over coherent memory. Not a Horizon SVC, host
 //! scheduler or target configuration. Priority inheritance requires opt-in.
 mod priority;
+pub mod svc;
 use crate::{
     exclusive::{ExclusiveMemory, Owner, Width},
     exclusive_native::{Attachment, Bridge, CpuV10},

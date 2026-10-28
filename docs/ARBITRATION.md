@@ -5,7 +5,9 @@ mutex words in the existing coherent memory authority. FIFO remains the default;
 [logical priority inheritance](PRIORITY_ARBITRATION.md) is an explicit optional
 policy. It is a prerequisite for
 measured SDK critical-section slow paths, not a Horizon SVC implementation,
-scheduler or verified Switch 2 runtime.
+scheduler or verified Switch 2 runtime. A separate, explicitly selected
+[bounded SVC reference binding](ARBITRATION_SVC.md) now uses this mechanism;
+its kernel-result semantics do not replace the host API contracts.
 
 ## Explicit ownership and operations
 
