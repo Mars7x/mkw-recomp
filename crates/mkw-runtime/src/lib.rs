@@ -26,6 +26,7 @@ pub mod owned_memory_budget;
 pub mod pauth;
 pub mod process_entropy;
 pub mod process_memory;
+pub mod process_queries;
 pub mod process_regions;
 #[cfg(target_os = "linux")]
 pub mod romfs_hle;

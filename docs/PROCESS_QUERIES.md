@@ -1,0 +1,13 @@
+# Consistent owned process-query configuration
+
+`process_queries::registry` constructs GetInfo and QueryMemory together from an owned budget, region reservations, memory-state catalog, explicit ASLR span and optional entropy source. It reuses the existing checked handlers. Individual constructors and default registries remain unchanged.
+
+The new constructor rejects capabilities with different memory containers or generations. The catalog address space must exactly match the region address space. Each fixed Stack declaration must fit the stack reservation; every other fixed declaration must fit the code reservation. Thus independently valid declarations cannot silently assign stack semantics to a data mapping in another reservation. Existing region construction validates physical mapping containment and heap identity; existing catalog construction validates declaration completeness and permissions.
+
+Catalog freshness, zero-based QueryMemory profile requirements and enclosing ASLR constraints are checked by the existing constructors. No handler is returned on failure. Invocation retains namespace/generation/live-owner checks, instruction budgets, output packet rules and duplicate-service rejection. Optional entropy is dispatched by the existing single GetInfo entry; absence remains unsupported. No new query numbers, target defaults, guessed bounds or original-execution permissions are introduced.
+
+This explicitly selected private-page host configuration is not a retail kernel resource model. Remote-region queries, actual TLS/boot/PAC configuration and full initialization closure remain unresolved. QueryMemory continues to use checked host faults for invalid output memory rather than claiming kernel result ordering.
+
+Three additive tests pass in debug and release. Seven constructor cases reject foreign capabilities, inconsistent address spaces, incompatible mapping roles and invalid ASLR bounds. Native O0/O2 tests with fatal UBSan perform 168 composed query/budget traces across three heap sizes, plus context/allowlist refusals and absent-entropy checks. They compare visible heap state, used-memory accounting, heap reservation capacity and ASLR bounds while preserving existing test suites.
+
+A private supplied-input probe constructs the combined profile over four module page images and a synthetic stack, then runs fifteen synthetic native metadata queries. Payload/zero-fill and relocation verification remain intact. Only synthetic routes execute; state assignments, bounds and allowance are explicit host configuration. Compiler survey coverage is expected to remain unchanged.

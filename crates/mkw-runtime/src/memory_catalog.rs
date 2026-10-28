@@ -45,6 +45,23 @@ pub struct MemoryCatalog {
     declarations: Vec<Declaration>,
 }
 impl MemoryCatalog {
+    pub(crate) fn matches_budget(
+        &self,
+        budget: &crate::owned_memory_budget::OwnedMemoryBudget,
+    ) -> bool {
+        budget.matches_binding(&self.memory, &self.authority)
+    }
+    pub(crate) fn agrees_with_regions(&self, layout: crate::process_regions::Layout) -> bool {
+        self.address_space == layout.address_space
+            && self.declarations.iter().all(|d| {
+                if d.state == State::Stack {
+                    layout.stack.contains(d.span)
+                } else {
+                    layout.code.contains(d.span)
+                }
+            })
+    }
+
     pub(crate) fn address_space(&self) -> Span {
         self.address_space
     }
