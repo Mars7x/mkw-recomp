@@ -1,6 +1,7 @@
 //! Owned checked guest memory, relocation planning and explicit native/HLE bridges.
 //! Original startup remains gated; no instruction-fetch interpreter or raw guest-pointer casts.
 pub mod abi;
+pub mod arbitration;
 pub mod atomics;
 pub mod bridge;
 pub mod dispatch;

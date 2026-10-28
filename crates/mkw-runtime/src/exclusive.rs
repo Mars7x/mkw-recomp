@@ -155,6 +155,9 @@ impl ExclusiveMemory {
             .exact_rw_region(base, size)
             .then(|| self.authority.clone())
     }
+    pub(crate) fn authority(&self) -> Arc<()> {
+        self.authority.clone()
+    }
     pub(crate) fn has_authority(&self, authority: &Arc<()>) -> bool {
         Arc::ptr_eq(&self.authority, authority)
     }

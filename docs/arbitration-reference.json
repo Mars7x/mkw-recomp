@@ -1,0 +1,32 @@
+{
+  "repository": "Atmosphere-NX/Atmosphere",
+  "revision": "6b0c077b4c608a3a2ee712b8dc35fee87ceb62e8",
+  "sources": [
+    {
+      "path": "libraries/libmesosphere/source/kern_k_condition_variable.cpp",
+      "blob": "2e2d47d5039bdc84d676b727c37a5c1b39776013",
+      "sha256": "6eaf1b66ee068b255bbfeb663c073608a8ec99bd5d4e3ee298fa1bf17c37b962"
+    },
+    {
+      "path": "libraries/libmesosphere/source/svc/kern_svc_condition_variable.cpp",
+      "blob": "aebe884435bf5c592df64bbc900e91c2f53fb6da",
+      "sha256": "a15a5abc47fd4d9a3dc7319bc1663ee45413bffa1ef8d1ebe91d1b640660a66d"
+    },
+    {
+      "path": "libraries/libmesosphere/source/svc/kern_svc_lock.cpp",
+      "blob": "9ada8d0fc19ef6e898777171b148377497cfde8f",
+      "sha256": "31cf68a292c42a90333ba266ad37b5533d17e0719506258ccd9321dee44bbf57"
+    }
+  ],
+  "license": "GPL-2.0; private semantic reference only",
+  "copied_or_linked_implementation": false,
+  "actual_switch2_compatibility_verified": false,
+  "upstream_runtime_comparison": {
+    "repository": "seedds/nxnative",
+    "revision": "c8ab8166f68296dc712a4ec13b892535d9d790c6",
+    "path": "dm/host/hle_thread.c",
+    "sha256": "89dc9c47e4aa21352e633f0bf8748ec276f512808b630455d128494ae05c7bcb",
+    "license": "MIT",
+    "role": "wait queue and handoff comparison; no implementation copied"
+  }
+}
