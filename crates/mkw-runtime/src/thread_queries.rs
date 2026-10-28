@@ -63,6 +63,11 @@ struct Handler {
     number: u16,
     current: Option<Arc<Current>>,
 }
+pub(crate) type ActorBinding = (
+    Arc<std::sync::Mutex<crate::exclusive::ExclusiveMemory>>,
+    crate::exclusive::Owner,
+    Arc<ThreadIdentity>,
+);
 struct Current {
     memory: Arc<std::sync::Mutex<crate::exclusive::ExclusiveMemory>>,
     owner: crate::exclusive::Owner,
@@ -103,6 +108,22 @@ impl ThreadQueries {
         Ok(self.registry_with(Some(Arc::new(Current {
             memory: context.memory.clone(),
             owner: context.owner.clone(),
+            thread,
+        }))))
+    }
+    /// Bind current-thread queries to the actor's existing pinned identity and
+    /// bridge owner. Its original real handle must still resolve in this table
+    /// at construction. Later handle closure preserves the current-thread pin.
+    /// Priority replies remain the explicit initial-priority reference profile,
+    /// not the actor's dynamic effective scheduling priority.
+    pub fn registry_for_actor(
+        &self,
+        actor: &crate::arbitration::Actor,
+    ) -> Result<Services, String> {
+        let (memory, owner, thread) = actor.query_binding(&self.table)?;
+        Ok(self.registry_with(Some(Arc::new(Current {
+            memory,
+            owner,
             thread,
         }))))
     }

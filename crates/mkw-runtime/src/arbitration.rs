@@ -266,6 +266,33 @@ impl Arbitration {
     }
 }
 impl Actor {
+    pub(crate) fn query_binding(
+        &self,
+        table: &Table,
+    ) -> Result<crate::thread_queries::ActorBinding, String> {
+        let thread = table
+            .get::<ThreadIdentity>(Handle::from_raw(self.tag))
+            .map_err(|e| format!("actor query handle: {e:?}"))?;
+        let state = self
+            .domain
+            .state
+            .lock()
+            .map_err(|_| "arbitration state poisoned")?;
+        let memory = self
+            .domain
+            .memory
+            .lock()
+            .map_err(|_| "arbitration memory poisoned")?;
+        self.domain
+            .validate(&state, &memory, self.id)
+            .map_err(|e| format!("actor query binding: {e:?}"))?;
+        let identity = &state.actors[&self.id];
+        if !Arc::ptr_eq(&thread, &identity.thread) {
+            return Err("actor query thread identity differs".into());
+        }
+        Ok((self.domain.memory.clone(), identity.owner.clone(), thread))
+    }
+
     /// Domain-local logical values, independent of the initial query registry.
     pub fn priorities(&self) -> Result<Priorities, Error> {
         let s = self.domain.state.lock().map_err(|_| Error::Poisoned)?;
