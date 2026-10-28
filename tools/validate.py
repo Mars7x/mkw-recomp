@@ -34,8 +34,9 @@ def run(label, command, *, cwd=ROOT, required=True):
 run('format', ['cargo', 'fmt', '--all', '--', '--check'])
 run('lint', ['cargo', 'clippy', '--workspace', '--all-targets', '--offline', '--locked', '--', '-D', 'warnings'])
 run('unit and native semantic tests', ['cargo', 'test', '--workspace', '--offline', '--locked'])
-run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks', '--test', 'thread_runner', '--test', 'services', '--test', 'events', '--test', 'event_services', '--test', 'event_poll', '--test', 'service_permissions', '--test', 'kernel_handles', '--test', 'kernel_handles_native', '--test', 'process_entropy', '--test', 'table_event_services'])
+run('exclusive-memory release semantic tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-runtime', '--lib', '--test', 'exclusive_memory', '--test', 'exclusive_native', '--test', 'exclusive_entry', '--test', 'exclusive_lifting', '--test', 'exclusive_calls', '--test', 'romfs_hle', '--test', 'romfs_hooks', '--test', 'thread_runner', '--test', 'services', '--test', 'events', '--test', 'event_services', '--test', 'event_poll', '--test', 'service_permissions', '--test', 'kernel_handles', '--test', 'kernel_handles_native', '--test', 'process_entropy', '--test', 'table_event_services', '--test', 'terminal_proofs'])
 run('kernel capability facts release tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-formats', '--test', 'capabilities'])
+run('immutable terminal proof release tests', ['cargo', 'test', '--release', '--offline', '--locked', '-p', 'mkw-arm64', '--test', 'terminal_proofs'])
 run('native synthetic demo', ['cargo', 'run', '--release', '--offline', '--locked', '--', 'aot-demo'])
 binary = ROOT / 'target/release/mkw-recomp'
 header = run('native ELF header', ['readelf', '-h', str(ROOT / 'private/builds/synthetic/aot-demo')])
@@ -65,6 +66,17 @@ if args.game:
     results[-1]['expectation_met'] = True
     run('supplied FDE lifting and native object samples', [str(binary), 'cpu-survey', str(game)])
     run('bounded native sample evidence', [sys.executable, str(ROOT / 'tools/check_survey_samples.py')])
+    run('immutable terminal source evidence', [str(binary), 'terminal-proof-check', str(game)])
+    source_proofs = json.loads((ROOT / 'private/analysis/terminal-source-proof-summary.json').read_text())
+    source_strict = json.loads((ROOT / 'private/analysis/cpu-survey-summary.json').read_text())
+    if ({m['module']: (m['indexed_extents'], m['strict_accepted']) for m in source_proofs['modules']}
+            != {m['module']: (m['fde_extents'], m['subset_liftable_functions']) for m in source_strict['modules']}
+            or any(source_proofs[k] for k in ['compiler_acceptance_changed', 'game_code_generated',
+                'game_code_executed', 'runtime_guards_installed', 'target_profile_verified',
+                'imports_or_cross_image_facts_supported'])
+            or any(m['checked_return_free_candidates'] != m['certified_local_closed_control']
+                   for m in source_proofs['modules'])):
+        raise SystemExit('Source proof checks changed admission/generation/execution or left candidates unverified')
     run('explicit exclusive-v10 conditional compiler survey', [str(binary), 'cpu-survey-exclusive-v10', str(game)])
     explicit = json.loads((ROOT / 'private/analysis/cpu-exclusive-v10/summary.json').read_text())
     strict = json.loads((ROOT / 'private/analysis/cpu-survey-summary.json').read_text())

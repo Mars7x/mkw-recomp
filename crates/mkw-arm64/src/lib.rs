@@ -9,12 +9,14 @@ pub mod memory;
 pub mod simd;
 pub mod simd_shift;
 pub mod structures;
+pub mod terminal;
 pub mod vector_compare;
 pub mod vector_fp;
 pub mod vector_integer;
 use serde::Serialize;
 pub const SOURCE_INPUTS: &[&str] = &[
     include_str!("lib.rs"),
+    include_str!("terminal.rs"),
     include_str!("memory.rs"),
     include_str!("bitops.rs"),
     include_str!("integer.rs"),

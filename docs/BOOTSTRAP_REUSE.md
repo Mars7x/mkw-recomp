@@ -13,3 +13,7 @@ Whole-module or 100% survey coverage is not required before runtime work. The us
 A host phase supervisor could potentially retain all validated callbacks and constructor order while using accepted phase entries, shortening the path around the rejected Start body. That would change the bootstrap architecture and must be explained before implementation. It cannot silently omit rtld state, constructors, finalizers or TLS registration. No such supervisor or wholesale runtime replacement is implemented here. The checked AOT/memory/PAC core, existing correctness tests and original-execution gates remain intact.
 
 The inspected upstream source is [LAS main.c](https://github.com/peiikai/LASRecomp/blob/a4b53a3fc5e91bf101367063bafe45017dc23335/runtime/main.c) and [nxnative main.c](https://github.com/seedds/nxnative/blob/c8ab8166f68296dc712a4ec13b892535d9d790c6/dm/host/main.c), both at the already audited revisions. Their title-specific startup assumptions are source evidence, not demonstrated Mario Kart World compatibility.
+
+## Local source evidence foundation
+
+[TERMINAL_PROOFS.md](TERMINAL_PROOFS.md) adds immutable local control evidence and certifies 21 existing closed bodies without changing lifting or adding runtime guards. The measured startup roots still reject under current admission. Import/cross-image assumptions are explicitly unsupported by this first verifier; the much larger private terminal-call candidate count remains counterfactual, not accepted coverage. This proof foundation precedes any compiler or bootstrap change.
